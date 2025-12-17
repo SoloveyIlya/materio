@@ -21,8 +21,14 @@ class TaskController extends Controller
     {
         $user = $request->user();
         
-        $query = Task::where('assigned_to', $user->id)
-            ->with(['category', 'template']);
+        // Получаем задачи, где пользователь назначен напрямую или через TaskAssignment
+        $query = Task::where(function ($q) use ($user) {
+                $q->where('assigned_to', $user->id)
+                  ->orWhereHas('assignments', function ($assignmentQuery) use ($user) {
+                      $assignmentQuery->where('assigned_to', $user->id);
+                  });
+            })
+            ->with(['category', 'template', 'assignments']);
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -53,8 +59,10 @@ class TaskController extends Controller
 
     public function show(Task $task, Request $request): JsonResponse
     {
-        // Проверяем, что таск принадлежит текущему пользователю
-        if ($task->assigned_to !== $request->user()->id) {
+        $user = $request->user();
+        
+        // Проверяем, что таск принадлежит текущему пользователю (напрямую или через TaskAssignment)
+        if (!$task->isAssignedTo($user->id)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -63,7 +71,10 @@ class TaskController extends Controller
 
     public function start(Task $task, Request $request): JsonResponse
     {
-        if ($task->assigned_to !== $request->user()->id) {
+        $user = $request->user();
+        
+        // Проверяем, что таск принадлежит текущему пользователю (напрямую или через TaskAssignment)
+        if (!$task->isAssignedTo($user->id)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -74,13 +85,22 @@ class TaskController extends Controller
         $task->update([
             'status' => 'in_progress',
         ]);
+        
+        // Обновляем started_at в TaskAssignment, если есть
+        $assignment = $task->assignments()->where('assigned_to', $user->id)->first();
+        if ($assignment && !$assignment->started_at) {
+            $assignment->update(['started_at' => now()]);
+        }
 
-        return response()->json($task);
+        return response()->json($task->fresh()->load(['category', 'template', 'assignments']));
     }
 
     public function complete(Task $task, Request $request): JsonResponse
     {
-        if ($task->assigned_to !== $request->user()->id) {
+        $user = $request->user();
+        
+        // Проверяем, что таск принадлежит текущему пользователю (напрямую или через TaskAssignment)
+        if (!$task->isAssignedTo($user->id)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -92,8 +112,14 @@ class TaskController extends Controller
             'status' => 'completed',
             'completed_at' => now(),
         ]);
+        
+        // Обновляем completed_at в TaskAssignment, если есть
+        $assignment = $task->assignments()->where('assigned_to', $user->id)->first();
+        if ($assignment && !$assignment->completed_at) {
+            $assignment->update(['completed_at' => now()]);
+        }
 
-        return response()->json($task);
+        return response()->json($task->fresh()->load(['category', 'template', 'assignments']));
     }
 
     public function getCurrentWorkDay(Request $request): JsonResponse

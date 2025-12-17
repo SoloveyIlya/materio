@@ -63,5 +63,14 @@ class Task extends Model
     {
         return $this->hasMany(TaskAssignment::class);
     }
+
+    /**
+     * Проверяет, назначена ли задача пользователю (напрямую или через TaskAssignment)
+     */
+    public function isAssignedTo(int $userId): bool
+    {
+        return $this->assigned_to === $userId || 
+               $this->assignments()->where('assigned_to', $userId)->exists();
+    }
 }
 

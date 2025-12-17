@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@components/*": ["./src/components/*"],
+      "@layouts/*": ["./src/@layouts/*"],
+      "@views/*": ["./src/views/*"],
+      "@core/*": ["./src/@core/*"],
+      "@assets/*": ["./src/assets/*"],
+      "@configs/*": ["./src/configs/*"],
+      "@menu/*": ["./src/@menu/*"],
+      "@data/*": ["./src/data/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@hocs/*": ["./src/hocs/*"],
+      "@libs/*": ["./src/libs/*"],
+      "@redux-store/*": ["./src/redux-store/*"],
+      "@fake-db/*": ["./src/fake-db/*"]
+    }
+  },
+  "include": ["src/**/*", "next-env.d.ts"],
+  "exclude": ["node_modules"]
+}

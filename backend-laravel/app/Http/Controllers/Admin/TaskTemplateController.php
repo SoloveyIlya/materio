@@ -11,9 +11,15 @@ class TaskTemplateController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $domainId = $request->user()->domain_id;
+        $user = $request->user();
         
-        $query = TaskTemplate::where('domain_id', $domainId)
+        if (!$user->domain_id) {
+            return response()->json([
+                'message' => 'User domain not set'
+            ], 400);
+        }
+        
+        $query = TaskTemplate::where('domain_id', $user->domain_id)
             ->with('category');
 
         if ($request->has('category_id')) {
@@ -31,6 +37,14 @@ class TaskTemplateController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $user = $request->user();
+        
+        if (!$user->domain_id) {
+            return response()->json([
+                'message' => 'User domain not set'
+            ], 400);
+        }
+        
         $validated = $request->validate([
             'category_id' => 'required|exists:task_categories,id',
             'title' => 'required|string|max:255',
@@ -45,20 +59,28 @@ class TaskTemplateController extends Controller
         ]);
 
         $template = TaskTemplate::create([
-            'domain_id' => $request->user()->domain_id,
+            'domain_id' => $user->domain_id,
             ...$validated,
         ]);
 
         return response()->json($template->load('category'), 201);
     }
 
-    public function show(TaskTemplate $taskTemplate): JsonResponse
+    public function show(Request $request, TaskTemplate $taskTemplate): JsonResponse
     {
+        if ($taskTemplate->domain_id !== $request->user()->domain_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        
         return response()->json($taskTemplate->load('category'));
     }
 
     public function update(Request $request, TaskTemplate $taskTemplate): JsonResponse
     {
+        if ($taskTemplate->domain_id !== $request->user()->domain_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        
         $validated = $request->validate([
             'category_id' => 'required|exists:task_categories,id',
             'title' => 'required|string|max:255',
@@ -77,8 +99,12 @@ class TaskTemplateController extends Controller
         return response()->json($taskTemplate->load('category'));
     }
 
-    public function destroy(TaskTemplate $taskTemplate): JsonResponse
+    public function destroy(Request $request, TaskTemplate $taskTemplate): JsonResponse
     {
+        if ($taskTemplate->domain_id !== $request->user()->domain_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        
         $taskTemplate->delete();
 
         return response()->json(['message' => 'Template deleted successfully']);

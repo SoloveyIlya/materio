@@ -18,6 +18,13 @@ class User extends Authenticatable
         'password',
         'timezone',
         'work_start_date',
+        'ip_address',
+        'user_agent',
+        'location',
+        'platform',
+        'last_seen_at',
+        'is_online',
+        'administrator_id',
     ];
 
     protected $hidden = [
@@ -31,6 +38,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'work_start_date' => 'date',
+            'last_seen_at' => 'datetime',
+            'is_online' => 'boolean',
         ];
     }
 
@@ -79,6 +88,26 @@ class User extends Authenticatable
         $now = \Carbon\Carbon::now($this->timezone ?? 'UTC');
         
         return $startDate->diffInDays($now) + 1; // День 1, 2, 3...
+    }
+
+    public function administrator()
+    {
+        return $this->belongsTo(User::class, 'administrator_id');
+    }
+
+    public function moderators()
+    {
+        return $this->hasMany(User::class, 'administrator_id');
+    }
+
+    public function tasks()
+    {
+        return $this->hasMany(Task::class, 'assigned_to');
+    }
+
+    public function activityLogs()
+    {
+        return $this->hasMany(ActivityLog::class);
     }
 }
 

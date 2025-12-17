@@ -1,0 +1,101 @@
+.table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.table :global(thead) {
+  text-transform: uppercase;
+  color: var(--mui-palette-text-primary);
+}
+
+.table :global(thead) :global(th) {
+  font-weight: 500;
+  font-size: 0.8125rem;
+  letter-spacing: 0.2px;
+  line-height: 1.8462;
+  text-align: start;
+  block-size: 56px;
+  background-color: var(--mui-palette-customColors-tableHeaderBg);
+}
+
+.table :global(thead) :global(th[align='right']) :global(*) {
+  text-align: end;
+}
+
+.table :global(thead) :global(th[align='center']) :global(*) {
+  text-align: center;
+}
+
+.table :global(thead) :global(th:not(:first-of-type):not(:last-of-type)) {
+  padding-block: 0.5rem;
+  padding-inline: 1rem;
+}
+
+.table :global(thead) :global(th:first-of-type:not(:has(input[type='checkbox']))) {
+  padding-block: 0.5rem;
+  padding-inline: 1.25rem 1rem;
+}
+
+.table :global(thead) :global(th:first-of-type:has(input[type='checkbox'])) {
+  padding-inline-start: 0.6875rem;
+}
+
+.table :global(thead) :global(th:last-of-type) {
+  padding-block: 0.5rem;
+  padding-inline: 1rem 1.25rem;
+}
+
+.table :global(tbody) {
+  color: var(--mui-palette-text-secondary);
+}
+
+.table :global(tbody) :global(th),
+.table :global(tbody) :global(td) {
+  font-size: 0.9375rem;
+  line-height: 1.4667;
+  block-size: 50px;
+}
+
+.table :global(tbody) :global(th:not(:first-of-type):not(:last-of-type)),
+.table :global(tbody) :global(td:not(:first-of-type):not(:last-of-type)) {
+  padding-block: 0.5rem;
+  padding-inline: 1rem;
+}
+
+.table :global(tbody) :global(th:first-of-type:not(:has(input[type='checkbox']))),
+.table :global(tbody) :global(td:first-of-type:not(:has(input[type='checkbox']))) {
+  padding-block: 0.5rem;
+  padding-inline: 1.25rem 1rem;
+}
+
+.table :global(tbody) :global(th:first-of-type:has(input[type='checkbox'])),
+.table :global(tbody) :global(td:first-of-type:has(input[type='checkbox'])) {
+  padding-inline-start: 0.6875rem;
+}
+
+.table :global(tbody) :global(th:last-of-type),
+.table :global(tbody) :global(td:last-of-type) {
+  padding-block: 0.5rem;
+  padding-inline: 1rem 1.25rem;
+}
+
+.table :global(tbody) :global(tr:not(:last-child)) {
+  border-block-end: 1px solid var(--border-color);
+}
+
+.cellWithInput :global(input) {
+  inline-size: 100%;
+  background-color: transparent;
+  font-size: inherit;
+  color: inherit;
+  border-radius: var(--mui-shape-customBorderRadius-sm);
+  padding-block: 6px;
+  padding-inline: 10px;
+  margin-inline: -10px;
+}
+
+.cellWithInput :global(input:focus-visible) {
+  outline: 1px solid var(--mui-palette-primary-main);
+}

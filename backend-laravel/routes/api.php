@@ -1,9 +1,16 @@
 <?php
 
+use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\DocumentationCategoryController;
+use App\Http\Controllers\Admin\DocumentationPageController;
 use App\Http\Controllers\Admin\TaskCategoryController;
 use App\Http\Controllers\Admin\TaskTemplateController;
+use App\Http\Controllers\Admin\ToolController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Moderator\DocumentationController;
 use App\Http\Controllers\Moderator\TaskController;
+use App\Http\Controllers\Moderator\ToolController as ModeratorToolController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
@@ -18,16 +25,36 @@ Route::prefix('auth')->group(function () {
 });
 
 // Admin routes
-Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
+Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->group(function () {
     // Task Categories
     Route::apiResource('task-categories', TaskCategoryController::class);
     
     // Task Templates
     Route::apiResource('task-templates', TaskTemplateController::class);
+
+    // Documentation
+    Route::apiResource('documentation-categories', DocumentationCategoryController::class);
+    Route::apiResource('documentation-pages', DocumentationPageController::class);
+
+    // Tools
+    Route::apiResource('tools', ToolController::class);
+
+    // Users
+    Route::get('/users', [UserController::class, 'index']);
+    Route::get('/users/{user}', [UserController::class, 'show']);
+    Route::put('/users/{user}', [UserController::class, 'update']);
+    Route::post('/users/{user}/send-test-task', [UserController::class, 'sendTestTask']);
+
+    // Moderators (алиас для users с фильтром)
+    Route::get('/moderators', [UserController::class, 'index']);
+
+    // Activity Logs
+    Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+    Route::get('/activity-logs/{activityLog}', [ActivityLogController::class, 'show']);
 });
 
 // Moderator routes
-Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator'])->group(function () {
+Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activity'])->group(function () {
     // Tasks
     Route::get('/tasks', [TaskController::class, 'index']);
     Route::post('/tasks/start-work', [TaskController::class, 'startWork']);
@@ -35,4 +62,13 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator'])->grou
     Route::post('/tasks/{task}/start', [TaskController::class, 'start']);
     Route::post('/tasks/{task}/complete', [TaskController::class, 'complete']);
     Route::get('/work-day', [TaskController::class, 'getCurrentWorkDay']);
+
+    // Documentation
+    Route::get('/documentation/categories', [DocumentationController::class, 'categories']);
+    Route::get('/documentation/categories/{category}', [DocumentationController::class, 'category']);
+    Route::get('/documentation/pages/{page}', [DocumentationController::class, 'page']);
+
+    // Tools
+    Route::get('/tools', [ModeratorToolController::class, 'index']);
+    Route::get('/tools/{tool}', [ModeratorToolController::class, 'show']);
 });

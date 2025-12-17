@@ -14,11 +14,26 @@ class RoleMiddleware
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        $userRoles = $request->user()->roles->pluck('name')->toArray();
+        $user = $request->user();
+        
+        // Загружаем роли, если они не загружены
+        if (!$user->relationLoaded('roles')) {
+            $user->load('roles');
+        }
+        
+        $userRoles = $user->roles->pluck('name')->toArray();
+        
+        // Логирование для отладки (можно убрать в продакшене)
+        \Log::debug('RoleMiddleware check', [
+            'user_id' => $user->id,
+            'user_roles' => $userRoles,
+            'required_roles' => $roles,
+            'has_access' => !empty(array_intersect($roles, $userRoles))
+        ]);
         
         if (empty(array_intersect($roles, $userRoles))) {
             return response()->json([
-                'message' => 'Unauthorized. Required roles: ' . implode(', ', $roles)
+                'message' => 'Unauthorized. Required roles: ' . implode(', ', $roles) . '. Your roles: ' . implode(', ', $userRoles ?: ['none'])
             ], 403);
         }
 

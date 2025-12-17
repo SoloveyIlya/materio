@@ -1,4 +1,3 @@
-# Admin Panel
 
 Админ-панель с backend на Laravel и frontend на Next.js.
 

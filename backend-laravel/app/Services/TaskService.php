@@ -72,9 +72,22 @@ class TaskService
         }
 
         $domainId = $moderator->domain_id;
+        
+        // Получаем шаблоны, которые подходят для текущего дня:
+        // 1. Шаблоны без work_day (null) - универсальные, создаются для любого дня
+        // 2. Шаблоны с work_day равным текущему дню
+        // 3. Шаблоны с work_day меньше текущего дня (если еще не были созданы)
         $templates = TaskTemplate::where('domain_id', $domainId)
-            ->where('work_day', $workDay)
             ->where('is_active', true)
+            ->where(function ($query) use ($workDay) {
+                $query->whereNull('work_day') // Универсальные шаблоны
+                      ->orWhere('work_day', $workDay) // Для текущего дня
+                      ->orWhere(function ($q) use ($workDay) {
+                          // Для прошедших дней, если еще не созданы
+                          $q->where('work_day', '<', $workDay)
+                            ->where('work_day', '>', 0);
+                      });
+            })
             ->get();
 
         $assignedTasks = [];
@@ -85,11 +98,16 @@ class TaskService
                 continue;
             }
 
+            // Определяем work_day для создаваемого таска
+            // Если у шаблона есть work_day, используем его, иначе используем текущий день
+            $taskWorkDay = $template->work_day ?? $workDay;
+
             // Проверяем, не существует ли уже такой таск
+            // Для универсальных шаблонов (work_day = null) проверяем, не был ли создан таск из этого шаблона для текущего дня
             $existingTask = Task::where('domain_id', $domainId)
                 ->where('assigned_to', $moderator->id)
                 ->where('template_id', $template->id)
-                ->where('work_day', $workDay)
+                ->where('work_day', $taskWorkDay)
                 ->first();
 
             if (!$existingTask) {
@@ -104,7 +122,7 @@ class TaskService
                     'completion_hours' => $template->completion_hours,
                     'guides_links' => $template->guides_links,
                     'attached_services' => $template->attached_services,
-                    'work_day' => $workDay,
+                    'work_day' => $taskWorkDay,
                     'status' => 'pending',
                     'assigned_at' => Carbon::now(),
                 ]);

@@ -11,6 +11,7 @@ class DocumentationCategory extends Model
 
     protected $fillable = [
         'domain_id',
+        'parent_id',
         'name',
         'slug',
         'description',
@@ -26,9 +27,19 @@ class DocumentationCategory extends Model
         return $this->belongsTo(Domain::class);
     }
 
+    public function parent()
+    {
+        return $this->belongsTo(DocumentationCategory::class, 'parent_id');
+    }
+
+    public function children()
+    {
+        return $this->hasMany(DocumentationCategory::class, 'parent_id')->orderBy('order');
+    }
+
     public function pages()
     {
-        return $this->hasMany(DocumentationPage::class);
+        return $this->hasMany(DocumentationPage::class, 'category_id')->orderBy('order');
     }
 }
 

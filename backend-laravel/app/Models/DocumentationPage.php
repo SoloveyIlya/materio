@@ -15,6 +15,10 @@ class DocumentationPage extends Model
         'title',
         'slug',
         'content',
+        'images',
+        'videos',
+        'related_task_categories',
+        'related_tasks',
         'order',
         'is_published',
     ];
@@ -22,6 +26,10 @@ class DocumentationPage extends Model
     protected $casts = [
         'order' => 'integer',
         'is_published' => 'boolean',
+        'images' => 'array',
+        'videos' => 'array',
+        'related_task_categories' => 'array',
+        'related_tasks' => 'array',
     ];
 
     public function domain()
@@ -32,6 +40,16 @@ class DocumentationPage extends Model
     public function category()
     {
         return $this->belongsTo(DocumentationCategory::class);
+    }
+
+    public function relatedTaskCategories()
+    {
+        return $this->belongsToMany(TaskCategory::class, 'documentation_page_task_category', 'documentation_page_id', 'task_category_id');
+    }
+
+    public function relatedTasks()
+    {
+        return $this->belongsToMany(Task::class, 'documentation_page_task', 'documentation_page_id', 'task_id');
     }
 }
 

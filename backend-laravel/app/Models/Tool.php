@@ -11,6 +11,7 @@ class Tool extends Model
 
     protected $fillable = [
         'domain_id',
+        'guide_id',
         'name',
         'slug',
         'description',
@@ -27,6 +28,11 @@ class Tool extends Model
     public function domain()
     {
         return $this->belongsTo(Domain::class);
+    }
+
+    public function guide()
+    {
+        return $this->belongsTo(DocumentationPage::class, 'guide_id');
     }
 }
 
