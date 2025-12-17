@@ -67,3 +67,75 @@ install: ## Первоначальная установка (создать .env
 	@echo "Frontend: http://localhost:3000"
 	@echo "Backend: http://localhost:8000"
 
+# Production commands
+up-prod: ## Запустить все сервисы в production режиме
+	@if [ ! -f .env.production ]; then \
+		echo "Ошибка: файл .env.production не найден!"; \
+		echo "Скопируйте env.production.example в .env.production и заполните значениями"; \
+		exit 1; \
+	fi
+	docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+
+down-prod: ## Остановить все сервисы production
+	docker-compose -f docker-compose.prod.yml --env-file .env.production down
+
+build-prod: ## Пересобрать контейнеры для production
+	@if [ ! -f .env.production ]; then \
+		echo "Ошибка: файл .env.production не найден!"; \
+		echo "Скопируйте env.production.example в .env.production и заполните значениями"; \
+		exit 1; \
+	fi
+	docker-compose -f docker-compose.prod.yml --env-file .env.production build --no-cache
+
+restart-prod: ## Перезапустить все сервисы production
+	docker-compose -f docker-compose.prod.yml --env-file .env.production restart
+
+logs-prod: ## Показать логи всех сервисов production
+	docker-compose -f docker-compose.prod.yml --env-file .env.production logs -f
+
+logs-backend-prod: ## Показать логи backend production
+	docker-compose -f docker-compose.prod.yml --env-file .env.production logs -f backend
+
+logs-frontend-prod: ## Показать логи frontend production
+	docker-compose -f docker-compose.prod.yml --env-file .env.production logs -f frontend
+
+ps-prod: ## Показать статус контейнеров production
+	docker-compose -f docker-compose.prod.yml --env-file .env.production ps
+
+shell-backend-prod: ## Открыть shell в backend контейнере production
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec backend sh
+
+shell-frontend-prod: ## Открыть shell в frontend контейнере production
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec frontend sh
+
+migrate-prod: ## Выполнить миграции в production
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan migrate --force
+
+artisan-prod: ## Выполнить artisan команду в production (использование: make artisan-prod CMD="route:list")
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan $(CMD)
+
+optimize-prod: ## Оптимизировать Laravel для production
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan config:cache
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan route:cache
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan view:cache
+
+install-prod: ## Первоначальная установка для production
+	@if [ ! -f .env.production ]; then \
+		echo "Ошибка: файл .env.production не найден!"; \
+		echo "Скопируйте env.production.example в .env.production и заполните значениями"; \
+		exit 1; \
+	fi
+	@echo "Установка проекта для production..."
+	docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+	@echo "Ожидание запуска сервисов..."
+	sleep 15
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan key:generate --force || true
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan migrate --force
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan config:cache
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan route:cache
+	docker-compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan view:cache
+	@echo "Установка для production завершена!"
+
+clean-prod: ## Остановить и удалить все контейнеры, volumes и сети production
+	docker-compose -f docker-compose.prod.yml --env-file .env.production down -v
+

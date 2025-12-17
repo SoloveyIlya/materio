@@ -94,3 +94,68 @@ admin/
 - По умолчанию используется SQLite база данных
 - MySQL сервис настроен, но не используется по умолчанию
 - Все зависимости устанавливаются автоматически при сборке контейнеров
+
+## Развертывание в Production
+
+### Подготовка
+
+1. Скопируйте файл с примером переменных окружения:
+   ```bash
+   cp env.production.example .env.production
+   ```
+
+2. Отредактируйте `.env.production` и заполните все необходимые значения:
+   - `APP_URL` - URL вашего приложения
+   - `NEXT_PUBLIC_API_URL` - URL API
+   - `MYSQL_PASSWORD` и `MYSQL_ROOT_PASSWORD` - надежные пароли для базы данных
+   - `SANCTUM_STATEFUL_DOMAINS` - домены для Sanctum
+   - `SESSION_DOMAIN` - домен для сессий
+   - Настройки почты (если требуется)
+
+### Установка для Production
+
+```bash
+make install-prod
+```
+
+Эта команда:
+- Соберет оптимизированные Docker образы для production
+- Запустит все сервисы с production настройками
+- Выполнит миграции базы данных
+- Оптимизирует Laravel (кеширование конфигурации, маршрутов, представлений)
+
+### Управление Production
+
+- `make up-prod` - Запустить все сервисы production
+- `make down-prod` - Остановить все сервисы production
+- `make build-prod` - Пересобрать контейнеры для production
+- `make restart-prod` - Перезапустить все сервисы production
+- `make logs-prod` - Показать логи всех сервисов production
+- `make migrate-prod` - Выполнить миграции в production
+- `make optimize-prod` - Оптимизировать Laravel для production
+- `make artisan-prod CMD="команда"` - Выполнить artisan команду в production
+
+### Особенности Production конфигурации
+
+- **Backend**: Использует PHP-FPM с оптимизированным OPcache
+- **Frontend**: Собирается в standalone режиме для минимального размера образа
+- **База данных**: Используется MySQL (обязательно для production)
+- **Оптимизация**: Автоматическое кеширование конфигурации, маршрутов и представлений
+- **Безопасность**: `APP_DEBUG=false`, отключены dev зависимости
+
+### Обновление Production
+
+```bash
+# Получить последние изменения (если используете Git)
+git pull origin main
+
+# Пересобрать и перезапустить
+make build-prod
+make restart-prod
+
+# Выполнить миграции (если есть новые)
+make migrate-prod
+
+# Оптимизировать (если изменилась конфигурация)
+make optimize-prod
+```

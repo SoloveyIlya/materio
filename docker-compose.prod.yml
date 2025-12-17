@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0-oracle
+    container_name: admin_mysql_prod
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-admin_db}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER:-admin}
+    volumes:
+      - mysql_data_prod:/var/lib/mysql
+    networks:
+      - admin_network_prod
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password
+
+  backend:
+    build:
+      context: ./backend-laravel
+      dockerfile: Dockerfile.prod
+    container_name: admin_backend_prod
+    restart: always
+    working_dir: /var/www
+    volumes:
+      - ./backend-laravel:/var/www
+      - /var/www/vendor
+      - backend_storage:/var/www/storage
+      - backend_cache:/var/www/bootstrap/cache
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - APP_NAME=${APP_NAME:-AdminBackend}
+      - APP_ENV=production
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_URL=${APP_URL}
+      - APP_KEY=${APP_KEY}
+      - DB_CONNECTION=${DB_CONNECTION:-mysql}
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=${MYSQL_DATABASE:-admin_db}
+      - DB_USERNAME=${MYSQL_USER:-admin}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - CACHE_DRIVER=${CACHE_DRIVER:-file}
+      - SESSION_DRIVER=${SESSION_DRIVER:-file}
+      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
+      - SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS}
+      - SESSION_DOMAIN=${SESSION_DOMAIN}
+      - MAIL_MAILER=${MAIL_MAILER:-smtp}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-tls}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-${APP_NAME}}
+    networks:
+      - admin_network_prod
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend-nextjs
+      dockerfile: Dockerfile.prod
+    container_name: admin_frontend_prod
+    restart: always
+    working_dir: /app
+    volumes:
+      - frontend_nextjs_data:/app/.next
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - PORT=3000
+    networks:
+      - admin_network_prod
+    depends_on:
+      - backend
+
+networks:
+  admin_network_prod:
+    driver: bridge
+
+volumes:
+  mysql_data_prod:
+  backend_storage:
+  backend_cache:
+  frontend_nextjs_data:
