@@ -152,23 +152,35 @@ install-prod: ## Первоначальная установка для producti
 	@echo "Удаление старых сетей..."
 	@docker network prune -f 2>/dev/null || true
 	@echo "Установка проекта для production..."
-	docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-	@echo "Ожидание запуска сервисов (особенно MySQL)..."
-	@echo "Проверка статуса MySQL..."
-	@timeout=60; \
+	@echo "Запуск MySQL отдельно..."
+	docker compose -f docker-compose.prod.yml --env-file .env.production up -d mysql
+	@echo "Ожидание готовности MySQL (может занять до 2 минут)..."
+	@timeout=120; \
 	while [ $$timeout -gt 0 ]; do \
-		if docker compose -f docker-compose.prod.yml --env-file .env.production ps mysql | grep -q "healthy"; then \
-			echo "MySQL готов!"; \
+		status=$$(docker compose -f docker-compose.prod.yml --env-file .env.production ps mysql 2>/dev/null | grep mysql | awk '{print $$4}' || echo "unknown"); \
+		if [ "$$status" = "healthy" ]; then \
+			echo "MySQL готов (healthy)!"; \
 			break; \
 		fi; \
-		echo "Ожидание MySQL... (осталось $$timeout секунд)"; \
-		sleep 2; \
-		timeout=$$((timeout - 2)); \
+		if [ "$$status" = "running" ] && [ $$timeout -lt 30 ]; then \
+			# Если контейнер running и прошло достаточно времени, считаем что готов
+			echo "MySQL запущен (running), продолжаем..."; \
+			sleep 5; \
+			break; \
+		fi; \
+		echo "Ожидание MySQL... (статус: $$status, осталось $$timeout секунд)"; \
+		sleep 3; \
+		timeout=$$((timeout - 3)); \
 	done; \
 	if [ $$timeout -le 0 ]; then \
-		echo "Предупреждение: MySQL может быть еще не готов, но продолжаем..."; \
+		echo "ОШИБКА: MySQL не запустился за отведенное время!"; \
+		echo "Логи MySQL:"; \
+		docker compose -f docker-compose.prod.yml --env-file .env.production logs mysql --tail 50; \
+		exit 1; \
 	fi
-	sleep 10
+	@echo "Запуск остальных сервисов..."
+	docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+	sleep 5
 	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan key:generate --force || true
 	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan migrate --force
 	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan config:cache
