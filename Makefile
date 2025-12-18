@@ -126,14 +126,14 @@ install-prod: ## Первоначальная установка для producti
 		exit 1; \
 	fi
 	@echo "Установка проекта для production..."
-	docker compose -f docker compose.prod.yml --env-file .env.production up -d --build
+	docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 	@echo "Ожидание запуска сервисов..."
 	sleep 15
-	docker compose -f docker compose.prod.yml --env-file .env.production exec backend php artisan key:generate --force || true
-	docker compose -f docker compose.prod.yml --env-file .env.production exec backend php artisan migrate --force
-	docker compose -f docker compose.prod.yml --env-file .env.production exec backend php artisan config:cache
-	docker compose -f docker compose.prod.yml --env-file .env.production exec backend php artisan route:cache
-	docker compose -f docker compose.prod.yml --env-file .env.production exec backend php artisan view:cache
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan key:generate --force || true
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan migrate --force
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan config:cache
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan route:cache
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan view:cache
 	@echo "Установка для production завершена!"
 
 clean-prod: ## Остановить и удалить все контейнеры, volumes и сети production
