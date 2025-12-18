@@ -28,9 +28,6 @@ RUN composer install --no-dev --no-scripts --no-autoloader --optimize-autoloader
 # Copy application files
 COPY . /var/www
 
-# Remove any cached package discovery files that might reference dev packages
-RUN rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
-
 # Temporarily disable post-autoload-dump script to prevent dev package discovery
 # Create a temporary composer.json without the problematic script
 RUN cp composer.json composer.json.bak && \
@@ -46,6 +43,10 @@ RUN composer dump-autoload --optimize --classmap-authoritative --no-scripts
 
 # Restore original composer.json
 RUN mv composer.json.bak composer.json
+
+# Remove any cached package discovery files that might reference dev packages
+# These files will be regenerated at runtime without dev dependencies
+RUN rm -f bootstrap/cache/packages.php bootstrap/cache/services.php || true
 
 # Create necessary directories
 RUN mkdir -p storage/framework/cache/data \

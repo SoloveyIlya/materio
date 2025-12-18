@@ -67,8 +67,15 @@ fi
 echo "Running migrations..."
 php artisan migrate --force
 
+# Clear package discovery cache to remove dev dependencies
+echo "Clearing package discovery cache..."
+rm -f bootstrap/cache/packages.php bootstrap/cache/services.php || true
+
 # Optimize Laravel for production
 echo "Optimizing Laravel for production..."
+php artisan config:clear || true
+php artisan route:clear || true
+php artisan view:clear || true
 php artisan config:cache || true
 php artisan route:cache || true
 php artisan view:cache || true
