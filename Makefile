@@ -96,10 +96,10 @@ up-prod: ## Запустить все сервисы в production режиме
 		echo "Скопируйте env.production.example в .env.production и заполните значениями"; \
 		exit 1; \
 	fi
-	docker compose -f docker compose.prod.yml --env-file .env.production up -d --build
+	docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 
 down-prod: ## Остановить все сервисы production
-	docker compose -f docker compose.prod.yml --env-file .env.production down
+	docker compose -f docker-compose.prod.yml --env-file .env.production down
 
 build-prod: ## Пересобрать контейнеры для production
 	@if [ ! -f .env.production ]; then \
@@ -107,39 +107,39 @@ build-prod: ## Пересобрать контейнеры для production
 		echo "Скопируйте env.production.example в .env.production и заполните значениями"; \
 		exit 1; \
 	fi
-	docker compose -f docker compose.prod.yml --env-file .env.production build --no-cache
+	docker compose -f docker-compose.prod.yml --env-file .env.production build --no-cache
 
 restart-prod: ## Перезапустить все сервисы production
-	docker compose -f docker compose.prod.yml --env-file .env.production restart
+	docker compose -f docker-compose.prod.yml --env-file .env.production restart
 
 logs-prod: ## Показать логи всех сервисов production
-	docker compose -f docker compose.prod.yml --env-file .env.production logs -f
+	docker compose -f docker-compose.prod.yml --env-file .env.production logs -f
 
 logs-backend-prod: ## Показать логи backend production
-	docker compose -f docker compose.prod.yml --env-file .env.production logs -f backend
+	docker compose -f docker-compose.prod.yml --env-file .env.production logs -f backend
 
 logs-frontend-prod: ## Показать логи frontend production
-	docker compose -f docker compose.prod.yml --env-file .env.production logs -f frontend
+	docker compose -f docker-compose.prod.yml --env-file .env.production logs -f frontend
 
 ps-prod: ## Показать статус контейнеров production
-	docker compose -f docker compose.prod.yml --env-file .env.production ps
+	docker compose -f docker-compose.prod.yml --env-file .env.production ps
 
 shell-backend-prod: ## Открыть shell в backend контейнере production
-	docker compose -f docker compose.prod.yml --env-file .env.production exec backend sh
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend sh
 
 shell-frontend-prod: ## Открыть shell в frontend контейнере production
-	docker compose -f docker compose.prod.yml --env-file .env.production exec frontend sh
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec frontend sh
 
 migrate-prod: ## Выполнить миграции в production
-	docker compose -f docker compose.prod.yml --env-file .env.production exec backend php artisan migrate --force
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan migrate --force
 
 artisan-prod: ## Выполнить artisan команду в production (использование: make artisan-prod CMD="route:list")
-	docker compose -f docker compose.prod.yml --env-file .env.production exec backend php artisan $(CMD)
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan $(CMD)
 
 optimize-prod: ## Оптимизировать Laravel для production
-	docker compose -f docker compose.prod.yml --env-file .env.production exec backend php artisan config:cache
-	docker compose -f docker compose.prod.yml --env-file .env.production exec backend php artisan route:cache
-	docker compose -f docker compose.prod.yml --env-file .env.production exec backend php artisan view:cache
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan config:cache
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan route:cache
+	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan view:cache
 
 install-prod: ## Первоначальная установка для production
 	@if [ ! -f .env.production ]; then \
@@ -147,6 +147,10 @@ install-prod: ## Первоначальная установка для producti
 		echo "Скопируйте env.production.example в .env.production и заполните значениями"; \
 		exit 1; \
 	fi
+	@echo "Очистка старых контейнеров и сетей..."
+	@docker compose -f docker-compose.prod.yml --env-file .env.production down -v 2>/dev/null || true
+	@echo "Удаление старых сетей..."
+	@docker network prune -f 2>/dev/null || true
 	@echo "Установка проекта для production..."
 	docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 	@echo "Ожидание запуска сервисов (особенно MySQL)..."

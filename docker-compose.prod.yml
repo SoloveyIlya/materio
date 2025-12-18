@@ -90,6 +90,7 @@ services:
 
 networks:
   admin_network_prod:
+    name: admin_admin_network_prod
     driver: bridge
 
 volumes:
