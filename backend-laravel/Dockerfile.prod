@@ -28,8 +28,24 @@ RUN composer install --no-dev --no-scripts --no-autoloader --optimize-autoloader
 # Copy application files
 COPY . /var/www
 
+# Remove any cached package discovery files that might reference dev packages
+RUN rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
+
+# Temporarily disable post-autoload-dump script to prevent dev package discovery
+# Create a temporary composer.json without the problematic script
+RUN cp composer.json composer.json.bak && \
+    php -r " \
+        \$json = json_decode(file_get_contents('composer.json'), true); \
+        unset(\$json['scripts']['post-autoload-dump']); \
+        file_put_contents('composer.json', json_encode(\$json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); \
+    "
+
 # Complete composer install and generate optimized autoload
+# Use --no-scripts to skip any remaining scripts
 RUN composer dump-autoload --optimize --classmap-authoritative --no-scripts
+
+# Restore original composer.json
+RUN mv composer.json.bak composer.json
 
 # Create necessary directories
 RUN mkdir -p storage/framework/cache/data \
