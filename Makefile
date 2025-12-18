@@ -149,8 +149,22 @@ install-prod: ## Первоначальная установка для producti
 	fi
 	@echo "Установка проекта для production..."
 	docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-	@echo "Ожидание запуска сервисов..."
-	sleep 15
+	@echo "Ожидание запуска сервисов (особенно MySQL)..."
+	@echo "Проверка статуса MySQL..."
+	@timeout=60; \
+	while [ $$timeout -gt 0 ]; do \
+		if docker compose -f docker-compose.prod.yml --env-file .env.production ps mysql | grep -q "healthy"; then \
+			echo "MySQL готов!"; \
+			break; \
+		fi; \
+		echo "Ожидание MySQL... (осталось $$timeout секунд)"; \
+		sleep 2; \
+		timeout=$$((timeout - 2)); \
+	done; \
+	if [ $$timeout -le 0 ]; then \
+		echo "Предупреждение: MySQL может быть еще не готов, но продолжаем..."; \
+	fi
+	sleep 10
 	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan key:generate --force || true
 	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan migrate --force
 	docker compose -f docker-compose.prod.yml --env-file .env.production exec backend php artisan config:cache
@@ -159,5 +173,5 @@ install-prod: ## Первоначальная установка для producti
 	@echo "Установка для production завершена!"
 
 clean-prod: ## Остановить и удалить все контейнеры, volumes и сети production
-	docker compose -f docker compose.prod.yml --env-file .env.production down -v
+	docker compose -f docker-compose.prod.yml --env-file .env.production down -v
 
