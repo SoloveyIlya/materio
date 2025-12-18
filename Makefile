@@ -52,6 +52,28 @@ artisan: ## Выполнить artisan команду (использовани�
 tinker: ## Открыть Laravel Tinker
 	docker compose exec backend php artisan tinker
 
+check-user: ## Проверить пользователя (использование: make check-user EMAIL="email@example.com" PASSWORD="password")
+	@if [ -z "$(EMAIL)" ]; then \
+		echo "Использование: make check-user EMAIL=\"email@example.com\" PASSWORD=\"password\""; \
+		echo "Проверяю пользователя по умолчанию: infso@smart-eu-solution.com"; \
+		docker compose exec backend php check-user.php infso@smart-eu-solution.com 12345678; \
+	else \
+		docker compose exec backend php check-user.php $(EMAIL) $(PASSWORD); \
+	fi
+
+list-users: ## Показать всех пользователей в базе данных
+	docker compose exec backend php artisan tinker --execute="App\Models\User::all(['id', 'name', 'email', 'created_at'])->each(function(\$u) { echo \"ID: {\$u->id}, Name: {\$u->name}, Email: {\$u->email}, Created: {\$u->created_at}\n\"; });"
+
+check-database: ## Проверить базу данных (все таблицы и записи)
+	docker compose exec backend php check-database.php
+
+create-user: ## Создать пользователя (использование: make create-user EMAIL="email@example.com" PASSWORD="password" NAME="User Name" ROLE="admin|moderator")
+	@if [ -z "$(EMAIL)" ] || [ -z "$(PASSWORD)" ]; then \
+		echo "Использование: make create-user EMAIL=\"email@example.com\" PASSWORD=\"password\" NAME=\"User Name\" ROLE=\"admin\""; \
+		exit 1; \
+	fi
+	docker compose exec backend php create-user.php $(EMAIL) $(PASSWORD) "$(NAME)" $(ROLE)
+
 clean: ## Остановить и удалить все контейнеры, volumes и сети
 	docker compose down -v
 	docker system prune -f

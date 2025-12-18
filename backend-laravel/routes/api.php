@@ -4,13 +4,17 @@ use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\DocumentationCategoryController;
 use App\Http\Controllers\Admin\DocumentationPageController;
 use App\Http\Controllers\Admin\TaskCategoryController;
+use App\Http\Controllers\Admin\TaskController as AdminTaskController;
 use App\Http\Controllers\Admin\TaskTemplateController;
 use App\Http\Controllers\Admin\ToolController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\MessageController;
+use App\Http\Controllers\Moderator\DashboardController;
 use App\Http\Controllers\Moderator\DocumentationController;
 use App\Http\Controllers\Moderator\TaskController;
 use App\Http\Controllers\Moderator\ToolController as ModeratorToolController;
+use App\Http\Controllers\Moderator\TrainingController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
@@ -51,6 +55,11 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
     // Activity Logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);
     Route::get('/activity-logs/{activityLog}', [ActivityLogController::class, 'show']);
+
+    // Tasks
+    Route::get('/tasks', [AdminTaskController::class, 'index']);
+    Route::get('/tasks/{task}', [AdminTaskController::class, 'show']);
+    Route::post('/tasks/{task}/moderate', [AdminTaskController::class, 'moderateResult']);
 });
 
 // Moderator routes
@@ -71,4 +80,27 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
     // Tools
     Route::get('/tools', [ModeratorToolController::class, 'index']);
     Route::get('/tools/{tool}', [ModeratorToolController::class, 'show']);
+
+    // Dashboard
+    Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    // Training Center
+    Route::get('/training', [TrainingController::class, 'index']);
+    Route::get('/training/questions', [TrainingController::class, 'questions']);
+});
+
+// Messages/Chat routes (для админов и модераторов)
+Route::prefix('messages')->middleware(['auth:sanctum', 'activity'])->group(function () {
+    Route::get('/', [MessageController::class, 'index']);
+    Route::post('/', [MessageController::class, 'store']);
+    Route::put('/{message}', [MessageController::class, 'update']);
+    Route::delete('/{message}', [MessageController::class, 'destroy']);
+    Route::post('/{message}/read', [MessageController::class, 'markAsRead']);
+});
+
+// Telegram routes
+Route::prefix('telegram')->group(function () {
+    Route::post('/webhook', [\App\Http\Controllers\TelegramController::class, 'webhook']);
+    Route::post('/link', [\App\Http\Controllers\TelegramController::class, 'link'])
+        ->middleware('auth:sanctum');
 });

@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Moderator;
 
 use App\Http\Controllers\Controller;
 use App\Models\Task;
+use App\Models\TaskResult;
+use App\Models\ModeratorEarning;
 use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TaskController extends Controller
 {
@@ -28,10 +31,37 @@ class TaskController extends Controller
                       $assignmentQuery->where('assigned_to', $user->id);
                   });
             })
-            ->with(['category', 'template', 'assignments']);
+            ->with(['category', 'template', 'assignments', 'result']);
 
-        if ($request->has('status')) {
+        // Фильтрация по группе статусов для модератора
+        if ($request->has('group')) {
+            $group = $request->get('group');
+            switch ($group) {
+                case 'waiting': // Ожидают
+                    $query->where('status', 'pending');
+                    break;
+                case 'in_work': // В работе
+                    $query->where('status', 'in_progress');
+                    break;
+                case 'history': // История
+                    $query->whereIn('status', [
+                        'completed_by_moderator',
+                        'under_admin_review',
+                        'approved',
+                        'rejected',
+                        'sent_for_revision',
+                    ]);
+                    break;
+            }
+        } elseif ($request->has('status')) {
             $query->where('status', $request->status);
+        }
+
+        // Training center - задачи с категорией Test
+        if ($request->has('training')) {
+            $query->whereHas('category', function ($q) {
+                $q->where('name', 'Test');
+            });
         }
 
         if ($request->has('work_day')) {
@@ -39,6 +69,14 @@ class TaskController extends Controller
         }
 
         $tasks = $query->orderBy('assigned_at', 'desc')->get();
+
+        // Добавляем информацию о дедлайне и таймере
+        $tasks = $tasks->map(function ($task) {
+            $task->deadline_timer = $task->due_at 
+                ? now()->diffInSeconds($task->due_at, false) 
+                : null;
+            return $task;
+        });
 
         return response()->json($tasks);
     }
@@ -108,18 +146,51 @@ class TaskController extends Controller
             return response()->json(['message' => 'Task must be in progress'], 400);
         }
 
-        $task->update([
-            'status' => 'completed',
-            'completed_at' => now(),
+        $validated = $request->validate([
+            'answers' => 'nullable|string',
+            'screenshots' => 'nullable|array',
+            'screenshots.*' => 'string',
+            'attachments' => 'nullable|array',
+            'attachments.*' => 'string',
+            'comment' => 'nullable|string',
         ]);
-        
-        // Обновляем completed_at в TaskAssignment, если есть
-        $assignment = $task->assignments()->where('assigned_to', $user->id)->first();
-        if ($assignment && !$assignment->completed_at) {
-            $assignment->update(['completed_at' => now()]);
-        }
 
-        return response()->json($task->fresh()->load(['category', 'template', 'assignments']));
+        DB::beginTransaction();
+        try {
+            // Обновляем статус таска
+            $task->update([
+                'status' => 'completed_by_moderator',
+                'completed_at' => now(),
+            ]);
+            
+            // Обновляем completed_at в TaskAssignment, если есть
+            $assignment = $task->assignments()->where('assigned_to', $user->id)->first();
+            if ($assignment && !$assignment->completed_at) {
+                $assignment->update(['completed_at' => now()]);
+            }
+
+            // Создаем или обновляем результат таска
+            TaskResult::updateOrCreate(
+                ['task_id' => $task->id],
+                [
+                    'moderator_id' => $user->id,
+                    'answers' => $validated['answers'] ?? null,
+                    'screenshots' => $validated['screenshots'] ?? null,
+                    'attachments' => $validated['attachments'] ?? null,
+                    'moderator_comment' => $validated['comment'] ?? null,
+                ]
+            );
+
+            // Меняем статус на "на проверке у админа"
+            $task->update(['status' => 'under_admin_review']);
+
+            DB::commit();
+
+            return response()->json($task->fresh()->load(['category', 'template', 'assignments', 'result']));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error completing task: ' . $e->getMessage()], 500);
+        }
     }
 
     public function getCurrentWorkDay(Request $request): JsonResponse
@@ -130,6 +201,43 @@ class TaskController extends Controller
             'work_start_date' => $user->work_start_date,
             'current_work_day' => $user->getCurrentWorkDay(),
             'timezone' => $user->timezone,
+        ]);
+    }
+
+    public function dashboard(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        // Количество выполненных тасков (approved)
+        $completedTasks = Task::where('assigned_to', $user->id)
+            ->where('status', 'approved')
+            ->count();
+
+        // Общее количество тасков
+        $totalTasks = Task::where('assigned_to', $user->id)
+            ->whereIn('status', ['approved', 'rejected', 'completed_by_moderator', 'under_admin_review', 'sent_for_revision'])
+            ->count();
+
+        // Процент успешно выполненных
+        $successRate = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100, 2) : 0;
+
+        // Количество проработанных дней
+        $workDays = $user->work_start_date 
+            ? max(1, now($user->timezone ?? 'UTC')->diffInDays($user->work_start_date) + 1)
+            : 0;
+
+        // Сумма заработанных денег
+        $totalEarnings = ModeratorEarning::where('moderator_id', $user->id)
+            ->sum('amount');
+
+        return response()->json([
+            'completed_tasks' => $completedTasks,
+            'total_tasks' => $totalTasks,
+            'success_rate' => $successRate,
+            'work_days' => $workDays,
+            'work_start_date' => $user->work_start_date,
+            'timezone' => $user->timezone ?? 'UTC',
+            'total_earnings' => number_format($totalEarnings, 2, '.', ''),
         ]);
     }
 }

@@ -25,6 +25,8 @@ class User extends Authenticatable
         'last_seen_at',
         'is_online',
         'administrator_id',
+        'telegram_id',
+        'telegram_username',
     ];
 
     protected $hidden = [
@@ -108,6 +110,26 @@ class User extends Authenticatable
     public function activityLogs()
     {
         return $this->hasMany(ActivityLog::class);
+    }
+
+    public function earnings()
+    {
+        return $this->hasMany(ModeratorEarning::class, 'moderator_id');
+    }
+
+    public function taskResults()
+    {
+        return $this->hasMany(TaskResult::class, 'moderator_id');
+    }
+
+    public function sentMessages()
+    {
+        return $this->hasMany(Message::class, 'from_user_id');
+    }
+
+    public function receivedMessages()
+    {
+        return $this->hasMany(Message::class, 'to_user_id');
     }
 }
 

@@ -64,6 +64,11 @@ class Task extends Model
         return $this->hasMany(TaskAssignment::class);
     }
 
+    public function result()
+    {
+        return $this->hasOne(TaskResult::class);
+    }
+
     /**
      * Проверяет, назначена ли задача пользователю (напрямую или через TaskAssignment)
      */
