@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\TelegramService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class TelegramController extends Controller
@@ -34,6 +35,15 @@ class TelegramController extends Controller
             $messageText = $callback['message']['text'] ?? '';
 
             $this->telegramService->handleCallback($callbackData, $chatId, $messageText);
+            
+            // Отвечаем на callback query
+            try {
+                Http::post("https://api.telegram.org/bot" . config('services.telegram.bot_token') . "/answerCallbackQuery", [
+                    'callback_query_id' => $callback['id'],
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Telegram callback answer error: ' . $e->getMessage());
+            }
         }
 
         // Обработка обычных сообщений
@@ -42,17 +52,24 @@ class TelegramController extends Controller
             $chatId = $message['chat']['id'];
             $text = $message['text'] ?? '';
             $username = $message['from']['username'] ?? null;
+            $messageId = $message['message_id'] ?? null;
 
             // Если сообщение начинается с /start, привязываем Telegram ID
             if (str_starts_with($text, '/start')) {
                 $token = str_replace('/start ', '', $text);
                 // Здесь можно добавить логику привязки по токену
                 // Пока просто сохраняем telegram_id
+                $this->telegramService->sendConfirmation($chatId, 'Добро пожаловать! Ваш Telegram аккаунт привязан.');
             }
 
-            // Если это ответ на callback, обрабатываем
+            // Если это ответ на сообщение (reply to message), обрабатываем
             if (isset($message['reply_to_message'])) {
-                // Обработка ответа
+                $replyToMessage = $message['reply_to_message'];
+                $replyToMessageId = $replyToMessage['message_id'] ?? null;
+                
+                if ($text && $replyToMessageId) {
+                    $this->telegramService->handleReply($chatId, $replyToMessageId, $text);
+                }
             }
         }
 

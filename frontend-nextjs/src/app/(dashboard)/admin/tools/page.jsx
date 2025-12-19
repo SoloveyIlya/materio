@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, Typography, Button, Paper, Dialog, DialogTitle, DialogContent, TextField, DialogActions, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel } from '@mui/material'
+import { Box, Typography, Button, Dialog, DialogTitle, DialogContent, TextField, DialogActions, FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, Grid } from '@mui/material'
 import api from '@/lib/api'
+
+// Component Imports
+import ToolsListTable from '@/views/apps/tools/ToolsListTable'
 
 export default function ToolsPage() {
   const [tools, setTools] = useState([])
@@ -18,24 +21,25 @@ export default function ToolsPage() {
   const loadTools = async () => {
     try {
       const response = await api.get('/admin/tools')
-      setTools(response.data)
+      setTools(response.data || [])
     } catch (error) {
       console.error('Error loading tools:', error)
+      setTools([])
     }
   }
 
   const loadGuides = async () => {
     try {
       const response = await api.get('/admin/documentation-pages')
-      setGuides(response.data)
+      setGuides(response.data || [])
     } catch (error) {
       console.error('Error loading guides:', error)
+      setGuides([])
     }
   }
 
   const handleSave = async () => {
     try {
-      // Prepare data for sending
       const dataToSend = {
         name: formData.name,
         description: formData.description || null,
@@ -61,6 +65,18 @@ export default function ToolsPage() {
     }
   }
 
+  const handleEdit = (tool) => {
+    setFormData({ 
+      id: tool.id,
+      name: tool.name,
+      description: tool.description || '',
+      url: tool.url || '',
+      guide_id: tool.guide_id || '',
+      is_active: tool.is_active !== undefined ? tool.is_active : true
+    })
+    setDialogOpen(true)
+  }
+
   const handleDelete = async (id) => {
     if (!confirm('Delete tool?')) return
     try {
@@ -72,81 +88,28 @@ export default function ToolsPage() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Tools</Typography>
-        <Button variant="contained" startIcon={<i className="ri-add-line" />} onClick={() => setDialogOpen(true)}>
+    <Box sx={{ p: 6 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant='h4'>Tools</Typography>
+        <Button variant='contained' startIcon={<i className='ri-add-line' />} onClick={() => setDialogOpen(true)}>
           Add Tool
         </Button>
       </Box>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Description</TableCell>
-              <TableCell>URL</TableCell>
-              <TableCell>Guide</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {tools.map((tool) => (
-              <TableRow key={tool.id}>
-                <TableCell>{tool.id}</TableCell>
-                <TableCell>{tool.name}</TableCell>
-                <TableCell>{tool.description || '—'}</TableCell>
-                <TableCell>
-                  {tool.url ? (
-                    <Button startIcon={<i className="ri-links-line" />} href={tool.url} target="_blank" size="small">
-                      Open
-                    </Button>
-                  ) : (
-                    '—'
-                  )}
-                </TableCell>
-                <TableCell>
-                  {tool.guide ? (
-                    <Chip label={tool.guide.title} size="small" color="primary" />
-                  ) : (
-                    '—'
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={tool.is_active ? 'Active' : 'Inactive'}
-                    color={tool.is_active ? 'success' : 'default'}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell align="right">
-                  <IconButton size="small" onClick={() => {
-                    setFormData({ 
-                      id: tool.id,
-                      name: tool.name,
-                      description: tool.description || '',
-                      url: tool.url || '',
-                      guide_id: tool.guide_id || '',
-                      is_active: tool.is_active !== undefined ? tool.is_active : true
-                    })
-                    setDialogOpen(true)
-                  }}>
-                    <i className="ri-edit-box-line" />
-                  </IconButton>
-                  <IconButton size="small" color="error" onClick={() => handleDelete(tool.id)}>
-                    <i className="ri-delete-bin-7-line" />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Grid container spacing={6}>
+        <Grid size={{ xs: 12 }}>
+          <ToolsListTable
+            tableData={tools}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        </Grid>
+      </Grid>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={dialogOpen} onClose={() => {
+        setDialogOpen(false)
+        setFormData({ name: '', description: '', url: '', guide_id: '', is_active: true })
+      }} maxWidth="sm" fullWidth>
         <DialogTitle>{formData.id ? 'Edit' : 'Create'} Tool</DialogTitle>
         <DialogContent>
           <TextField

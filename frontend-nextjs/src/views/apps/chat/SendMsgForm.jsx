@@ -1,5 +1,5 @@
 // React Imports
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState } from 'react'
 
 // MUI Imports
 import TextField from '@mui/material/TextField'
@@ -11,13 +11,12 @@ import Paper from '@mui/material/Paper'
 import ClickAwayListener from '@mui/material/ClickAwayListener'
 import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
+import Chip from '@mui/material/Chip'
+import Box from '@mui/material/Box'
 
 // Third-party Imports
 import Picker from '@emoji-mart/react'
 import data from '@emoji-mart/data'
-
-// Slice Imports
-import { sendMsg } from '@/redux-store/slices/chat'
 
 // Component Imports
 import CustomIconButton from '@core/components/mui/IconButton'
@@ -60,9 +59,18 @@ const EmojiPicker = ({ onChange, isBelowSmScreen, openEmojiPicker, setOpenEmojiP
   )
 }
 
-const SendMsgForm = ({ dispatch, activeUser, isBelowSmScreen, messageInputRef }) => {
+const SendMsgForm = ({ 
+  messageText, 
+  setMessageText, 
+  attachments, 
+  setAttachments, 
+  onSend, 
+  onFileSelect, 
+  onPaste,
+  isBelowSmScreen, 
+  messageInputRef 
+}) => {
   // States
-  const [msg, setMsg] = useState('')
   const [anchorEl, setAnchorEl] = useState(null)
   const [openEmojiPicker, setOpenEmojiPicker] = useState(false)
 
@@ -82,12 +90,11 @@ const SendMsgForm = ({ dispatch, activeUser, isBelowSmScreen, messageInputRef })
     setAnchorEl(null)
   }
 
-  const handleSendMsg = (event, msg) => {
+  const handleSendMsg = (event) => {
     event.preventDefault()
 
-    if (msg.trim() !== '') {
-      dispatch(sendMsg({ msg }))
-      setMsg('')
+    if (messageText.trim() !== '' || attachments.length > 0) {
+      onSend()
     }
   }
 
@@ -116,13 +123,16 @@ const SendMsgForm = ({ dispatch, activeUser, isBelowSmScreen, messageInputRef })
               >
                 <i className='ri-emotion-happy-line text-textPrimary' />
               </MenuItem>
-              <MenuItem onClick={handleClose} className='justify-center'>
-                <i className='ri-mic-line text-textPrimary' />
-              </MenuItem>
               <MenuItem onClick={handleClose} className='p-0'>
                 <label htmlFor='upload-img' className='plb-2 pli-5'>
                   <i className='ri-attachment-2 text-textPrimary' />
-                  <input hidden type='file' id='upload-img' />
+                  <input 
+                    hidden 
+                    type='file' 
+                    id='upload-img' 
+                    multiple 
+                    onChange={onFileSelect}
+                  />
                 </label>
               </MenuItem>
             </Menu>
@@ -132,7 +142,7 @@ const SendMsgForm = ({ dispatch, activeUser, isBelowSmScreen, messageInputRef })
               setOpenEmojiPicker={setOpenEmojiPicker}
               isBelowSmScreen={isBelowSmScreen}
               onChange={value => {
-                setMsg(msg + value)
+                setMessageText(messageText + value)
 
                 if (messageInputRef.current) {
                   messageInputRef.current.focus()
@@ -151,19 +161,22 @@ const SendMsgForm = ({ dispatch, activeUser, isBelowSmScreen, messageInputRef })
               setOpenEmojiPicker={setOpenEmojiPicker}
               isBelowSmScreen={isBelowSmScreen}
               onChange={value => {
-                setMsg(msg + value)
+                setMessageText(messageText + value)
 
                 if (messageInputRef.current) {
                   messageInputRef.current.focus()
                 }
               }}
             />
-            <IconButton size='small'>
-              <i className='ri-mic-line text-textPrimary' />
-            </IconButton>
             <IconButton size='small' component='label' htmlFor='upload-img'>
               <i className='ri-attachment-2 text-textPrimary' />
-              <input hidden type='file' id='upload-img' />
+              <input 
+                hidden 
+                type='file' 
+                id='upload-img' 
+                multiple 
+                onChange={onFileSelect}
+              />
             </IconButton>
           </>
         )}
@@ -180,24 +193,34 @@ const SendMsgForm = ({ dispatch, activeUser, isBelowSmScreen, messageInputRef })
     )
   }
 
-  useEffect(() => {
-    setMsg('')
-  }, [activeUser.id])
-
   return (
     <form
       autoComplete='off'
-      onSubmit={event => handleSendMsg(event, msg)}
-      className=' bg-[var(--mui-palette-customColors-chatBg)]'
+      onSubmit={handleSendMsg}
+      className='bg-[var(--mui-palette-customColors-chatBg)]'
     >
+      {attachments.length > 0 && (
+        <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider' }}>
+          {attachments.map((file, idx) => (
+            <Chip
+              key={idx}
+              label={file.name || file}
+              onDelete={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+              size="small"
+              sx={{ mr: 0.5, mb: 0.5 }}
+            />
+          ))}
+        </Box>
+      )}
       <TextField
         fullWidth
         multiline
         maxRows={4}
-        placeholder='Type a message'
-        value={msg}
+        placeholder='Type a message... (Ctrl+V to paste screenshot)'
+        value={messageText}
         className='p-5'
-        onChange={e => setMsg(e.target.value)}
+        onChange={e => setMessageText(e.target.value)}
+        onPaste={onPaste}
         sx={{
           '& fieldset': { border: '0' },
           '& .MuiOutlinedInput-root': {
@@ -207,7 +230,7 @@ const SendMsgForm = ({ dispatch, activeUser, isBelowSmScreen, messageInputRef })
         }}
         onKeyDown={e => {
           if (e.key === 'Enter' && !e.shiftKey) {
-            handleSendMsg(e, msg)
+            handleSendMsg(e)
           }
         }}
         size='small'

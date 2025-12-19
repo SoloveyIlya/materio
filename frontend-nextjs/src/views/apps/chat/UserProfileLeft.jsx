@@ -22,12 +22,9 @@ import Button from '@mui/material/Button'
 // Third Party Imports
 import PerfectScrollbar from 'react-perfect-scrollbar'
 
-// Slice Imports
-import { setUserStatus } from '@/redux-store/slices/chat'
-
 // Component Imports
 import AvatarWithBadge from './AvatarWithBadge'
-import { statusObj } from '@views/apps/chat/SidebarLeft'
+import { statusObj } from './SidebarLeft'
 
 const ScrollWrapper = ({ children, isBelowLgScreen }) => {
   if (isBelowLgScreen) {
@@ -44,6 +41,7 @@ const UserProfileLeft = props => {
   // States
   const [twoStepVerification, setTwoStepVerification] = useState(true)
   const [notification, setNotification] = useState(false)
+  const [userStatus, setUserStatus] = useState(profileUserData?.status || 'online')
 
   const handleTwoStepVerification = () => {
     setTwoStepVerification(!twoStepVerification)
@@ -54,7 +52,13 @@ const UserProfileLeft = props => {
   }
 
   const handleUserStatus = e => {
-    dispatch(setUserStatus({ status: e.target.value }))
+    const newStatus = e.target.value
+    setUserStatus(newStatus)
+    // If dispatch is provided (for Redux), use it
+    if (dispatch) {
+      // This would require importing setUserStatus from Redux if needed
+      // For now, we just update local state
+    }
   }
 
   return profileUserData ? (
@@ -75,15 +79,15 @@ const UserProfileLeft = props => {
         </IconButton>
         <div className='flex flex-col justify-center items-center gap-4 mbs-6 pli-5 pbs-5 pbe-1'>
           <AvatarWithBadge
-            alt={profileUserData.fullName}
+            alt={profileUserData.name || profileUserData.fullName || profileUserData.email}
             src={profileUserData.avatar}
-            badgeColor={statusObj[profileUserData.status]}
+            badgeColor={statusObj[userStatus]}
             className='bs-[84px] is-[84px]'
             badgeSize={12}
           />
           <div className='text-center'>
-            <Typography variant='h5'>{profileUserData.fullName}</Typography>
-            <Typography>{profileUserData.role}</Typography>
+            <Typography variant='h5'>{profileUserData.name || profileUserData.fullName || profileUserData.email}</Typography>
+            <Typography>{profileUserData.role || profileUserData.email}</Typography>
           </div>
         </div>
         <ScrollWrapper isBelowLgScreen={isBelowLgScreen}>
@@ -92,14 +96,14 @@ const UserProfileLeft = props => {
               <Typography className='uppercase' color='text.disabled'>
                 About
               </Typography>
-              <TextField fullWidth rows={3} multiline id='about-textarea' defaultValue={profileUserData.about} />
+              <TextField fullWidth rows={3} multiline id='about-textarea' defaultValue={profileUserData.about || ''} />
             </div>
             <div className='flex flex-col gap-1'>
               <FormLabel id='status-radio-buttons-group-label' className='uppercase text-textDisabled'>
                 Status
               </FormLabel>
               <RadioGroup
-                value={profileUserData.status}
+                value={userStatus}
                 name='radio-buttons-group'
                 onChange={handleUserStatus}
                 aria-labelledby='status-radio-buttons-group-label'

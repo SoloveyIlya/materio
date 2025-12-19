@@ -27,6 +27,11 @@ const verticalMenuData = (user = null) => {
   if (isAdmin) {
     menu.push(
       {
+        label: 'Tasks',
+        icon: 'ri-task-line',
+        href: '/admin/tasks'
+      },
+      {
         label: 'Documentation',
         icon: 'ri-file-text-line',
         href: '/admin/documentation'
@@ -45,6 +50,11 @@ const verticalMenuData = (user = null) => {
         label: 'Activity Logs',
         icon: 'ri-file-list-3-line',
         href: '/admin/activity-logs'
+      },
+      {
+        label: 'Support',
+        icon: 'ri-customer-service-2-line',
+        href: '/admin/support'
       }
     )
   }
@@ -52,6 +62,16 @@ const verticalMenuData = (user = null) => {
   // Add moderator menu items
   if (isModerator) {
     menu.push(
+      {
+        label: 'Tasks',
+        icon: 'ri-task-line',
+        href: '/moderator/tasks'
+      },
+      {
+        label: 'Training Center',
+        icon: 'ri-graduation-cap-line',
+        href: '/moderator/training'
+      },
       {
         label: 'Documentation',
         icon: 'ri-file-text-line',
@@ -61,6 +81,11 @@ const verticalMenuData = (user = null) => {
         label: 'Tools',
         icon: 'ri-tools-line',
         href: '/moderator/tools'
+      },
+      {
+        label: 'Support',
+        icon: 'ri-customer-service-2-line',
+        href: '/moderator/support'
       }
     )
   }

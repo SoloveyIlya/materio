@@ -25,6 +25,7 @@ class Task extends Model
         'guides_links',
         'attached_services',
         'work_day',
+        'is_main_task',
     ];
 
     protected $casts = [
@@ -37,6 +38,7 @@ class Task extends Model
         'guides_links' => 'array',
         'attached_services' => 'array',
         'work_day' => 'integer',
+        'is_main_task' => 'boolean',
     ];
 
     public function domain()

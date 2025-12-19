@@ -1,0 +1,12 @@
+.bgImage {
+  background-image: url('/images/front-pages/help-center-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+@media (max-width: 768px) {
+  .bgImage {
+    background-size: contain;
+  }
+}

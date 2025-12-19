@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, Button, Tabs, Tab, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Grid, Card, CardContent } from '@mui/material'
+import { Box, Typography, Tabs, Tab, Grid, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material'
 import api from '@/lib/api'
-import { API_URL } from '@/lib/api'
+
+// Component Imports
+import ModeratorTaskListTable from '@/views/apps/tasks/list/ModeratorTaskListTable'
+import TaskCard from '@/views/apps/tasks/list/TaskCard'
 
 export default function ModeratorTasksPage() {
   const [tasks, setTasks] = useState([])
@@ -34,9 +37,10 @@ export default function ModeratorTasksPage() {
       }
 
       const response = await api.get(`/moderator/tasks?${params}`)
-      setTasks(response.data)
+      setTasks(response.data || [])
     } catch (error) {
       console.error('Error loading tasks:', error)
+      setTasks([])
     }
   }
 
@@ -50,7 +54,12 @@ export default function ModeratorTasksPage() {
     }
   }
 
-  const handleComplete = async () => {
+  const handleComplete = async (task) => {
+    setSelectedTask(task)
+    setDialogOpen(true)
+  }
+
+  const handleSubmitComplete = async () => {
     try {
       const formDataToSend = new FormData()
       formDataToSend.append('answers', formData.answers)
@@ -96,97 +105,39 @@ export default function ModeratorTasksPage() {
     }))
   }
 
-  const formatDeadline = (seconds) => {
-    if (!seconds || seconds < 0) return 'Expired'
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    return `${hours}h ${minutes}m`
-  }
-
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: 'default',
-      in_progress: 'info',
-      completed_by_moderator: 'warning',
-      under_admin_review: 'primary',
-      approved: 'success',
-      rejected: 'error',
-      sent_for_revision: 'warning',
-    }
-    return colors[status] || 'default'
+  const handleMessage = (task) => {
+    window.location.href = `/messages?task_id=${task.id}&type=message`
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>Tasks</Typography>
+    <Box sx={{ p: 6 }}>
+      <Typography variant='h4' gutterBottom>Tasks</Typography>
 
-      <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 3 }}>
-        <Tab label="Waiting" />
-        <Tab label="In Work" />
-        <Tab label="History" />
+      <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 6 }}>
+        <Tab label='Waiting' />
+        <Tab label='In Work' />
+        <Tab label='History' />
       </Tabs>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Title</TableCell>
-              <TableCell>Category</TableCell>
-              <TableCell>Price</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Deadline</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {tasks.map((task) => (
-              <TableRow key={task.id}>
-                <TableCell>{task.id}</TableCell>
-                <TableCell>{task.title}</TableCell>
-                <TableCell>{task.category?.name || '—'}</TableCell>
-                <TableCell>${task.price}</TableCell>
-                <TableCell>
-                  <Chip label={task.status} color={getStatusColor(task.status)} size="small" />
-                </TableCell>
-                <TableCell>
-                  {task.deadline_timer !== null ? formatDeadline(task.deadline_timer) : '—'}
-                </TableCell>
-                <TableCell align="right">
-                  {task.status === 'pending' && (
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={() => handleStart(task)}
-                    >
-                      Start
-                    </Button>
-                  )}
-                  {task.status === 'in_progress' && (
-                    <Button
-                      size="small"
-                      variant="contained"
-                      color="success"
-                      onClick={() => {
-                        setSelectedTask(task)
-                        setDialogOpen(true)
-                      }}
-                    >
-                      Complete
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Grid container spacing={6}>
+        <Grid size={{ xs: 12 }}>
+          <TaskCard activeTab={activeTab} />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <ModeratorTaskListTable
+            tableData={tasks}
+            onStart={handleStart}
+            onComplete={handleComplete}
+            onMessage={handleMessage}
+          />
+        </Grid>
+      </Grid>
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>Complete Task - {selectedTask?.title}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
                 multiline
@@ -198,7 +149,7 @@ export default function ModeratorTasksPage() {
               />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Button
                 variant="outlined"
                 component="label"
@@ -221,7 +172,7 @@ export default function ModeratorTasksPage() {
               )}
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Button
                 variant="outlined"
                 component="label"
@@ -243,7 +194,7 @@ export default function ModeratorTasksPage() {
               )}
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
                 multiline
@@ -258,7 +209,7 @@ export default function ModeratorTasksPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleComplete} variant="contained" color="success">
+          <Button onClick={handleSubmitComplete} variant="contained" color="success">
             Submit
           </Button>
         </DialogActions>

@@ -49,26 +49,28 @@ const UserProfileRight = props => {
       </IconButton>
       <div className='flex flex-col justify-center items-center gap-4 mbs-6 pli-5 pbs-5 pbe-1'>
         <AvatarWithBadge
-          alt={activeUser.fullName}
+          alt={activeUser.name || activeUser.fullName || activeUser.email}
           src={activeUser.avatar}
-          color={activeUser.avatarColor}
-          badgeColor={statusObj[activeUser.status]}
+          color={activeUser.avatarColor || 'primary'}
+          badgeColor={activeUser.is_online ? statusObj.online : statusObj.offline}
           className='bs-[84px] is-[84px] text-3xl'
           badgeSize={12}
         />
         <div className='text-center'>
-          <Typography variant='h5'>{activeUser.fullName}</Typography>
-          <Typography>{activeUser.role}</Typography>
+          <Typography variant='h5'>{activeUser.name || activeUser.fullName || activeUser.email}</Typography>
+          <Typography>{activeUser.role || activeUser.email}</Typography>
         </div>
       </div>
 
       <ScrollWrapper isBelowLgScreen={isBelowLgScreen} className='flex flex-col gap-6 p-5'>
-        <div className='flex flex-col gap-1'>
-          <Typography className='uppercase' color='text.disabled'>
-            About
-          </Typography>
-          <Typography>{activeUser.about}</Typography>
-        </div>
+        {activeUser.about && (
+          <div className='flex flex-col gap-1'>
+            <Typography className='uppercase' color='text.disabled'>
+              About
+            </Typography>
+            <Typography>{activeUser.about}</Typography>
+          </div>
+        )}
         <div className='flex flex-col gap-1'>
           <Typography className='uppercase' color='text.disabled'>
             Personal Information
@@ -78,7 +80,7 @@ const UserProfileRight = props => {
               <ListItemIcon>
                 <i className='ri-mail-line' />
               </ListItemIcon>
-              <ListItemText primary={`${activeUser.fullName.toLowerCase().replace(/\s/g, '_')}@email.com`} />
+              <ListItemText primary={activeUser.email || 'No email'} />
             </ListItem>
             <ListItem className='p-2 gap-2'>
               <ListItemIcon>

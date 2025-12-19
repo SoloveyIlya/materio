@@ -1,17 +1,21 @@
 <?php
 
 use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DocumentationCategoryController;
 use App\Http\Controllers\Admin\DocumentationPageController;
+use App\Http\Controllers\Admin\SupportController as AdminSupportController;
 use App\Http\Controllers\Admin\TaskCategoryController;
 use App\Http\Controllers\Admin\TaskController as AdminTaskController;
 use App\Http\Controllers\Admin\TaskTemplateController;
 use App\Http\Controllers\Admin\ToolController;
+use App\Http\Controllers\Admin\TrainingQuestionController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\Moderator\DashboardController;
 use App\Http\Controllers\Moderator\DocumentationController;
+use App\Http\Controllers\Moderator\SupportController;
 use App\Http\Controllers\Moderator\TaskController;
 use App\Http\Controllers\Moderator\ToolController as ModeratorToolController;
 use App\Http\Controllers\Moderator\TrainingController;
@@ -43,6 +47,10 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
     // Tools
     Route::apiResource('tools', ToolController::class);
 
+    // Dashboard
+    Route::get('/dashboard', [AdminDashboardController::class, 'index']);
+    Route::post('/users/{user}/hide-from-dashboard', [AdminDashboardController::class, 'hideDeletedUser']);
+
     // Users
     Route::get('/users', [UserController::class, 'index']);
     Route::get('/users/{user}', [UserController::class, 'show']);
@@ -58,8 +66,20 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
 
     // Tasks
     Route::get('/tasks', [AdminTaskController::class, 'index']);
+    Route::post('/tasks', [AdminTaskController::class, 'store']);
     Route::get('/tasks/{task}', [AdminTaskController::class, 'show']);
+    Route::put('/tasks/{task}', [AdminTaskController::class, 'update']);
     Route::post('/tasks/{task}/moderate', [AdminTaskController::class, 'moderateResult']);
+
+    // Training Questions
+    Route::get('/training-questions', [TrainingQuestionController::class, 'index']);
+    Route::post('/training-questions/{question}/answer', [TrainingQuestionController::class, 'answer']);
+    Route::post('/training-questions/{question}/resolve', [TrainingQuestionController::class, 'markResolved']);
+
+    // Support Tickets
+    Route::get('/support', [AdminSupportController::class, 'index']);
+    Route::get('/support/{ticket}', [AdminSupportController::class, 'show']);
+    Route::put('/support/{ticket}', [AdminSupportController::class, 'update']);
 });
 
 // Moderator routes
@@ -75,7 +95,8 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
     // Documentation
     Route::get('/documentation/categories', [DocumentationController::class, 'categories']);
     Route::get('/documentation/categories/{category}', [DocumentationController::class, 'category']);
-    Route::get('/documentation/pages/{page}', [DocumentationController::class, 'page']);
+    Route::get('/documentation/pages', [DocumentationController::class, 'pages']);
+    Route::get('/documentation/pages/{id}', [DocumentationController::class, 'page']);
 
     // Tools
     Route::get('/tools', [ModeratorToolController::class, 'index']);
@@ -87,6 +108,12 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
     // Training Center
     Route::get('/training', [TrainingController::class, 'index']);
     Route::get('/training/questions', [TrainingController::class, 'questions']);
+    Route::post('/training/questions', [TrainingController::class, 'storeQuestion']);
+
+    // Support
+    Route::get('/support', [SupportController::class, 'index']);
+    Route::post('/support', [SupportController::class, 'store']);
+    Route::get('/support/{ticket}', [SupportController::class, 'show']);
 });
 
 // Messages/Chat routes (для админов и модераторов)

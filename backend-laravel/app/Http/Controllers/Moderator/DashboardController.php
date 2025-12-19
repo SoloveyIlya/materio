@@ -15,22 +15,35 @@ class DashboardController extends Controller
         $user = $request->user();
         
         // Количество выполненных тасков (approved)
-        $completedTasks = Task::where('assigned_to', $user->id)
+        $completedTasks = Task::where(function ($q) use ($user) {
+                $q->where('assigned_to', $user->id)
+                  ->orWhereHas('assignments', function ($assignmentQuery) use ($user) {
+                      $assignmentQuery->where('assigned_to', $user->id);
+                  });
+            })
             ->where('status', 'approved')
             ->count();
 
-        // Общее количество тасков
-        $totalTasks = Task::where('assigned_to', $user->id)
+        // Общее количество тасков (все завершенные)
+        $totalTasks = Task::where(function ($q) use ($user) {
+                $q->where('assigned_to', $user->id)
+                  ->orWhereHas('assignments', function ($assignmentQuery) use ($user) {
+                      $assignmentQuery->where('assigned_to', $user->id);
+                  });
+            })
             ->whereIn('status', ['approved', 'rejected', 'completed_by_moderator', 'under_admin_review', 'sent_for_revision'])
             ->count();
 
-        // Процент успешно выполненных
+        // Процент успешно выполненных (approved/total)
         $successRate = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100, 2) : 0;
 
         // Количество проработанных дней
-        $workDays = $user->work_start_date 
-            ? max(1, now($user->timezone ?? 'UTC')->diffInDays($user->work_start_date) + 1)
-            : 0;
+        $workDays = 0;
+        if ($user->work_start_date) {
+            $startDate = \Carbon\Carbon::parse($user->work_start_date);
+            $now = \Carbon\Carbon::now($user->timezone ?? 'UTC');
+            $workDays = max(1, $startDate->diffInDays($now) + 1);
+        }
 
         // Сумма заработанных денег
         $totalEarnings = ModeratorEarning::where('moderator_id', $user->id)

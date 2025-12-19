@@ -3,19 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'domain_id',
         'name',
         'email',
         'password',
+        'registration_password', // ВНИМАНИЕ: Хранение в открытом виде небезопасно!
         'timezone',
         'work_start_date',
         'ip_address',
@@ -27,6 +29,7 @@ class User extends Authenticatable
         'administrator_id',
         'telegram_id',
         'telegram_username',
+        'hidden_from_dashboard',
     ];
 
     protected $hidden = [
@@ -42,6 +45,7 @@ class User extends Authenticatable
             'work_start_date' => 'date',
             'last_seen_at' => 'datetime',
             'is_online' => 'boolean',
+            'hidden_from_dashboard' => 'boolean',
         ];
     }
 

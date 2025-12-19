@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DocumentationCategory;
 use App\Models\DocumentationPage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class DocumentationController extends Controller
 {
@@ -23,6 +24,27 @@ class DocumentationController extends Controller
             ->orderBy('order')
             ->get();
 
+        // Преобразуем пути к изображениям в полные URL для всех страниц
+        $appUrl = config('app.url');
+        $categories->each(function ($category) use ($appUrl) {
+            if ($category->pages) {
+                $category->pages->transform(function ($page) use ($appUrl) {
+                    if ($page->images && is_array($page->images)) {
+                        $page->images = array_map(function ($imagePath) use ($appUrl) {
+                            if (filter_var($imagePath, FILTER_VALIDATE_URL)) {
+                                return $imagePath;
+                            }
+                            if (Str::startsWith($imagePath, '/storage/')) {
+                                return rtrim($appUrl, '/') . $imagePath;
+                            }
+                            return rtrim($appUrl, '/') . '/storage/' . ltrim($imagePath, '/');
+                        }, $page->images);
+                    }
+                    return $page;
+                });
+            }
+        });
+
         return response()->json($categories);
     }
 
@@ -36,13 +58,72 @@ class DocumentationController extends Controller
             $query->where('is_published', true)->orderBy('order');
         }]);
 
+        // Преобразуем пути к изображениям в полные URL для всех страниц
+        $appUrl = config('app.url');
+        if ($category->pages) {
+            $category->pages->transform(function ($page) use ($appUrl) {
+                if ($page->images && is_array($page->images)) {
+                    $page->images = array_map(function ($imagePath) use ($appUrl) {
+                        if (filter_var($imagePath, FILTER_VALIDATE_URL)) {
+                            return $imagePath;
+                        }
+                        if (Str::startsWith($imagePath, '/storage/')) {
+                            return rtrim($appUrl, '/') . $imagePath;
+                        }
+                        return rtrim($appUrl, '/') . '/storage/' . ltrim($imagePath, '/');
+                    }, $page->images);
+                }
+                return $page;
+            });
+        }
+
         return response()->json($category);
     }
 
-    public function page(Request $request, DocumentationPage $page)
+    public function pages(Request $request)
     {
-        if ($page->domain_id !== $request->user()->domain_id) {
-            return response()->json(['message' => 'Forbidden'], 403);
+        $query = DocumentationPage::where('domain_id', $request->user()->domain_id)
+            ->where('is_published', true);
+
+        if ($request->has('popular')) {
+            // Пока возвращаем все опубликованные страницы (можно добавить логику популярности позже)
+            $query->orderBy('created_at', 'desc');
+        }
+
+        $pages = $query->with('category')->get();
+
+        // Преобразуем пути к изображениям в полные URL для всех страниц
+        $appUrl = config('app.url');
+        $pages->transform(function ($page) use ($appUrl) {
+            if ($page->images && is_array($page->images)) {
+                $page->images = array_map(function ($imagePath) use ($appUrl) {
+                    if (filter_var($imagePath, FILTER_VALIDATE_URL)) {
+                        return $imagePath;
+                    }
+                    if (Str::startsWith($imagePath, '/storage/')) {
+                        return rtrim($appUrl, '/') . $imagePath;
+                    }
+                    return rtrim($appUrl, '/') . '/storage/' . ltrim($imagePath, '/');
+                }, $page->images);
+            }
+            return $page;
+        });
+
+        return response()->json($pages);
+    }
+
+    public function page(Request $request, $id)
+    {
+        // Пробуем найти по ID или slug
+        $page = DocumentationPage::where(function ($q) use ($id) {
+                $q->where('id', $id)
+                  ->orWhere('slug', $id);
+            })
+            ->where('domain_id', $request->user()->domain_id)
+            ->first();
+
+        if (!$page) {
+            return response()->json(['message' => 'Page not found'], 404);
         }
 
         if (!$page->is_published) {
@@ -50,6 +131,45 @@ class DocumentationController extends Controller
         }
 
         $page->load(['category', 'category.parent']);
+
+        $appUrl = config('app.url');
+
+        // Преобразуем пути к изображениям в полные URL
+        if ($page->images && is_array($page->images)) {
+            $page->images = array_map(function ($imagePath) use ($appUrl) {
+                // Если путь уже полный URL, возвращаем как есть
+                if (filter_var($imagePath, FILTER_VALIDATE_URL)) {
+                    return $imagePath;
+                }
+                // Если путь начинается с /storage/, добавляем APP_URL
+                if (Str::startsWith($imagePath, '/storage/')) {
+                    return rtrim($appUrl, '/') . $imagePath;
+                }
+                // Если путь относительный, добавляем /storage/
+                return rtrim($appUrl, '/') . '/storage/' . ltrim($imagePath, '/');
+            }, $page->images);
+        }
+
+        // Преобразуем пути к изображениям в HTML контенте
+        if ($page->content) {
+            $page->content = preg_replace_callback(
+                '/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i',
+                function ($matches) use ($appUrl) {
+                    $src = $matches[1];
+                    // Если это уже полный URL, оставляем как есть
+                    if (filter_var($src, FILTER_VALIDATE_URL)) {
+                        return $matches[0];
+                    }
+                    // Если путь начинается с /storage/, преобразуем в полный URL
+                    if (Str::startsWith($src, '/storage/')) {
+                        $fullUrl = rtrim($appUrl, '/') . $src;
+                        return str_replace($src, $fullUrl, $matches[0]);
+                    }
+                    return $matches[0];
+                },
+                $page->content
+            );
+        }
 
         return response()->json($page);
     }

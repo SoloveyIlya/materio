@@ -10,6 +10,7 @@ use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class TaskController extends Controller
 {
@@ -70,11 +71,21 @@ class TaskController extends Controller
 
         $tasks = $query->orderBy('assigned_at', 'desc')->get();
 
-        // Добавляем информацию о дедлайне и таймере
-        $tasks = $tasks->map(function ($task) {
+        // Добавляем информацию о дедлайне и таймере, а также категорию и подгруппу
+        $tasks = $tasks->map(function ($task) use ($user) {
+            // Таймер обратного отсчёта до дедлайна (в секундах)
             $task->deadline_timer = $task->due_at 
-                ? now()->diffInSeconds($task->due_at, false) 
+                ? now($user->timezone ?? 'UTC')->diffInSeconds($task->due_at, false) 
                 : null;
+            
+            // Убеждаемся, что категория загружена
+            if (!$task->relationLoaded('category')) {
+                $task->load('category');
+            }
+            
+            // Подгруппа - это название категории (или можно использовать slug)
+            $task->subgroup = $task->category ? $task->category->name : null;
+            
             return $task;
         });
 
@@ -148,12 +159,51 @@ class TaskController extends Controller
 
         $validated = $request->validate([
             'answers' => 'nullable|string',
-            'screenshots' => 'nullable|array',
-            'screenshots.*' => 'string',
-            'attachments' => 'nullable|array',
-            'attachments.*' => 'string',
             'comment' => 'nullable|string',
         ]);
+
+        // Обработка загрузки файлов
+        $screenshotPaths = [];
+        if ($request->hasFile('screenshots')) {
+            $screenshots = $request->file('screenshots');
+            
+            // Если screenshots - массив файлов
+            if (is_array($screenshots)) {
+                foreach ($screenshots as $screenshot) {
+                    if ($screenshot && $screenshot->isValid()) {
+                        $path = $screenshot->store('task-results/screenshots', 'public');
+                        $screenshotPaths[] = Storage::url($path);
+                    }
+                }
+            } else {
+                // Если одно вложение
+                if ($screenshots->isValid()) {
+                    $path = $screenshots->store('task-results/screenshots', 'public');
+                    $screenshotPaths[] = Storage::url($path);
+                }
+            }
+        }
+
+        $attachmentPaths = [];
+        if ($request->hasFile('attachments')) {
+            $attachments = $request->file('attachments');
+            
+            // Если attachments - массив файлов
+            if (is_array($attachments)) {
+                foreach ($attachments as $attachment) {
+                    if ($attachment && $attachment->isValid()) {
+                        $path = $attachment->store('task-results/attachments', 'public');
+                        $attachmentPaths[] = Storage::url($path);
+                    }
+                }
+            } else {
+                // Если одно вложение
+                if ($attachments->isValid()) {
+                    $path = $attachments->store('task-results/attachments', 'public');
+                    $attachmentPaths[] = Storage::url($path);
+                }
+            }
+        }
 
         DB::beginTransaction();
         try {
@@ -175,8 +225,8 @@ class TaskController extends Controller
                 [
                     'moderator_id' => $user->id,
                     'answers' => $validated['answers'] ?? null,
-                    'screenshots' => $validated['screenshots'] ?? null,
-                    'attachments' => $validated['attachments'] ?? null,
+                    'screenshots' => !empty($screenshotPaths) ? $screenshotPaths : null,
+                    'attachments' => !empty($attachmentPaths) ? $attachmentPaths : null,
                     'moderator_comment' => $validated['comment'] ?? null,
                 ]
             );

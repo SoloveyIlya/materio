@@ -82,7 +82,7 @@ class TelegramService
     /**
      * Обработка ответа из Telegram
      */
-    public function handleCallback(string $callbackData, int $chatId, string $messageText): bool
+    public function handleCallback(string $callbackData, int $chatId, string $messageText = null): bool
     {
         if (str_starts_with($callbackData, 'reply_')) {
             $messageId = (int) str_replace('reply_', '', $callbackData);
@@ -92,18 +92,21 @@ class TelegramService
                 return false;
             }
 
-            // Создаем ответное сообщение
-            $replyMessage = Message::create([
-                'domain_id' => $originalMessage->domain_id,
-                'from_user_id' => $originalMessage->to_user_id, // Админ отвечает
-                'to_user_id' => $originalMessage->from_user_id, // Модератору
-                'task_id' => $originalMessage->task_id,
-                'type' => $originalMessage->type,
-                'body' => $messageText,
-            ]);
+            // Если есть текст сообщения, создаём ответ
+            if ($messageText) {
+                // Создаем ответное сообщение
+                $replyMessage = Message::create([
+                    'domain_id' => $originalMessage->domain_id,
+                    'from_user_id' => $originalMessage->to_user_id, // Админ отвечает
+                    'to_user_id' => $originalMessage->from_user_id, // Модератору
+                    'task_id' => $originalMessage->task_id,
+                    'type' => $originalMessage->type,
+                    'body' => $messageText,
+                ]);
 
-            // Отправляем подтверждение в Telegram
-            $this->sendConfirmation($chatId, 'Сообщение отправлено');
+                // Отправляем подтверждение в Telegram
+                $this->sendConfirmation($chatId, '✅ Сообщение отправлено в веб-чат');
+            }
 
             return true;
         }
@@ -112,17 +115,82 @@ class TelegramService
     }
 
     /**
+     * Обработка ответа на сообщение из Telegram (reply to message)
+     */
+    public function handleReply(int $chatId, int $replyToMessageId, string $messageText): bool
+    {
+        // Находим пользователя по telegram_id
+        $user = User::where('telegram_id', (string)$chatId)->first();
+        
+        if (!$user || !$user->isAdmin()) {
+            return false;
+        }
+
+        // Ищем последнее сообщение от модератора, на которое может быть ответ
+        // В реальности нужно хранить mapping между Telegram message_id и нашим message_id
+        // Пока используем упрощённый подход: ищем последнее непрочитанное сообщение для этого админа
+        $lastMessage = Message::where('to_user_id', $user->id)
+            ->where('is_read', false)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$lastMessage) {
+            $this->sendConfirmation($chatId, '❌ Не найдено сообщение для ответа');
+            return false;
+        }
+
+        // Создаем ответное сообщение
+        $replyMessage = Message::create([
+            'domain_id' => $lastMessage->domain_id,
+            'from_user_id' => $user->id,
+            'to_user_id' => $lastMessage->from_user_id,
+            'task_id' => $lastMessage->task_id,
+            'type' => $lastMessage->type,
+            'body' => $messageText,
+        ]);
+
+        // Отправляем подтверждение в Telegram
+        $this->sendConfirmation($chatId, '✅ Сообщение отправлено в веб-чат');
+
+        return true;
+    }
+
+    /**
      * Отправка подтверждения в Telegram
      */
-    protected function sendConfirmation(int $chatId, string $text): void
+    public function sendConfirmation(int $chatId, string $text): void
     {
         try {
             Http::post("{$this->apiUrl}/sendMessage", [
                 'chat_id' => $chatId,
                 'text' => $text,
+                'parse_mode' => 'HTML',
             ]);
         } catch (\Exception $e) {
             Log::error('Telegram confirmation error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Отправка файла (скриншота или документа) в Telegram
+     */
+    public function sendFile(int $chatId, string $filePath, string $caption = null): bool
+    {
+        if (!$this->botToken) {
+            return false;
+        }
+
+        try {
+            $response = Http::attach('document', file_get_contents($filePath), basename($filePath))
+                ->post("{$this->apiUrl}/sendDocument", [
+                    'chat_id' => $chatId,
+                    'caption' => $caption,
+                ]);
+
+            return $response->successful();
+        } catch (\Exception $e) {
+            Log::error('Telegram file send error: ' . $e->getMessage());
+            return false;
         }
     }
 

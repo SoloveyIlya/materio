@@ -16,7 +16,7 @@ const nextConfig = {
     ignoreBuildErrors: process.env.NODE_ENV === 'production',
   },
   // Ensure proper module resolution
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': path.resolve(__dirname, 'src'),
@@ -34,6 +34,15 @@ const nextConfig = {
       '@redux-store': path.resolve(__dirname, 'src/redux-store'),
       '@fake-db': path.resolve(__dirname, 'src/fake-db'),
     }
+    
+    // Ensure @tanstack packages are resolved correctly
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      }
+    }
+    
     return config
   },
 }

@@ -1,16 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, IconButton, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Tabs, Tab, Grid, Card, CardContent } from '@mui/material'
+import { Box, Typography, Tabs, Tab, Grid, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Card, CardContent } from '@mui/material'
 import api from '@/lib/api'
 import { API_URL } from '@/lib/api'
+
+// Component Imports
+import TaskListTable from '@/views/apps/tasks/list/TaskListTable'
+import TaskCard from '@/views/apps/tasks/list/TaskCard'
 
 export default function AdminTasksPage() {
   const [tasks, setTasks] = useState([])
   const [selectedTask, setSelectedTask] = useState(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [moderationComment, setModerationComment] = useState('')
-  const [activeTab, setActiveTab] = useState(0)
+  const [activeTab, setActiveTab] = useState(0) // По умолчанию "Under Review"
 
   useEffect(() => {
     loadTasks()
@@ -19,8 +23,8 @@ export default function AdminTasksPage() {
   const loadTasks = async () => {
     try {
       const statusMap = {
-        0: null, // Все
-        1: 'under_admin_review',
+        0: 'under_admin_review', // Under Review (первый таб, по умолчанию)
+        1: 'pending,in_progress', // Pending - включает pending и in_progress
         2: 'approved',
         3: 'rejected',
         4: 'sent_for_revision',
@@ -31,9 +35,10 @@ export default function AdminTasksPage() {
       }
 
       const response = await api.get(`/admin/tasks?${params}`)
-      setTasks(response.data.data || response.data)
+      setTasks(response.data.data || response.data || [])
     } catch (error) {
       console.error('Error loading tasks:', error)
+      setTasks([])
     }
   }
 
@@ -44,6 +49,13 @@ export default function AdminTasksPage() {
       setDialogOpen(true)
     } catch (error) {
       console.error('Error loading task:', error)
+    }
+  }
+
+  const handleMessageModerator = (task) => {
+    const moderatorId = task.assigned_user?.id || task.assignedUser?.id
+    if (moderatorId) {
+      window.location.href = `/messages?moderator_id=${moderatorId}&task_id=${task.id}&type=message`
     }
   }
 
@@ -64,75 +76,30 @@ export default function AdminTasksPage() {
     }
   }
 
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: 'default',
-      in_progress: 'info',
-      completed_by_moderator: 'warning',
-      under_admin_review: 'primary',
-      approved: 'success',
-      rejected: 'error',
-      sent_for_revision: 'warning',
-    }
-    return colors[status] || 'default'
-  }
-
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>Tasks</Typography>
+    <Box sx={{ p: 6 }}>
+      <Typography variant='h4' gutterBottom>Tasks</Typography>
 
-      <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 3 }}>
-        <Tab label="All" />
-        <Tab label="Under Review" />
-        <Tab label="Approved" />
-        <Tab label="Rejected" />
-        <Tab label="Revision" />
+      <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 6 }}>
+        <Tab label='Under Review' />
+        <Tab label='Pending' />
+        <Tab label='Approved' />
+        <Tab label='Rejected' />
+        <Tab label='Revision' />
       </Tabs>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Title</TableCell>
-              <TableCell>Moderator</TableCell>
-              <TableCell>Category</TableCell>
-              <TableCell>Price</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Completed At</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {tasks.map((task) => (
-              <TableRow key={task.id}>
-                <TableCell>{task.id}</TableCell>
-                <TableCell>{task.title}</TableCell>
-                <TableCell>{task.assigned_user?.name || '—'}</TableCell>
-                <TableCell>{task.category?.name || '—'}</TableCell>
-                <TableCell>${task.price}</TableCell>
-                <TableCell>
-                  <Chip label={task.status} color={getStatusColor(task.status)} size="small" />
-                </TableCell>
-                <TableCell>
-                  {task.completed_at ? new Date(task.completed_at).toLocaleString() : '—'}
-                </TableCell>
-                <TableCell align="right">
-                  {task.status === 'under_admin_review' && (
-                    <IconButton
-                      size="small"
-                      color="primary"
-                      onClick={() => handleViewResult(task)}
-                    >
-                      <i className="ri-eye-line" />
-                    </IconButton>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Grid container spacing={6}>
+        <Grid size={{ xs: 12 }}>
+          <TaskCard activeTab={activeTab} />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <TaskListTable
+            tableData={tasks}
+            onViewResult={handleViewResult}
+            onMessageModerator={handleMessageModerator}
+          />
+        </Grid>
+      </Grid>
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>Task Result - {selectedTask?.title}</DialogTitle>
@@ -140,19 +107,21 @@ export default function AdminTasksPage() {
           {selectedTask?.result && (
             <Box sx={{ mt: 2 }}>
               <Grid container spacing={2}>
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" gutterBottom>Answers</Typography>
                       <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                        {selectedTask.result.answers || 'No answers provided'}
+                        {typeof selectedTask.result.answers === 'object' 
+                          ? JSON.stringify(selectedTask.result.answers, null, 2)
+                          : selectedTask.result.answers || 'No answers provided'}
                       </Typography>
                     </CardContent>
                   </Card>
                 </Grid>
 
                 {selectedTask.result.screenshots && selectedTask.result.screenshots.length > 0 && (
-                  <Grid item xs={12}>
+                  <Grid size={{ xs: 12 }}>
                     <Card>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>Screenshots</Typography>
@@ -181,7 +150,7 @@ export default function AdminTasksPage() {
                 )}
 
                 {selectedTask.result.attachments && selectedTask.result.attachments.length > 0 && (
-                  <Grid item xs={12}>
+                  <Grid size={{ xs: 12 }}>
                     <Card>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>Attachments</Typography>
@@ -203,7 +172,7 @@ export default function AdminTasksPage() {
                 )}
 
                 {selectedTask.result.moderator_comment && (
-                  <Grid item xs={12}>
+                  <Grid size={{ xs: 12 }}>
                     <Card>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>Moderator Comment</Typography>
@@ -216,7 +185,7 @@ export default function AdminTasksPage() {
                 )}
 
                 {selectedTask.result.admin_comment && (
-                  <Grid item xs={12}>
+                  <Grid size={{ xs: 12 }}>
                     <Card>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>Admin Comment</Typography>
@@ -228,7 +197,7 @@ export default function AdminTasksPage() {
                   </Grid>
                 )}
 
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <TextField
                     fullWidth
                     multiline
@@ -245,15 +214,24 @@ export default function AdminTasksPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button onClick={() => handleModerate('reject')} color="error">
-            Reject
-          </Button>
-          <Button onClick={() => handleModerate('revision')} color="warning">
-            Send for Revision
-          </Button>
-          <Button onClick={() => handleModerate('approve')} color="success" variant="contained">
-            Approve
-          </Button>
+          {selectedTask?.status === 'under_admin_review' && (
+            <>
+              <Button onClick={() => handleModerate('reject')} color="error">
+                Reject
+              </Button>
+              <Button onClick={() => handleModerate('revision')} color="warning">
+                Send for Revision
+              </Button>
+              <Button onClick={() => handleModerate('approve')} color="success" variant="contained">
+                Approve
+              </Button>
+            </>
+          )}
+          {selectedTask?.status !== 'under_admin_review' && (
+            <Button onClick={() => setDialogOpen(false)} variant="contained">
+              Close
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>
