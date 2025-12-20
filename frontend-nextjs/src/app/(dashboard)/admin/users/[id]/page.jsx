@@ -12,6 +12,9 @@ import Box from '@mui/material/Box'
 import UserLeftOverview from '@/views/apps/user/view/user-left-overview'
 import UserRight from '@/views/apps/user/view/user-right'
 import OverViewTab from '@/views/apps/user/view/user-right/overview'
+import TestList from '@/views/apps/user/view/user-right/TestList'
+import TaskList from '@/views/apps/user/view/user-right/TaskList'
+import DocumentsTab from '@/views/apps/user/view/user-right/DocumentsTab'
 import api from '@/lib/api'
 
 const UserViewPage = () => {
@@ -19,6 +22,9 @@ const UserViewPage = () => {
   const userId = params.id
   const [user, setUser] = useState(null)
   const [stats, setStats] = useState(null)
+  const [tests, setTests] = useState([])
+  const [testResults, setTestResults] = useState([])
+  const [requiredDocuments, setRequiredDocuments] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -32,6 +38,9 @@ const UserViewPage = () => {
       const response = await api.get(`/admin/users/${userId}`)
       setUser(response.data.user)
       setStats(response.data.stats)
+      setTests(response.data.tests || [])
+      setTestResults(response.data.user?.testResults || [])
+      setRequiredDocuments(response.data.required_documents || [])
     } catch (error) {
       console.error('Error loading user:', error)
     } finally {
@@ -49,7 +58,17 @@ const UserViewPage = () => {
 
   // Tab content list
   const tabContentList = {
-    overview: <OverViewTab userId={userId} />
+    overview: (
+      <Grid container spacing={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <TestList userId={userId} tests={tests} testResults={testResults} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <TaskList tasks={user?.tasks || []} userId={userId} />
+        </Grid>
+      </Grid>
+    ),
+    documents: <DocumentsTab userId={userId} requiredDocuments={requiredDocuments} userDocuments={user?.userDocuments || []} />
   }
 
   return (

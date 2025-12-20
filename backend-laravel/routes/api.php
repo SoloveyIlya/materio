@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DocumentationPageController;
 use App\Http\Controllers\Admin\SupportController as AdminSupportController;
 use App\Http\Controllers\Admin\TestController;
 use App\Http\Controllers\Admin\TestLevelController;
+use App\Http\Controllers\Admin\RequiredDocumentController;
 use App\Http\Controllers\Admin\TaskCategoryController;
 use App\Http\Controllers\Admin\TaskController as AdminTaskController;
 use App\Http\Controllers\Admin\TaskTemplateController;
@@ -49,6 +50,9 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
     // Tests
     Route::apiResource('test-levels', TestLevelController::class);
     Route::apiResource('tests', TestController::class);
+
+    // Required Documents
+    Route::apiResource('required-documents', RequiredDocumentController::class);
 
     // Tools
     Route::apiResource('tools', ToolController::class);

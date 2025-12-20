@@ -13,11 +13,17 @@ class ModeratorProfile extends Model
         'user_id',
         'settings',
         'minimum_minutes_between_tasks',
+        'has_w4',
+        'has_i9',
+        'has_direct',
     ];
 
     protected $casts = [
         'settings' => 'array',
         'minimum_minutes_between_tasks' => 'integer',
+        'has_w4' => 'boolean',
+        'has_i9' => 'boolean',
+        'has_direct' => 'boolean',
     ];
 
     public function user()

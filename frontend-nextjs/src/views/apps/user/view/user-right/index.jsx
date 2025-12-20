@@ -27,6 +27,7 @@ const UserRight = ({ tabContentList }) => {
           <Grid size={{ xs: 12 }}>
             <CustomTabList onChange={handleChange} variant='scrollable' pill='true'>
               <Tab icon={<i className='ri-user-3-line' />} value='overview' label='Overview' iconPosition='start' />
+              <Tab icon={<i className='ri-file-text-line' />} value='documents' label='Documents' iconPosition='start' />
             </CustomTabList>
           </Grid>
           <Grid size={{ xs: 12 }}>

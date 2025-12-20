@@ -56,6 +56,8 @@ class UserController extends Controller
             'moderatorProfile',
             'adminProfile',
             'domain',
+            'userDocuments.requiredDocument',
+            'testResults.test',
         ]);
 
         // Статистика
@@ -66,9 +68,24 @@ class UserController extends Controller
             'pending_tasks' => $user->tasks()->where('status', 'pending')->count(),
         ];
 
+        // Загружаем все тесты для отображения
+        $tests = \App\Models\Test::where('domain_id', $request->user()->domain_id)
+            ->where('is_active', true)
+            ->with('level')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Загружаем обязательные документы
+        $requiredDocuments = \App\Models\RequiredDocument::where('domain_id', $request->user()->domain_id)
+            ->where('is_active', true)
+            ->orderBy('order')
+            ->get();
+
         return response()->json([
             'user' => $user,
             'stats' => $stats,
+            'tests' => $tests,
+            'required_documents' => $requiredDocuments,
         ]);
     }
 

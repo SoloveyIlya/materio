@@ -43,21 +43,36 @@ const UserDetails = ({ user, stats }) => {
           {stats && (
             <div className='flex items-center justify-around flex-wrap gap-4'>
               <div className='flex items-center gap-4'>
-                <CustomAvatar variant='rounded' color='primary' skin='light'>
+                <CustomAvatar variant='rounded' color='success' skin='light'>
                   <i className='ri-check-line' />
                 </CustomAvatar>
                 <div>
                   <Typography variant='h5'>{stats.completed_tasks || 0}</Typography>
-                  <Typography>Tasks Completed</Typography>
+                  <Typography>Completed</Typography>
                 </div>
               </div>
               <div className='flex items-center gap-4'>
-                <CustomAvatar variant='rounded' color='success' skin='light'>
-                  <i className='ri-star-smile-line' />
+                <CustomAvatar variant='rounded' color='error' skin='light'>
+                  <i className='ri-close-line' />
                 </CustomAvatar>
                 <div>
-                  <Typography variant='h5'>{stats.total_tasks || 0}</Typography>
-                  <Typography>Total Tasks</Typography>
+                  <Typography variant='h5'>{stats.pending_tasks + stats.in_progress_tasks || 0}</Typography>
+                  <Typography>Not Completed</Typography>
+                </div>
+              </div>
+            </div>
+          )}
+          {user.administrator && (
+            <div>
+              <Typography variant='h6' sx={{ mb: 2 }}>Assigned Admin</Typography>
+              <Divider sx={{ mb: 2 }} />
+              <div className='flex items-center gap-2'>
+                <CustomAvatar size={40}>
+                  {getInitials(user.administrator.name || user.administrator.email || 'Admin')}
+                </CustomAvatar>
+                <div>
+                  <Typography className='font-medium'>{user.administrator.name || user.administrator.email}</Typography>
+                  <Typography variant='caption' color='text.secondary'>{user.administrator.email}</Typography>
                 </div>
               </div>
             </div>
@@ -105,10 +120,32 @@ const UserDetails = ({ user, stats }) => {
             </div>
             <div className='flex items-center flex-wrap gap-x-1.5'>
               <Typography className='font-medium' color='text.primary'>
-                Location:
+                Country (from IP):
               </Typography>
-              <Typography>{user.location || '—'}</Typography>
+              <Typography>{user.location || user.ip_address || '—'}</Typography>
             </div>
+            {user.moderatorProfile && (
+              <>
+                <div className='flex items-center flex-wrap gap-x-1.5'>
+                  <Typography className='font-medium' color='text.primary'>
+                    W-4:
+                  </Typography>
+                  <Typography>{user.moderatorProfile.has_w4 ? '✅' : '❌'}</Typography>
+                </div>
+                <div className='flex items-center flex-wrap gap-x-1.5'>
+                  <Typography className='font-medium' color='text.primary'>
+                    I-9:
+                  </Typography>
+                  <Typography>{user.moderatorProfile.has_i9 ? '✅' : '❌'}</Typography>
+                </div>
+                <div className='flex items-center flex-wrap gap-x-1.5'>
+                  <Typography className='font-medium' color='text.primary'>
+                    Direct:
+                  </Typography>
+                  <Typography>{user.moderatorProfile.has_direct ? '✅' : '❌'}</Typography>
+                </div>
+              </>
+            )}
             {user.registration_password && (
               <div className='flex items-center flex-wrap gap-x-1.5'>
                 <Typography className='font-medium' color='text.primary'>
