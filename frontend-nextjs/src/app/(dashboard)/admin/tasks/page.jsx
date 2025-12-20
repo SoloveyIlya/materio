@@ -120,52 +120,62 @@ export default function AdminTasksPage() {
                   </Card>
                 </Grid>
 
-                {selectedTask.result.screenshots && selectedTask.result.screenshots.length > 0 && (
+                {selectedTask.result.screenshots && Array.isArray(selectedTask.result.screenshots) && selectedTask.result.screenshots.length > 0 && (
                   <Grid size={{ xs: 12 }}>
                     <Card>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>Screenshots</Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                          {selectedTask.result.screenshots.map((screenshot, index) => (
-                            <Box
-                              key={index}
-                              component="img"
-                              src={screenshot.startsWith('http') ? screenshot : `${API_URL}${screenshot}`}
-                              alt={`Screenshot ${index + 1}`}
-                              sx={{
-                                maxWidth: 200,
-                                maxHeight: 200,
-                                objectFit: 'cover',
-                                border: '1px solid #ddd',
-                                borderRadius: 1,
-                                cursor: 'pointer',
-                              }}
-                              onClick={() => window.open(screenshot.startsWith('http') ? screenshot : `${API_URL}${screenshot}`, '_blank')}
-                            />
-                          ))}
+                          {selectedTask.result.screenshots.map((screenshot, index) => {
+                            const imageUrl = typeof screenshot === 'string' 
+                              ? (screenshot.startsWith('http') ? screenshot : `${API_URL}${screenshot}`)
+                              : (screenshot.url || screenshot.path || '')
+                            return (
+                              <Box
+                                key={index}
+                                component="img"
+                                src={imageUrl}
+                                alt={`Screenshot ${index + 1}`}
+                                sx={{
+                                  maxWidth: 200,
+                                  maxHeight: 200,
+                                  objectFit: 'cover',
+                                  border: '1px solid #ddd',
+                                  borderRadius: 1,
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => window.open(imageUrl, '_blank')}
+                              />
+                            )
+                          })}
                         </Box>
                       </CardContent>
                     </Card>
                   </Grid>
                 )}
 
-                {selectedTask.result.attachments && selectedTask.result.attachments.length > 0 && (
+                {selectedTask.result.attachments && Array.isArray(selectedTask.result.attachments) && selectedTask.result.attachments.length > 0 && (
                   <Grid size={{ xs: 12 }}>
                     <Card>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>Attachments</Typography>
-                        {selectedTask.result.attachments.map((attachment, index) => (
-                          <Button
-                            key={index}
-                            variant="outlined"
-                            startIcon={<i className="ri-file-line" />}
-                            href={attachment.startsWith('http') ? attachment : `${API_URL}${attachment}`}
-                            target="_blank"
-                            sx={{ mr: 1, mb: 1 }}
-                          >
-                            Attachment {index + 1}
-                          </Button>
-                        ))}
+                        {selectedTask.result.attachments.map((attachment, index) => {
+                          const fileUrl = typeof attachment === 'string'
+                            ? (attachment.startsWith('http') ? attachment : `${API_URL}${attachment}`)
+                            : (attachment.url || attachment.path || '')
+                          return (
+                            <Button
+                              key={index}
+                              variant="outlined"
+                              startIcon={<i className="ri-file-line" />}
+                              href={fileUrl}
+                              target="_blank"
+                              sx={{ mr: 1, mb: 1 }}
+                            >
+                              Attachment {index + 1}
+                            </Button>
+                          )
+                        })}
                       </CardContent>
                     </Card>
                   </Grid>

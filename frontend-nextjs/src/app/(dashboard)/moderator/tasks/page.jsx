@@ -6,7 +6,6 @@ import api from '@/lib/api'
 
 // Component Imports
 import ModeratorTaskListTable from '@/views/apps/tasks/list/ModeratorTaskListTable'
-import TaskCard from '@/views/apps/tasks/list/TaskCard'
 
 export default function ModeratorTasksPage() {
   const [tasks, setTasks] = useState([])
@@ -93,7 +92,8 @@ export default function ModeratorTasksPage() {
       alert('Task completed successfully')
     } catch (error) {
       console.error('Error completing task:', error)
-      alert('Error completing task')
+      const errorMessage = error.response?.data?.message || error.message || 'Unknown error'
+      alert('Error completing task: ' + errorMessage)
     }
   }
 
@@ -106,7 +106,7 @@ export default function ModeratorTasksPage() {
   }
 
   const handleMessage = (task) => {
-    window.location.href = `/messages?task_id=${task.id}&type=message`
+    window.location.href = `/chat?task_id=${task.id}`
   }
 
   return (
@@ -120,9 +120,6 @@ export default function ModeratorTasksPage() {
       </Tabs>
 
       <Grid container spacing={6}>
-        <Grid size={{ xs: 12 }}>
-          <TaskCard activeTab={activeTab} />
-        </Grid>
         <Grid size={{ xs: 12 }}>
           <ModeratorTaskListTable
             tableData={tasks}

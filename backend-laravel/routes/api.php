@@ -69,6 +69,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
     Route::post('/tasks', [AdminTaskController::class, 'store']);
     Route::get('/tasks/{task}', [AdminTaskController::class, 'show']);
     Route::put('/tasks/{task}', [AdminTaskController::class, 'update']);
+    Route::delete('/tasks/{task}', [AdminTaskController::class, 'destroy']);
     Route::post('/tasks/{task}/moderate', [AdminTaskController::class, 'moderateResult']);
 
     // Training Questions
@@ -90,6 +91,7 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
     Route::get('/tasks/{task}', [TaskController::class, 'show']);
     Route::post('/tasks/{task}/start', [TaskController::class, 'start']);
     Route::post('/tasks/{task}/complete', [TaskController::class, 'complete']);
+    Route::post('/tasks/{task}/report', [TaskController::class, 'createReport']);
     Route::get('/work-day', [TaskController::class, 'getCurrentWorkDay']);
 
     // Documentation

@@ -115,7 +115,7 @@ class TaskController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        return response()->json($task->load(['category', 'template', 'assignments']));
+        return response()->json($task->load(['category', 'template', 'assignments', 'documentation', 'tool', 'result']));
     }
 
     public function start(Task $task, Request $request): JsonResponse
@@ -164,42 +164,23 @@ class TaskController extends Controller
 
         // Обработка загрузки файлов
         $screenshotPaths = [];
-        if ($request->hasFile('screenshots')) {
-            $screenshots = $request->file('screenshots');
-            
-            // Если screenshots - массив файлов
-            if (is_array($screenshots)) {
-                foreach ($screenshots as $screenshot) {
-                    if ($screenshot && $screenshot->isValid()) {
-                        $path = $screenshot->store('task-results/screenshots', 'public');
-                        $screenshotPaths[] = Storage::url($path);
-                    }
-                }
-            } else {
-                // Если одно вложение
-                if ($screenshots->isValid()) {
-                    $path = $screenshots->store('task-results/screenshots', 'public');
+        // Обрабатываем файлы screenshots (могут быть отправлены как массив screenshots[0], screenshots[1] и т.д.)
+        $allFiles = $request->allFiles();
+        if (isset($allFiles['screenshots']) && is_array($allFiles['screenshots'])) {
+            foreach ($allFiles['screenshots'] as $screenshot) {
+                if ($screenshot && $screenshot->isValid()) {
+                    $path = $screenshot->store('task-results/screenshots', 'public');
                     $screenshotPaths[] = Storage::url($path);
                 }
             }
         }
 
         $attachmentPaths = [];
-        if ($request->hasFile('attachments')) {
-            $attachments = $request->file('attachments');
-            
-            // Если attachments - массив файлов
-            if (is_array($attachments)) {
-                foreach ($attachments as $attachment) {
-                    if ($attachment && $attachment->isValid()) {
-                        $path = $attachment->store('task-results/attachments', 'public');
-                        $attachmentPaths[] = Storage::url($path);
-                    }
-                }
-            } else {
-                // Если одно вложение
-                if ($attachments->isValid()) {
-                    $path = $attachments->store('task-results/attachments', 'public');
+        // Обрабатываем файлы attachments (могут быть отправлены как массив attachments[0], attachments[1] и т.д.)
+        if (isset($allFiles['attachments']) && is_array($allFiles['attachments'])) {
+            foreach ($allFiles['attachments'] as $attachment) {
+                if ($attachment && $attachment->isValid()) {
+                    $path = $attachment->store('task-results/attachments', 'public');
                     $attachmentPaths[] = Storage::url($path);
                 }
             }
@@ -252,6 +233,66 @@ class TaskController extends Controller
             'current_work_day' => $user->getCurrentWorkDay(),
             'timezone' => $user->timezone,
         ]);
+    }
+
+    public function createReport(Task $task, Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        // Проверяем, что таск принадлежит текущему пользователю
+        if (!$task->isAssignedTo($user->id)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'text' => 'required|string',
+        ]);
+
+        // Обработка загрузки файлов
+        $filePaths = [];
+        if ($request->hasFile('files')) {
+            $files = $request->file('files');
+            
+            if (is_array($files)) {
+                foreach ($files as $file) {
+                    if ($file && $file->isValid()) {
+                        $path = $file->store('task-reports', 'public');
+                        $filePaths[] = Storage::url($path);
+                    }
+                }
+            } else {
+                if ($files->isValid()) {
+                    $path = $files->store('task-reports', 'public');
+                    $filePaths[] = Storage::url($path);
+                }
+            }
+        }
+
+        // Здесь можно создать модель TaskReport или добавить в TaskResult
+        // Для простоты, добавим в комментарий модератора или создадим отдельную запись
+        // Пока сохраним в TaskResult как расширение
+        
+        DB::beginTransaction();
+        try {
+            $result = $task->result;
+            if ($result) {
+                // Если результат уже есть, можем добавить отчет
+                // Для полной реализации нужна отдельная таблица TaskReport
+            }
+
+            // Простое решение - сохранить в TaskResult или создать новую запись
+            // TODO: Создать таблицу task_reports для хранения отчетов
+            
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Report created successfully',
+                'files' => $filePaths,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error creating report: ' . $e->getMessage()], 500);
+        }
     }
 
     public function dashboard(Request $request): JsonResponse

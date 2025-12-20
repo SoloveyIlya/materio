@@ -1,9 +1,14 @@
 const verticalMenuData = (user = null) => {
+  // Check user role
+  const isAdmin = user?.roles?.some((role) => role.name === 'admin')
+  const isModerator = user?.roles?.some((role) => role.name === 'moderator')
+
+  // Base menu for admin and regular users
   const baseMenu = [
     {
-      label: 'Home',
+      label: isAdmin ? 'Task Manager' : 'Home',
       icon: 'ri-home-smile-line',
-      href: '/home'
+      href: isAdmin ? '/admin/tasks/kanban' : '/home'
     },
     {
       label: 'Dashboard',
@@ -17,15 +22,26 @@ const verticalMenuData = (user = null) => {
     }
   ]
 
-  // Check user role
-  const isAdmin = user?.roles?.some((role) => role.name === 'admin')
-  const isModerator = user?.roles?.some((role) => role.name === 'moderator')
+  let menu = []
 
-  const menu = [...baseMenu]
-
-  // Add admin menu items
+  // Admin menu
   if (isAdmin) {
-    menu.push(
+    menu = [
+      {
+        label: 'Task Manager',
+        icon: 'ri-home-smile-line',
+        href: '/admin/tasks/kanban'
+      },
+      {
+        label: 'Dashboard',
+        icon: 'ri-dashboard-3-line',
+        href: '/dashboard'
+      },
+      {
+        label: 'Chats',
+        icon: 'ri-message-3-line',
+        href: '/chat'
+      },
       {
         label: 'Tasks',
         icon: 'ri-task-line',
@@ -56,12 +72,16 @@ const verticalMenuData = (user = null) => {
         icon: 'ri-customer-service-2-line',
         href: '/admin/support'
       }
-    )
+    ]
   }
-
-  // Add moderator menu items
-  if (isModerator) {
-    menu.push(
+  // Moderator menu - согласно ТЗ
+  else if (isModerator) {
+    menu = [
+      {
+        label: 'Dashboard',
+        icon: 'ri-dashboard-3-line',
+        href: '/moderator/dashboard'
+      },
       {
         label: 'Tasks',
         icon: 'ri-task-line',
@@ -83,11 +103,20 @@ const verticalMenuData = (user = null) => {
         href: '/moderator/tools'
       },
       {
+        label: 'Messages',
+        icon: 'ri-message-3-line',
+        href: '/chat'
+      },
+      {
         label: 'Support',
         icon: 'ri-customer-service-2-line',
         href: '/moderator/support'
       }
-    )
+    ]
+  }
+  // Default menu for other users
+  else {
+    menu = [...baseMenu]
   }
 
   return menu

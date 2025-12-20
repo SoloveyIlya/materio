@@ -26,6 +26,20 @@ class Task extends Model
         'attached_services',
         'work_day',
         'is_main_task',
+        'first_name',
+        'last_name',
+        'country',
+        'address',
+        'phone_number',
+        'email',
+        'date_of_birth',
+        'id_type',
+        'id_number',
+        'document_image',
+        'selfie_image',
+        'comment',
+        'documentation_id',
+        'tool_id',
     ];
 
     protected $casts = [
@@ -39,6 +53,7 @@ class Task extends Model
         'attached_services' => 'array',
         'work_day' => 'integer',
         'is_main_task' => 'boolean',
+        'date_of_birth' => 'date',
     ];
 
     public function domain()
@@ -69,6 +84,16 @@ class Task extends Model
     public function result()
     {
         return $this->hasOne(TaskResult::class);
+    }
+
+    public function documentation()
+    {
+        return $this->belongsTo(DocumentationPage::class, 'documentation_id');
+    }
+
+    public function tool()
+    {
+        return $this->belongsTo(Tool::class, 'tool_id');
     }
 
     /**

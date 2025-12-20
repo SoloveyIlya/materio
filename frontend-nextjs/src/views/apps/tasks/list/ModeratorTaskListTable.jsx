@@ -11,7 +11,6 @@ import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
-import Checkbox from '@mui/material/Checkbox'
 import Chip from '@mui/material/Chip'
 import TablePagination from '@mui/material/TablePagination'
 import TextField from '@mui/material/TextField'
@@ -70,10 +69,10 @@ const columnHelper = createColumnHelper()
 
 const ModeratorTaskListTable = ({ tableData, onStart, onComplete, onMessage }) => {
   // States
-  const [rowSelection, setRowSelection] = useState({})
   const [data, setData] = useState(tableData || [])
   const [filteredData, setFilteredData] = useState(data)
   const [globalFilter, setGlobalFilter] = useState('')
+  const [currentTime, setCurrentTime] = useState(Date.now())
 
   // Hooks
   const router = useRouter()
@@ -82,6 +81,25 @@ const ModeratorTaskListTable = ({ tableData, onStart, onComplete, onMessage }) =
     setData(tableData || [])
     setFilteredData(tableData || [])
   }, [tableData])
+
+  // Update timer every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  // Helper function to calculate deadline timer
+  const calculateDeadlineTimer = (task) => {
+    if (task.due_at && (task.status === 'pending' || task.status === 'in_progress')) {
+      const dueDate = new Date(task.due_at).getTime()
+      const now = currentTime || Date.now()
+      return Math.floor((dueDate - now) / 1000)
+    }
+    return task.deadline_timer
+  }
 
   const getStatusColor = (status) => {
     const colors = {
@@ -121,36 +139,6 @@ const ModeratorTaskListTable = ({ tableData, onStart, onComplete, onMessage }) =
 
   const columns = useMemo(
     () => [
-      {
-        id: 'select',
-        header: ({ table }) => (
-          <Checkbox
-            {...{
-              checked: table.getIsAllRowsSelected(),
-              indeterminate: table.getIsSomeRowsSelected(),
-              onChange: table.getToggleAllRowsSelectedHandler()
-            }}
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            {...{
-              checked: row.getIsSelected(),
-              disabled: !row.getCanSelect(),
-              indeterminate: row.getIsSomeSelected(),
-              onChange: row.getToggleSelectedHandler()
-            }}
-          />
-        )
-      },
-      columnHelper.accessor('id', {
-        header: 'ID',
-        cell: ({ row }) => (
-          <Typography color='primary.main' className='font-medium'>
-            #{row.original.id}
-          </Typography>
-        )
-      }),
       columnHelper.accessor('title', {
         header: 'Title',
         cell: ({ row }) => (
@@ -159,15 +147,36 @@ const ModeratorTaskListTable = ({ tableData, onStart, onComplete, onMessage }) =
           </Typography>
         )
       }),
+      columnHelper.accessor('created_at', {
+        header: 'Received Time',
+        cell: ({ row }) => {
+          if (!row.original.created_at) return <Typography>—</Typography>
+          const date = new Date(row.original.created_at)
+          return (
+            <Typography variant='body2'>
+              {date.toLocaleString()}
+            </Typography>
+          )
+        }
+      }),
       columnHelper.accessor('deadline_timer', {
-        header: 'Deadline',
+        header: 'Deadline Timer',
+        cell: ({ row }) => {
+          const timer = calculateDeadlineTimer(row.original)
+          return (
+            <Chip
+              label={formatDeadline(timer)}
+              color={timer && timer > 0 ? 'info' : 'error'}
+              size='small'
+              variant='outlined'
+            />
+          )
+        }
+      }),
+      columnHelper.accessor('subgroup', {
+        header: 'Subgroup',
         cell: ({ row }) => (
-          <Chip
-            label={formatDeadline(row.original.deadline_timer)}
-            color={row.original.deadline_timer && row.original.deadline_timer > 0 ? 'info' : 'error'}
-            size='small'
-            variant='outlined'
-          />
+          <Typography variant='body2'>{row.original.subgroup || row.original.category?.name || '—'}</Typography>
         )
       }),
       columnHelper.accessor('price', {
@@ -176,29 +185,6 @@ const ModeratorTaskListTable = ({ tableData, onStart, onComplete, onMessage }) =
           <Typography className='font-medium' color='text.primary'>
             ${row.original.price || '0.00'}
           </Typography>
-        )
-      }),
-      columnHelper.accessor('category', {
-        header: 'Category',
-        cell: ({ row }) => (
-          <Typography>{row.original.category?.name || '—'}</Typography>
-        )
-      }),
-      columnHelper.accessor('subgroup', {
-        header: 'Subgroup',
-        cell: ({ row }) => (
-          <Typography variant='body2'>{row.original.subgroup || row.original.category?.name || '—'}</Typography>
-        )
-      }),
-      columnHelper.accessor('status', {
-        header: 'Status',
-        cell: ({ row }) => (
-          <Chip
-            label={getStatusLabel(row.original.status)}
-            color={getStatusColor(row.original.status)}
-            variant='tonal'
-            size='small'
-          />
         )
       }),
       columnHelper.accessor('action', {
@@ -219,7 +205,7 @@ const ModeratorTaskListTable = ({ tableData, onStart, onComplete, onMessage }) =
                   variant='contained'
                   onClick={() => onStart(task)}
                 >
-                  Start
+                  Start execution
                 </Button>
               )}
               {canComplete && (
@@ -261,7 +247,7 @@ const ModeratorTaskListTable = ({ tableData, onStart, onComplete, onMessage }) =
         enableSorting: false
       })
     ],
-    [onStart, onComplete, onMessage]
+    [onStart, onComplete, onMessage, currentTime]
   )
 
   const table = useReactTable({
@@ -271,7 +257,6 @@ const ModeratorTaskListTable = ({ tableData, onStart, onComplete, onMessage }) =
       fuzzy: fuzzyFilter
     },
     state: {
-      rowSelection,
       globalFilter
     },
     initialState: {
@@ -279,9 +264,7 @@ const ModeratorTaskListTable = ({ tableData, onStart, onComplete, onMessage }) =
         pageSize: 10
       }
     },
-    enableRowSelection: true,
     globalFilterFn: fuzzyFilter,
-    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
     onGlobalFilterChange: setGlobalFilter,
     getFilteredRowModel: getFilteredRowModel(),
@@ -346,9 +329,21 @@ const ModeratorTaskListTable = ({ tableData, onStart, onComplete, onMessage }) =
                 .rows.slice(0, table.getState().pagination.pageSize)
                 .map(row => {
                   return (
-                    <tr key={row.id} className={classnames({ selected: row.getIsSelected() })}>
+                    <tr 
+                      key={row.id} 
+                      className={classnames({ selected: row.getIsSelected() })}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => router.push(`/moderator/tasks/${row.original.id}`)}
+                    >
                       {row.getVisibleCells().map(cell => (
-                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        <td key={cell.id} onClick={(e) => {
+                          // Prevent navigation when clicking on action buttons
+                          if (cell.column.id === 'action' || cell.column.id === 'select') {
+                            e.stopPropagation()
+                          }
+                        }}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
                       ))}
                     </tr>
                   )

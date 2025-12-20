@@ -9,6 +9,7 @@ use App\Models\ModeratorEarning;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class TaskController extends Controller
 {
@@ -21,7 +22,7 @@ class TaskController extends Controller
         }
 
         $query = Task::where('domain_id', $user->domain_id)
-            ->with(['category', 'template', 'assignedUser', 'result']);
+            ->with(['category', 'template', 'assignedUser', 'documentation', 'tool', 'result']);
 
         if ($request->has('status')) {
             $status = $request->status;
@@ -55,6 +56,8 @@ class TaskController extends Controller
             'category', 
             'template', 
             'assignedUser', 
+            'documentation',
+            'tool',
             'result.moderator',
             'result' => function($query) {
                 $query->with('moderator');
@@ -99,26 +102,54 @@ class TaskController extends Controller
             'attached_services' => 'nullable|array',
             'work_day' => 'nullable|integer',
             'is_main_task' => 'boolean',
+            'first_name' => 'nullable|string|max:255',
+            'last_name' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
+            'address' => 'nullable|string',
+            'phone_number' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'date_of_birth' => 'nullable|date',
+            'id_type' => 'nullable|string|max:255',
+            'id_number' => 'nullable|string|max:255',
+            'document_image' => 'nullable|file|image|max:10240',
+            'selfie_image' => 'nullable|file|image|max:10240',
+            'comment' => 'nullable|string',
+            'documentation_id' => 'nullable|exists:documentation_pages,id',
+            'tool_id' => 'nullable|exists:tools,id',
         ]);
 
         DB::beginTransaction();
         try {
+            // Handle file uploads
+            $data = $validated;
+            if ($request->hasFile('document_image')) {
+                $data['document_image'] = $request->file('document_image')->store('tasks/documents', 'public');
+            }
+            if ($request->hasFile('selfie_image')) {
+                $data['selfie_image'] = $request->file('selfie_image')->store('tasks/selfies', 'public');
+            }
+
             // Если устанавливаем как main task, снимаем флаг с других задач
-            if (!empty($validated['is_main_task'])) {
+            if (!empty($data['is_main_task'])) {
                 Task::where('domain_id', $user->domain_id)
                     ->where('is_main_task', true)
                     ->update(['is_main_task' => false]);
             }
 
+            // Устанавливаем due_at на основе completion_hours, если не указан явно
+            if (!isset($data['due_at']) && isset($data['completion_hours']) && $data['completion_hours']) {
+                $data['due_at'] = now()->addHours($data['completion_hours']);
+            }
+
             $task = Task::create([
                 'domain_id' => $user->domain_id,
-                'assigned_at' => $validated['assigned_to'] ? now() : null,
-                ...$validated,
+                'assigned_at' => isset($data['assigned_to']) && $data['assigned_to'] ? now() : null,
+                ...$data,
             ]);
 
             DB::commit();
 
-            return response()->json($task->load(['category', 'template', 'assignedUser']), 201);
+            return response()->json($task->load(['category', 'template', 'assignedUser', 'documentation', 'tool']), 201);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error creating task: ' . $e->getMessage()], 500);
@@ -147,23 +178,59 @@ class TaskController extends Controller
             'attached_services' => 'nullable|array',
             'work_day' => 'nullable|integer',
             'is_main_task' => 'boolean',
+            'first_name' => 'nullable|string|max:255',
+            'last_name' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
+            'address' => 'nullable|string',
+            'phone_number' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'date_of_birth' => 'nullable|date',
+            'id_type' => 'nullable|string|max:255',
+            'id_number' => 'nullable|string|max:255',
+            'document_image' => 'nullable|file|image|max:10240',
+            'selfie_image' => 'nullable|file|image|max:10240',
+            'comment' => 'nullable|string',
+            'documentation_id' => 'nullable|exists:documentation_pages,id',
+            'tool_id' => 'nullable|exists:tools,id',
         ]);
 
         DB::beginTransaction();
         try {
+            // Handle file uploads
+            $data = $validated;
+            if ($request->hasFile('document_image')) {
+                // Delete old file if exists
+                if ($task->document_image) {
+                    Storage::disk('public')->delete($task->document_image);
+                }
+                $data['document_image'] = $request->file('document_image')->store('tasks/documents', 'public');
+            }
+            if ($request->hasFile('selfie_image')) {
+                // Delete old file if exists
+                if ($task->selfie_image) {
+                    Storage::disk('public')->delete($task->selfie_image);
+                }
+                $data['selfie_image'] = $request->file('selfie_image')->store('tasks/selfies', 'public');
+            }
+
             // Если устанавливаем как main task, снимаем флаг с других задач
-            if (isset($validated['is_main_task']) && $validated['is_main_task'] && !$task->is_main_task) {
+            if (isset($data['is_main_task']) && $data['is_main_task'] && !$task->is_main_task) {
                 Task::where('domain_id', $user->domain_id)
                     ->where('is_main_task', true)
                     ->where('id', '!=', $task->id)
                     ->update(['is_main_task' => false]);
             }
 
-            $task->update($validated);
+            // Обновляем assigned_at при изменении assigned_to
+            if (array_key_exists('assigned_to', $data)) {
+                $data['assigned_at'] = $data['assigned_to'] ? now() : null;
+            }
+
+            $task->update($data);
 
             DB::commit();
 
-            return response()->json($task->fresh()->load(['category', 'template', 'assignedUser', 'result']));
+            return response()->json($task->fresh()->load(['category', 'template', 'assignedUser', 'documentation', 'tool', 'result']));
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error updating task: ' . $e->getMessage()], 500);
@@ -228,6 +295,36 @@ class TaskController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error moderating task: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function destroy(Task $task, Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        if ($task->domain_id !== $user->domain_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Удаляем связанные файлы
+            if ($task->document_image) {
+                Storage::disk('public')->delete($task->document_image);
+            }
+            if ($task->selfie_image) {
+                Storage::disk('public')->delete($task->selfie_image);
+            }
+
+            // Удаляем таск
+            $task->delete();
+
+            DB::commit();
+
+            return response()->json(['message' => 'Task deleted successfully']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error deleting task: ' . $e->getMessage()], 500);
         }
     }
 }
