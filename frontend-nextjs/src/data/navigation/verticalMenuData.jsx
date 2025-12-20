@@ -8,7 +8,7 @@ const verticalMenuData = (user = null) => {
     {
       label: isAdmin ? 'Task Manager' : 'Home',
       icon: 'ri-home-smile-line',
-      href: isAdmin ? '/admin/tasks/kanban' : '/home'
+      href: isAdmin ? '/admin/tasks/kanban' : '/dashboard'
     },
     {
       label: 'Dashboard',
