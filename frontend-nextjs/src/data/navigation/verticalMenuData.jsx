@@ -53,6 +53,11 @@ const verticalMenuData = (user = null) => {
         href: '/admin/documentation'
       },
       {
+        label: 'Tests',
+        icon: 'ri-questionnaire-line',
+        href: '/admin/tests'
+      },
+      {
         label: 'Tools',
         icon: 'ri-tools-line',
         href: '/admin/tools'
