@@ -1,22 +1,37 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, Typography, Button, Paper, Dialog, DialogTitle, DialogContent, TextField, DialogActions, IconButton, TreeView, TreeItem, Chip, Checkbox, FormControlLabel } from '@mui/material'
+import { Box, Grid, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, Button, Checkbox, FormControlLabel, Typography } from '@mui/material'
 import api from '@/lib/api'
+import ContentEditor from '@/components/documentation/ContentEditor'
+import DocumentationHeader from '@/components/documentation/DocumentationHeader'
+import Documentations from '@/components/documentation/Documentations'
 
 export default function DocumentationPage() {
   const [categories, setCategories] = useState([])
   const [pages, setPages] = useState([])
-  const [selectedCategory, setSelectedCategory] = useState(null)
+  const [tools, setTools] = useState([])
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [pageDialogOpen, setPageDialogOpen] = useState(false)
-  const [formData, setFormData] = useState({ name: '', description: '', parent_id: null })
-  const [pageFormData, setPageFormData] = useState({ title: '', content: '', category_id: '', images: [], videos: [], is_published: false })
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
+  const [formData, setFormData] = useState({
+    category_id: '',
+    tool_id: '',
+    title: '',
+    content: '',
+    content_blocks: [],
+    is_published: false
+  })
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: '',
+    description: '',
+    parent_id: ''
+  })
   const [editingPage, setEditingPage] = useState(null)
 
   useEffect(() => {
     loadCategories()
     loadPages()
+    loadTools()
   }, [])
 
   const loadCategories = async () => {
@@ -37,275 +52,303 @@ export default function DocumentationPage() {
     }
   }
 
-  const handleCreateCategory = async () => {
+  const loadTools = async () => {
     try {
-      await api.post('/admin/documentation-categories', formData)
-      setDialogOpen(false)
-      setFormData({ name: '', description: '', parent_id: null })
-      loadCategories()
+      const response = await api.get('/admin/tools')
+      setTools(response.data)
     } catch (error) {
-      console.error('Error creating category:', error)
-      alert('Error creating category')
+      console.error('Error loading tools:', error)
     }
   }
 
-  const handleCreatePage = async () => {
+  const handleOpenDialog = (page = null) => {
+    if (page) {
+      setEditingPage(page)
+      setFormData({
+        category_id: page.category_id?.toString() || '',
+        tool_id: page.tools?.[0]?.toString() || '',
+        title: page.title || '',
+        content: page.content || '',
+        content_blocks: page.content_blocks || [],
+        is_published: page.is_published || false
+      })
+    } else {
+      setEditingPage(null)
+      setFormData({
+        category_id: categories[0]?.id?.toString() || '',
+        tool_id: '',
+        title: '',
+        content: '',
+        content_blocks: [],
+        is_published: false
+      })
+    }
+    setDialogOpen(true)
+  }
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false)
+    setEditingPage(null)
+    setFormData({
+      category_id: '',
+      tool_id: '',
+      title: '',
+      content: '',
+      content_blocks: [],
+      is_published: false
+    })
+  }
+
+  const handleSave = async () => {
     try {
-      const hasNewImages = pageFormData.images && pageFormData.images.length > 0 && typeof pageFormData.images[0] !== 'string'
+      const formDataToSend = new FormData()
       
-      if (editingPage && !hasNewImages) {
-        // Обновление без новых файлов - используем JSON
-        await api.put(`/admin/documentation-pages/${editingPage.id}`, {
-          title: pageFormData.title,
-          content: pageFormData.content,
-          category_id: pageFormData.category_id,
-          is_published: pageFormData.is_published,
-          images: editingPage.images, // Сохраняем существующие изображения
-          videos: editingPage.videos, // Сохраняем существующие видео
+      formDataToSend.append('category_id', formData.category_id)
+      formDataToSend.append('title', formData.title)
+      formDataToSend.append('content', formData.content || '')
+      formDataToSend.append('is_published', formData.is_published ? '1' : '0')
+      
+      if (formData.tool_id) {
+        formDataToSend.append('tools[]', formData.tool_id)
+      }
+
+      // Process content blocks and extract images/videos
+      const images = []
+      const videos = []
+      const processedBlocks = []
+
+      if (formData.content_blocks && formData.content_blocks.length > 0) {
+        formData.content_blocks.forEach((block, index) => {
+          if (block.type === 'image') {
+            if (block.file) {
+              // New file upload
+              formDataToSend.append('images[]', block.file)
+              processedBlocks.push({ type: 'image', position: index, isNew: true })
+            } else if (block.url) {
+              // Existing URL
+              images.push(block.url)
+              processedBlocks.push({ type: 'image', url: block.url, position: index })
+            }
+          } else if (block.type === 'video') {
+            if (block.file) {
+              // New file upload
+              formDataToSend.append(`videos[${videos.length}][type]`, 'local')
+              formDataToSend.append(`videos[${videos.length}][file]`, block.file)
+              processedBlocks.push({ type: 'video', position: index, isNew: true })
+            } else if (block.url) {
+              // Embed URL
+              formDataToSend.append(`videos[${videos.length}][type]`, 'embed')
+              formDataToSend.append(`videos[${videos.length}][url]`, block.url)
+              processedBlocks.push({ type: 'video', videoType: block.videoType, url: block.url, position: index })
+            }
+          } else {
+            // Text or other blocks
+            processedBlocks.push(block)
+          }
+        })
+      }
+
+      // Add content_blocks as JSON
+      formDataToSend.append('content_blocks', JSON.stringify(processedBlocks))
+
+      if (editingPage) {
+        await api.put(`/admin/documentation-pages/${editingPage.id}`, formDataToSend, {
+          headers: { 'Content-Type': 'multipart/form-data' }
         })
       } else {
-        // Создание или обновление с новыми файлами - используем FormData
-        const formDataToSend = new FormData()
-        formDataToSend.append('title', pageFormData.title)
-        formDataToSend.append('content', pageFormData.content)
-        formDataToSend.append('category_id', pageFormData.category_id)
-        formDataToSend.append('is_published', pageFormData.is_published ? '1' : '0')
-        
-        if (hasNewImages) {
-          Array.from(pageFormData.images).forEach((image) => {
-            formDataToSend.append('images[]', image)
-          })
-        } else if (editingPage && editingPage.images) {
-          // Keep existing image URLs
-          editingPage.images.forEach((img) => {
-            formDataToSend.append('images[]', img)
-          })
-        }
-
-        if (editingPage) {
-          await api.post(`/admin/documentation-pages/${editingPage.id}`, formDataToSend, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            params: { _method: 'PUT' }
-          })
-        } else {
-          await api.post('/admin/documentation-pages', formDataToSend, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          })
-        }
+        await api.post('/admin/documentation-pages', formDataToSend, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
       }
       
-      setPageDialogOpen(false)
-      setEditingPage(null)
-      setPageFormData({ title: '', content: '', category_id: '', images: [], videos: [], is_published: false })
+      handleCloseDialog()
       loadPages()
     } catch (error) {
       console.error('Error saving page:', error)
-      alert('Error saving page')
+      alert('Error saving page: ' + (error.response?.data?.message || error.message))
+    }
+  }
+
+  const handleOpenCategoryDialog = () => {
+    setCategoryFormData({
+      name: '',
+      description: '',
+      parent_id: ''
+    })
+    setCategoryDialogOpen(true)
+  }
+
+  const handleCloseCategoryDialog = () => {
+    setCategoryDialogOpen(false)
+    setCategoryFormData({
+      name: '',
+      description: '',
+      parent_id: ''
+    })
+  }
+
+  const handleSaveCategory = async () => {
+    try {
+      const dataToSend = {
+        name: categoryFormData.name,
+        description: categoryFormData.description || null,
+        parent_id: categoryFormData.parent_id || null
+      }
+
+      await api.post('/admin/documentation-categories', dataToSend)
+      
+      handleCloseCategoryDialog()
+      loadCategories()
+    } catch (error) {
+      console.error('Error saving category:', error)
+      alert('Error saving category: ' + (error.response?.data?.message || error.message))
     }
   }
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Documentation</Typography>
-        <Box>
-          <Button variant="contained" startIcon={<i className="ri-add-line" />} onClick={() => setDialogOpen(true)} sx={{ mr: 2 }}>
-            Add Category
+      <Grid container spacing={6}>
+        <Grid size={{ xs: 12 }}>
+          <DocumentationHeader
+            onAddDocumentation={() => handleOpenDialog()}
+            onAddCategory={handleOpenCategoryDialog}
+          />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <Documentations
+            categories={categories}
+            pages={pages}
+            onEditPage={handleOpenDialog}
+          />
+        </Grid>
+      </Grid>
+
+      {/* Add/Edit Documentation Dialog */}
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth='lg' fullWidth>
+        <DialogTitle>{editingPage ? 'Edit' : 'Add'} Documentation</DialogTitle>
+        <DialogContent>
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={formData.category_id}
+              onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+              label='Category'
+            >
+              {categories.map((cat) => (
+                <MenuItem key={cat.id} value={cat.id?.toString() || ''}>
+                  {cat.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Tool (optional)</InputLabel>
+            <Select
+              value={formData.tool_id}
+              onChange={(e) => setFormData({ ...formData, tool_id: e.target.value })}
+              label='Tool (optional)'
+            >
+              <MenuItem value=''>None</MenuItem>
+              {tools.map((tool) => (
+                <MenuItem key={tool.id} value={tool.id?.toString() || ''}>
+                  {tool.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <TextField
+            fullWidth
+            label='Title'
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            sx={{ mt: 2 }}
+          />
+
+          <Box sx={{ mt: 2 }}>
+            <Typography variant='subtitle1' sx={{ mb: 1 }}>
+              Content Blocks (arrange text, images, and videos)
+            </Typography>
+            <ContentEditor
+              contentBlocks={formData.content_blocks}
+              onChange={(blocks) => setFormData({ ...formData, content_blocks: blocks })}
+              tools={tools}
+            />
+          </Box>
+
+          <TextField
+            fullWidth
+            label='Additional Content (optional)'
+            value={formData.content}
+            onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+            multiline
+            rows={3}
+            sx={{ mt: 2 }}
+            helperText='Plain text content (content blocks above are preferred)'
+          />
+
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={formData.is_published}
+                onChange={(e) => setFormData({ ...formData, is_published: e.target.checked })}
+              />
+            }
+            label='Publish'
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={handleSave} variant='contained'>
+            {editingPage ? 'Save' : 'Create'}
           </Button>
-          <Button variant="contained" startIcon={<i className="ri-add-line" />} onClick={() => setPageDialogOpen(true)}>
-            Add Page
-          </Button>
-        </Box>
-      </Box>
+        </DialogActions>
+      </Dialog>
 
-      <Box sx={{ display: 'flex', gap: 3 }}>
-        <Paper sx={{ p: 2, minWidth: 300 }}>
-          <Typography variant="h6" gutterBottom>Categories</Typography>
-          {categories.map((category) => (
-            <Box key={category.id} sx={{ mb: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography>{category.name}</Typography>
-                <Box>
-                  <IconButton size="small" onClick={() => setSelectedCategory(category)}>
-                    <i className="ri-edit-box-line" />
-                  </IconButton>
-                  <IconButton size="small" color="error">
-                    <i className="ri-delete-bin-7-line" />
-                  </IconButton>
-                </Box>
-              </Box>
-            </Box>
-          ))}
-        </Paper>
-
-        <Paper sx={{ p: 2, flex: 1 }}>
-          <Typography variant="h6" gutterBottom>Pages</Typography>
-          {pages.map((page) => (
-            <Box key={page.id} sx={{ mb: 2, p: 2, border: '1px solid #ddd', borderRadius: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
-                  <Typography variant="h6">{page.title}</Typography>
-                  <Chip
-                    label={page.is_published ? 'Published' : 'Draft'}
-                    color={page.is_published ? 'success' : 'default'}
-                    size="small"
-                  />
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  Category: {page.category?.name}
-                </Typography>
-                {page.images && page.images.length > 0 && (
-                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                    <i className="ri-image-line" />
-                    <Typography variant="caption">{page.images.length} image{page.images.length !== 1 ? 's' : ''}</Typography>
-                  </Box>
-                )}
-                {page.videos && page.videos.length > 0 && (
-                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                    <i className="ri-video-line" />
-                    <Typography variant="caption">{page.videos.length} video{page.videos.length !== 1 ? 's' : ''}</Typography>
-                  </Box>
-                )}
-              </Box>
-              <Box>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setEditingPage(page)
-                    setPageFormData({
-                      title: page.title,
-                      content: page.content,
-                      category_id: page.category_id,
-                      images: page.images || [],
-                      videos: page.videos || [],
-                      is_published: page.is_published || false
-                    })
-                    setPageDialogOpen(true)
-                  }}
-                >
-                  <i className="ri-edit-box-line" />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  color={page.is_published ? 'default' : 'success'}
-                  onClick={async () => {
-                    try {
-                      await api.put(`/admin/documentation-pages/${page.id}`, {
-                        is_published: !page.is_published
-                      })
-                      loadPages()
-                    } catch (error) {
-                      console.error('Error updating publication status:', error)
-                      alert('Error updating publication status: ' + (error.response?.data?.message || error.message))
-                    }
-                  }}
-                >
-                  <i className={page.is_published ? "ri-eye-off-line" : "ri-eye-line"} />
-                </IconButton>
-              </Box>
-            </Box>
-          ))}
-        </Paper>
-      </Box>
-
-      {/* Category creation dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create Category</DialogTitle>
+      {/* Add Category Dialog */}
+      <Dialog open={categoryDialogOpen} onClose={handleCloseCategoryDialog} maxWidth='sm' fullWidth>
+        <DialogTitle>Add Category</DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
-            label="Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            label='Category Name'
+            value={categoryFormData.name}
+            onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
             sx={{ mt: 2 }}
+            required
           />
           <TextField
             fullWidth
-            label="Description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            label='Description'
+            value={categoryFormData.description}
+            onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })}
             multiline
             rows={3}
             sx={{ mt: 2 }}
           />
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Parent Category (optional)</InputLabel>
+            <Select
+              value={categoryFormData.parent_id}
+              onChange={(e) => setCategoryFormData({ ...categoryFormData, parent_id: e.target.value })}
+              label='Parent Category (optional)'
+            >
+              <MenuItem value=''>None (Root Category)</MenuItem>
+              {categories.map((cat) => (
+                <MenuItem key={cat.id} value={cat.id?.toString() || ''}>
+                  {cat.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleCreateCategory} variant="contained">Create</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Page creation dialog */}
-      <Dialog open={pageDialogOpen} onClose={() => {
-        setPageDialogOpen(false)
-        setEditingPage(null)
-        setPageFormData({ title: '', content: '', category_id: '', images: [], videos: [], is_published: false })
-      }} maxWidth="md" fullWidth>
-        <DialogTitle>{editingPage ? 'Edit' : 'Create'} Page</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Title"
-            value={pageFormData.title}
-            onChange={(e) => setPageFormData({ ...pageFormData, title: e.target.value })}
-            sx={{ mt: 2 }}
-          />
-          <TextField
-            fullWidth
-            label="Category"
-            select
-            SelectProps={{ native: true }}
-            value={pageFormData.category_id}
-            onChange={(e) => setPageFormData({ ...pageFormData, category_id: e.target.value })}
-            sx={{ mt: 2 }}
-          >
-            <option value="">Select category</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            label="Content"
-            value={pageFormData.content}
-            onChange={(e) => setPageFormData({ ...pageFormData, content: e.target.value })}
-            multiline
-            rows={6}
-            sx={{ mt: 2 }}
-          />
-          <Button
-            variant="outlined"
-            component="label"
-            startIcon={<i className="ri-image-line" />}
-            sx={{ mt: 2 }}
-          >
-            Upload Images
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              hidden
-              onChange={(e) => setPageFormData({ ...pageFormData, images: e.target.files })}
-            />
+          <Button onClick={handleCloseCategoryDialog}>Cancel</Button>
+          <Button onClick={handleSaveCategory} variant='contained' disabled={!categoryFormData.name}>
+            Create
           </Button>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={pageFormData.is_published}
-                onChange={(e) => setPageFormData({ ...pageFormData, is_published: e.target.checked })}
-              />
-            }
-            label="Publish"
-            sx={{ mt: 2 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
-            setPageDialogOpen(false)
-            setEditingPage(null)
-            setPageFormData({ title: '', content: '', category_id: '', images: [], videos: [], is_published: false })
-          }}>Cancel</Button>
-          <Button onClick={handleCreatePage} variant="contained">{editingPage ? 'Save' : 'Create'}</Button>
         </DialogActions>
       </Dialog>
     </Box>

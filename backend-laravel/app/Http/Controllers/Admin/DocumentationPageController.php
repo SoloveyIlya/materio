@@ -29,13 +29,16 @@ class DocumentationPageController extends Controller
         $validated = $request->validate([
             'category_id' => 'required|exists:documentation_categories,id',
             'title' => 'required|string|max:255',
-            'content' => 'required|string',
+            'content' => 'nullable|string',
+            'content_blocks' => 'nullable|string', // JSON string from FormData
             'images' => 'nullable|array',
             'images.*' => 'nullable|file|image|max:10240', // 10MB max
             'videos' => 'nullable|array',
             'videos.*.type' => 'required_with:videos.*|in:local,embed',
             'videos.*.url' => 'required_with:videos.*',
             'videos.*.file' => 'required_if:videos.*.type,local|file|mimes:mp4,webm,ogg|max:102400', // 100MB max
+            'tools' => 'nullable|array',
+            'tools.*' => 'exists:tools,id',
             'related_task_categories' => 'nullable|array',
             'related_task_categories.*' => 'exists:task_categories,id',
             'related_tasks' => 'nullable|array',
@@ -49,9 +52,20 @@ class DocumentationPageController extends Controller
         $validated['order'] = $validated['order'] ?? 0;
         $validated['is_published'] = $validated['is_published'] ?? false;
 
+        // Обработка content_blocks (JSON string)
+        $contentBlocks = [];
+        if ($request->has('content_blocks')) {
+            $contentBlocksJson = $request->input('content_blocks');
+            if (is_string($contentBlocksJson)) {
+                $contentBlocks = json_decode($contentBlocksJson, true) ?? [];
+            } elseif (is_array($contentBlocksJson)) {
+                $contentBlocks = $contentBlocksJson;
+            }
+        }
+
         // Обработка загрузки изображений
+        $uploadedImagePaths = [];
         if ($request->hasFile('images')) {
-            $imagePaths = [];
             $images = $request->file('images');
             
             // Если images - массив
@@ -59,25 +73,46 @@ class DocumentationPageController extends Controller
                 foreach ($images as $image) {
                     if ($image && $image->isValid()) {
                         $path = $image->store('documentation/images', 'public');
-                        $imagePaths[] = Storage::url($path);
+                        $uploadedImagePaths[] = Storage::url($path);
                     }
                 }
             } else {
                 // Если одно изображение
                 if ($images->isValid()) {
                     $path = $images->store('documentation/images', 'public');
-                    $imagePaths[] = Storage::url($path);
+                    $uploadedImagePaths[] = Storage::url($path);
                 }
-            }
-            
-            if (!empty($imagePaths)) {
-                $validated['images'] = $imagePaths;
             }
         }
 
+        // Обновляем content_blocks с загруженными изображениями
+        $imageIndex = 0;
+        foreach ($contentBlocks as &$block) {
+            if ($block['type'] === 'image' && isset($block['isNew']) && $block['isNew']) {
+                if ($imageIndex < count($uploadedImagePaths)) {
+                    $block['url'] = $uploadedImagePaths[$imageIndex];
+                    unset($block['isNew']);
+                    unset($block['file']);
+                }
+                $imageIndex++;
+            }
+        }
+        unset($block);
+
+        // Сохраняем все URL изображений (из content_blocks и отдельно загруженные)
+        $allImagePaths = $uploadedImagePaths;
+        foreach ($contentBlocks as $block) {
+            if ($block['type'] === 'image' && isset($block['url']) && !in_array($block['url'], $allImagePaths)) {
+                $allImagePaths[] = $block['url'];
+            }
+        }
+        if (!empty($allImagePaths)) {
+            $validated['images'] = $allImagePaths;
+        }
+
         // Обработка видео
+        $processedVideos = [];
         if ($request->has('videos')) {
-            $processedVideos = [];
             foreach ($request->input('videos') as $index => $video) {
                 if ($video['type'] === 'embed') {
                     // Для embed просто сохраняем URL
@@ -95,7 +130,48 @@ class DocumentationPageController extends Controller
                     ];
                 }
             }
+        }
+
+        // Обновляем content_blocks с загруженными видео
+        $videoIndex = 0;
+        foreach ($contentBlocks as &$block) {
+            if ($block['type'] === 'video' && isset($block['isNew']) && $block['isNew']) {
+                if ($videoIndex < count($processedVideos)) {
+                    $block['videoType'] = $processedVideos[$videoIndex]['type'];
+                    $block['url'] = $processedVideos[$videoIndex]['url'];
+                    unset($block['isNew']);
+                    unset($block['file']);
+                }
+                $videoIndex++;
+            }
+        }
+        unset($block);
+
+        // Сохраняем все видео
+        foreach ($contentBlocks as $block) {
+            if ($block['type'] === 'video' && isset($block['url'])) {
+                $videoExists = false;
+                foreach ($processedVideos as $video) {
+                    if ($video['url'] === $block['url']) {
+                        $videoExists = true;
+                        break;
+                    }
+                }
+                if (!$videoExists) {
+                    $processedVideos[] = [
+                        'type' => $block['videoType'] ?? 'embed',
+                        'url' => $block['url'],
+                    ];
+                }
+            }
+        }
+        if (!empty($processedVideos)) {
             $validated['videos'] = $processedVideos;
+        }
+
+        // Сохраняем content_blocks
+        if (!empty($contentBlocks)) {
+            $validated['content_blocks'] = $contentBlocks;
         }
 
         // Проверка уникальности slug
@@ -130,13 +206,16 @@ class DocumentationPageController extends Controller
         $validated = $request->validate([
             'category_id' => 'sometimes|required|exists:documentation_categories,id',
             'title' => 'sometimes|required|string|max:255',
-            'content' => 'sometimes|required|string',
+            'content' => 'nullable|string',
+            'content_blocks' => 'nullable|string', // JSON string from FormData
             'images' => 'nullable|array',
             'images.*' => 'nullable|file|image|max:10240',
             'videos' => 'nullable|array',
             'videos.*.type' => 'required_with:videos.*|in:local,embed',
             'videos.*.url' => 'required_with:videos.*',
             'videos.*.file' => 'required_if:videos.*.type,local|file|mimes:mp4,webm,ogg|max:102400',
+            'tools' => 'nullable|array',
+            'tools.*' => 'exists:tools,id',
             'related_task_categories' => 'nullable|array',
             'related_task_categories.*' => 'exists:task_categories,id',
             'related_tasks' => 'nullable|array',
@@ -164,18 +243,67 @@ class DocumentationPageController extends Controller
             }
         }
 
-        // Обработка загрузки новых изображений
-        if ($request->hasFile('images')) {
-            $existingImages = $documentationPage->images ?? [];
-            $newImagePaths = [];
-            foreach ($request->file('images') as $image) {
-                $path = $image->store('documentation/images', 'public');
-                $newImagePaths[] = Storage::url($path);
+        // Обработка content_blocks (JSON string)
+        $contentBlocks = [];
+        if ($request->has('content_blocks')) {
+            $contentBlocksJson = $request->input('content_blocks');
+            if (is_string($contentBlocksJson)) {
+                $contentBlocks = json_decode($contentBlocksJson, true) ?? [];
+            } elseif (is_array($contentBlocksJson)) {
+                $contentBlocks = $contentBlocksJson;
             }
-            $validated['images'] = array_merge($existingImages, $newImagePaths);
+        } elseif (isset($documentationPage->content_blocks)) {
+            // Сохраняем существующие content_blocks если новые не переданы
+            $contentBlocks = $documentationPage->content_blocks;
         }
 
-        // Обработка видео аналогично
+        // Обработка загрузки новых изображений
+        $uploadedImagePaths = [];
+        if ($request->hasFile('images')) {
+            $images = $request->file('images');
+            if (is_array($images)) {
+                foreach ($images as $image) {
+                    if ($image && $image->isValid()) {
+                        $path = $image->store('documentation/images', 'public');
+                        $uploadedImagePaths[] = Storage::url($path);
+                    }
+                }
+            } else {
+                if ($images->isValid()) {
+                    $path = $images->store('documentation/images', 'public');
+                    $uploadedImagePaths[] = Storage::url($path);
+                }
+            }
+        }
+
+        // Обновляем content_blocks с загруженными изображениями
+        $imageIndex = 0;
+        foreach ($contentBlocks as &$block) {
+            if ($block['type'] === 'image' && isset($block['isNew']) && $block['isNew']) {
+                if ($imageIndex < count($uploadedImagePaths)) {
+                    $block['url'] = $uploadedImagePaths[$imageIndex];
+                    unset($block['isNew']);
+                    unset($block['file']);
+                }
+                $imageIndex++;
+            }
+        }
+        unset($block);
+
+        // Сохраняем все URL изображений
+        $existingImages = $documentationPage->images ?? [];
+        $allImagePaths = array_merge($existingImages, $uploadedImagePaths);
+        foreach ($contentBlocks as $block) {
+            if ($block['type'] === 'image' && isset($block['url']) && !in_array($block['url'], $allImagePaths)) {
+                $allImagePaths[] = $block['url'];
+            }
+        }
+        if (!empty($allImagePaths) || $request->has('content_blocks')) {
+            $validated['images'] = $allImagePaths;
+        }
+
+        // Обработка видео
+        $processedVideos = $documentationPage->videos ?? [];
         if ($request->has('videos')) {
             $processedVideos = [];
             foreach ($request->input('videos') as $index => $video) {
@@ -193,7 +321,48 @@ class DocumentationPageController extends Controller
                     ];
                 }
             }
+        }
+
+        // Обновляем content_blocks с загруженными видео
+        $videoIndex = 0;
+        foreach ($contentBlocks as &$block) {
+            if ($block['type'] === 'video' && isset($block['isNew']) && $block['isNew']) {
+                if ($videoIndex < count($processedVideos)) {
+                    $block['videoType'] = $processedVideos[$videoIndex]['type'];
+                    $block['url'] = $processedVideos[$videoIndex]['url'];
+                    unset($block['isNew']);
+                    unset($block['file']);
+                }
+                $videoIndex++;
+            }
+        }
+        unset($block);
+
+        // Сохраняем все видео
+        foreach ($contentBlocks as $block) {
+            if ($block['type'] === 'video' && isset($block['url'])) {
+                $videoExists = false;
+                foreach ($processedVideos as $video) {
+                    if (isset($video['url']) && $video['url'] === $block['url']) {
+                        $videoExists = true;
+                        break;
+                    }
+                }
+                if (!$videoExists) {
+                    $processedVideos[] = [
+                        'type' => $block['videoType'] ?? 'embed',
+                        'url' => $block['url'],
+                    ];
+                }
+            }
+        }
+        if (!empty($processedVideos) || $request->has('content_blocks')) {
             $validated['videos'] = $processedVideos;
+        }
+
+        // Сохраняем content_blocks
+        if ($request->has('content_blocks')) {
+            $validated['content_blocks'] = $contentBlocks;
         }
 
         $documentationPage->update($validated);

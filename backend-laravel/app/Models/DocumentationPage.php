@@ -15,8 +15,10 @@ class DocumentationPage extends Model
         'title',
         'slug',
         'content',
+        'content_blocks',
         'images',
         'videos',
+        'tools',
         'related_task_categories',
         'related_tasks',
         'order',
@@ -26,8 +28,10 @@ class DocumentationPage extends Model
     protected $casts = [
         'order' => 'integer',
         'is_published' => 'boolean',
+        'content_blocks' => 'array',
         'images' => 'array',
         'videos' => 'array',
+        'tools' => 'array',
         'related_task_categories' => 'array',
         'related_tasks' => 'array',
     ];
