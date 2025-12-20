@@ -91,6 +91,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
     Route::get('/support', [AdminSupportController::class, 'index']);
     Route::get('/support/{ticket}', [AdminSupportController::class, 'show']);
     Route::put('/support/{ticket}', [AdminSupportController::class, 'update']);
+    Route::post('/support/{ticket}/reply', [AdminSupportController::class, 'reply']);
 });
 
 // Moderator routes

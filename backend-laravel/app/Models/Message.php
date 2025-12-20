@@ -14,6 +14,7 @@ class Message extends Model
         'from_user_id',
         'to_user_id',
         'task_id',
+        'ticket_id',
         'type',
         'subject',
         'body',
@@ -54,6 +55,11 @@ class Message extends Model
     public function task()
     {
         return $this->belongsTo(Task::class);
+    }
+
+    public function ticket()
+    {
+        return $this->belongsTo(Ticket::class);
     }
 }
 

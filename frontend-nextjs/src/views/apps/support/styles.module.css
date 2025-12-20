@@ -1,0 +1,39 @@
+.activeSidebarListItem {
+  background-color: rgba(var(--mui-palette-primary-mainChannel) / 0.08);
+  color: rgb(var(--mui-palette-primary-main));
+  border-radius: var(--mui-shape-borderRadius);
+}
+
+.activeSidebarListItem i {
+  color: rgb(var(--mui-palette-primary-main));
+}
+
+.emailList {
+  border-bottom: 1px solid var(--mui-palette-divider);
+  transition: background-color 0.2s ease-in-out;
+}
+
+.emailList:hover {
+  background-color: var(--mui-palette-action-hover);
+}
+
+.emailInfo {
+  display: none;
+}
+
+@media (min-width: 600px) {
+  .emailInfo {
+    display: flex;
+  }
+}
+
+.emailActions {
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  .emailActions {
+    display: flex;
+  }
+}
+
