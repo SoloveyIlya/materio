@@ -23,6 +23,7 @@ import ListItemSecondaryAction from '@mui/material/ListItemSecondaryAction'
 
 // Component Imports
 import api from '@/lib/api'
+import { showToast } from '@/utils/toast'
 
 const DocumentsTab = ({ userId, requiredDocuments, userDocuments }) => {
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -77,9 +78,11 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments }) => {
       setDocuments(response.data || [])
       
       handleCloseDialog()
+      showToast.success(editingDoc ? 'Document updated successfully' : 'Document created successfully')
     } catch (error) {
       console.error('Error saving document:', error)
-      alert('Error saving document')
+      const errorMessage = error.response?.data?.message || error.message || 'Error saving document'
+      showToast.error(errorMessage)
     }
   }
 
@@ -92,9 +95,11 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments }) => {
       // Перезагружаем документы
       const response = await api.get('/admin/required-documents')
       setDocuments(response.data || [])
+      showToast.success('Document deleted successfully')
     } catch (error) {
       console.error('Error deleting document:', error)
-      alert('Error deleting document')
+      const errorMessage = error.response?.data?.message || error.message || 'Error deleting document'
+      showToast.error(errorMessage)
     }
   }
 

@@ -61,9 +61,21 @@ class TaskCategoryController extends Controller
 
     public function update(Request $request, TaskCategory $taskCategory): JsonResponse
     {
-        if ($taskCategory->domain_id !== $request->user()->domain_id) {
+        $user = $request->user();
+        
+        if ($taskCategory->domain_id !== $user->domain_id) {
+            \Log::warning('TaskCategory update forbidden', [
+                'category_id' => $taskCategory->id,
+                'category_domain' => $taskCategory->domain_id,
+                'user_domain' => $user->domain_id,
+            ]);
             return response()->json(['message' => 'Forbidden'], 403);
         }
+        
+        \Log::info('TaskCategory update request', [
+            'category_id' => $taskCategory->id,
+            'request_data' => $request->all(),
+        ]);
         
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -73,16 +85,37 @@ class TaskCategoryController extends Controller
 
         $taskCategory->update($validated);
 
+        \Log::info('TaskCategory updated successfully', [
+            'category_id' => $taskCategory->id,
+            'category_data' => $taskCategory->toArray(),
+        ]);
+
         return response()->json($taskCategory);
     }
 
     public function destroy(Request $request, TaskCategory $taskCategory): JsonResponse
     {
-        if ($taskCategory->domain_id !== $request->user()->domain_id) {
+        $user = $request->user();
+        
+        if ($taskCategory->domain_id !== $user->domain_id) {
+            \Log::warning('TaskCategory delete forbidden', [
+                'category_id' => $taskCategory->id,
+                'category_domain' => $taskCategory->domain_id,
+                'user_domain' => $user->domain_id,
+            ]);
             return response()->json(['message' => 'Forbidden'], 403);
         }
         
+        \Log::info('TaskCategory delete request', [
+            'category_id' => $taskCategory->id,
+            'category_name' => $taskCategory->name,
+        ]);
+        
         $taskCategory->delete();
+
+        \Log::info('TaskCategory deleted successfully', [
+            'category_id' => $taskCategory->id,
+        ]);
 
         return response()->json(['message' => 'Category deleted successfully']);
     }

@@ -123,10 +123,29 @@ class TaskController extends Controller
             // Handle file uploads
             $data = $validated;
             if ($request->hasFile('document_image')) {
-                $data['document_image'] = $request->file('document_image')->store('tasks/documents', 'public');
+                $path = $request->file('document_image')->store('tasks/documents', 'public');
+                $data['document_image'] = Storage::url($path);
             }
             if ($request->hasFile('selfie_image')) {
-                $data['selfie_image'] = $request->file('selfie_image')->store('tasks/selfies', 'public');
+                $path = $request->file('selfie_image')->store('tasks/selfies', 'public');
+                $data['selfie_image'] = Storage::url($path);
+            }
+            
+            // Конвертируем пустые строки в null для nullable полей
+            $nullableFields = ['template_id', 'assigned_to', 'documentation_id', 'tool_id', 'description', 
+                              'first_name', 'last_name', 'country', 'address', 'phone_number', 'email', 
+                              'date_of_birth', 'id_type', 'id_number', 'comment', 'due_at'];
+            foreach ($nullableFields as $field) {
+                if (isset($data[$field])) {
+                    // Конвертируем пустые строки в null
+                    if ($data[$field] === '') {
+                        $data[$field] = null;
+                    }
+                    // Для foreign keys также конвертируем '0' в null
+                    if (in_array($field, ['template_id', 'assigned_to', 'documentation_id', 'tool_id']) && ($data[$field] === '0' || $data[$field] === 0)) {
+                        $data[$field] = null;
+                    }
+                }
             }
 
             // Если устанавливаем как main task, снимаем флаг с других задач
@@ -136,6 +155,16 @@ class TaskController extends Controller
                     ->update(['is_main_task' => false]);
             }
 
+            // Конвертируем пустые строки в null для nullable полей
+            $nullableFields = ['template_id', 'assigned_to', 'documentation_id', 'tool_id', 'description', 
+                              'first_name', 'last_name', 'country', 'address', 'phone_number', 'email', 
+                              'date_of_birth', 'id_type', 'id_number', 'comment', 'due_at'];
+            foreach ($nullableFields as $field) {
+                if (isset($data[$field]) && $data[$field] === '') {
+                    $data[$field] = null;
+                }
+            }
+            
             // Устанавливаем due_at на основе completion_hours, если не указан явно
             if (!isset($data['due_at']) && isset($data['completion_hours']) && $data['completion_hours']) {
                 $data['due_at'] = now()->addHours($data['completion_hours']);
@@ -164,20 +193,32 @@ class TaskController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
+        // Отладочная информация
+        \Log::info('Task update request data:', [
+            'method' => $request->method(),
+            'all' => $request->all(),
+            'title' => $request->input('title'),
+            'category_id' => $request->input('category_id'),
+            'price' => $request->input('price'),
+            'completion_hours' => $request->input('completion_hours'),
+            'status' => $request->input('status'),
+            'has_file' => $request->hasFile('document_image'),
+        ]);
+
         $validated = $request->validate([
             'template_id' => 'nullable|exists:task_templates,id',
-            'category_id' => 'sometimes|exists:task_categories,id',
+            'category_id' => 'required|exists:task_categories,id',
             'assigned_to' => 'nullable|exists:users,id',
-            'title' => 'sometimes|string|max:255',
+            'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'price' => 'sometimes|numeric|min:0',
-            'completion_hours' => 'sometimes|integer|min:1',
-            'status' => 'sometimes|in:pending,in_progress,completed,cancelled',
+            'price' => 'required|numeric|min:0',
+            'completion_hours' => 'required|integer|min:1',
+            'status' => 'required|in:pending,in_progress,completed,cancelled',
             'due_at' => 'nullable|date',
             'guides_links' => 'nullable|array',
             'attached_services' => 'nullable|array',
             'work_day' => 'nullable|integer',
-            'is_main_task' => 'boolean',
+            'is_main_task' => 'nullable|boolean',
             'first_name' => 'nullable|string|max:255',
             'last_name' => 'nullable|string|max:255',
             'country' => 'nullable|string|max:255',
@@ -201,16 +242,44 @@ class TaskController extends Controller
             if ($request->hasFile('document_image')) {
                 // Delete old file if exists
                 if ($task->document_image) {
-                    Storage::disk('public')->delete($task->document_image);
+                    $relativePath = str_replace('/storage/', '', parse_url($task->document_image, PHP_URL_PATH));
+                    Storage::disk('public')->delete($relativePath);
                 }
-                $data['document_image'] = $request->file('document_image')->store('tasks/documents', 'public');
+                $path = $request->file('document_image')->store('tasks/documents', 'public');
+                $data['document_image'] = Storage::url($path);
+            } else {
+                // Сохраняем существующее значение, если файл не загружен
+                $data['document_image'] = $task->document_image;
             }
+            
             if ($request->hasFile('selfie_image')) {
                 // Delete old file if exists
                 if ($task->selfie_image) {
-                    Storage::disk('public')->delete($task->selfie_image);
+                    $relativePath = str_replace('/storage/', '', parse_url($task->selfie_image, PHP_URL_PATH));
+                    Storage::disk('public')->delete($relativePath);
                 }
-                $data['selfie_image'] = $request->file('selfie_image')->store('tasks/selfies', 'public');
+                $path = $request->file('selfie_image')->store('tasks/selfies', 'public');
+                $data['selfie_image'] = Storage::url($path);
+            } else {
+                // Сохраняем существующее значение, если файл не загружен
+                $data['selfie_image'] = $task->selfie_image;
+            }
+            
+            // Конвертируем пустые строки в null для nullable полей
+            $nullableFields = ['template_id', 'assigned_to', 'documentation_id', 'tool_id', 'description', 
+                              'first_name', 'last_name', 'country', 'address', 'phone_number', 'email', 
+                              'date_of_birth', 'id_type', 'id_number', 'comment', 'due_at'];
+            foreach ($nullableFields as $field) {
+                if (isset($data[$field])) {
+                    // Конвертируем пустые строки в null
+                    if ($data[$field] === '') {
+                        $data[$field] = null;
+                    }
+                    // Для foreign keys также конвертируем '0' в null
+                    if (in_array($field, ['template_id', 'assigned_to', 'documentation_id', 'tool_id']) && ($data[$field] === '0' || $data[$field] === 0)) {
+                        $data[$field] = null;
+                    }
+                }
             }
 
             // Если устанавливаем как main task, снимаем флаг с других задач
@@ -223,9 +292,14 @@ class TaskController extends Controller
 
             // Обновляем assigned_at при изменении assigned_to
             if (array_key_exists('assigned_to', $data)) {
-                $data['assigned_at'] = $data['assigned_to'] ? now() : null;
+                if ($data['assigned_to'] && $data['assigned_to'] != $task->assigned_to) {
+                    $data['assigned_at'] = now();
+                } elseif (!$data['assigned_to']) {
+                    $data['assigned_at'] = null;
+                }
             }
 
+            // Обновляем задачу
             $task->update($data);
 
             DB::commit();

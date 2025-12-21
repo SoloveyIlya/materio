@@ -48,6 +48,11 @@ const verticalMenuData = (user = null) => {
         href: '/admin/tasks'
       },
       {
+        label: 'Categories',
+        icon: 'ri-price-tag-3-line',
+        href: '/admin/categories'
+      },
+      {
         label: 'Documentation',
         icon: 'ri-file-text-line',
         href: '/admin/documentation'

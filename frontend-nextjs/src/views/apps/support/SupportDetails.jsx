@@ -28,6 +28,7 @@ import styles from './styles.module.css'
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
 import api from '@/lib/api'
+import { showToast } from '@/utils/toast'
 
 const ScrollWrapper = ({ children, isBelowLgScreen }) => {
   if (isBelowLgScreen) {
@@ -109,9 +110,11 @@ const SupportDetails = ({
       if (onReplySent) {
         onReplySent()
       }
+      showToast.success('Reply sent successfully')
     } catch (error) {
       console.error('Error sending reply:', error)
-      alert('Error sending reply')
+      const errorMessage = error.response?.data?.message || error.message || 'Error sending reply'
+      showToast.error(errorMessage)
     } finally {
       setSending(false)
     }

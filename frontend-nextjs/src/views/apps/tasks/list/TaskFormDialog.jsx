@@ -17,11 +17,14 @@ import {
 } from '@mui/material'
 import api from '@/lib/api'
 import { API_URL } from '@/lib/api'
+import { showToast } from '@/utils/toast'
 
 const TaskFormDialog = ({ open, onClose, task, onSave }) => {
   const [formData, setFormData] = useState({
     title: '',
+    description: '',
     category_id: '',
+    template_id: '',
     documentation_id: '',
     tool_id: '',
     first_name: '',
@@ -34,9 +37,13 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
     id_type: '',
     id_number: '',
     price: '',
+    completion_hours: '',
+    status: 'pending',
+    due_at: '',
     comment: '',
     document_image: null,
     selfie_image: null,
+    is_main_task: false,
   })
   const [categories, setCategories] = useState([])
   const [documentations, setDocumentations] = useState([])
@@ -46,87 +53,182 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
 
   useEffect(() => {
     if (open) {
-      loadCategories()
-      loadDocumentations()
-      loadTools()
-      if (task) {
-        setFormData({
-          title: task.title || '',
-          category_id: task.category_id || '',
-          documentation_id: task.documentation_id || '',
-          tool_id: task.tool_id || '',
-          first_name: task.first_name || '',
-          last_name: task.last_name || '',
-          country: task.country || '',
-          address: task.address || '',
-          phone_number: task.phone_number || '',
-          email: task.email || '',
-          date_of_birth: task.date_of_birth || '',
-          id_type: task.id_type || '',
-          id_number: task.id_number || '',
-          price: task.price || '',
-          comment: task.comment || '',
-          document_image: null,
-          selfie_image: null,
-        })
-        if (task.document_image) {
-          setDocumentPreview(task.document_image.startsWith('http') ? task.document_image : `${API_URL}/storage/${task.document_image}`)
+      // Сначала загружаем все списки, потом данные задачи
+      const loadAll = async () => {
+        await Promise.all([
+          loadCategories(),
+          loadDocumentations(),
+          loadTools()
+        ])
+        
+        // После загрузки списков загружаем данные задачи
+        if (task && task.id) {
+          await loadTaskData(task.id)
+        } else {
+          resetForm()
         }
-        if (task.selfie_image) {
-          setSelfiePreview(task.selfie_image.startsWith('http') ? task.selfie_image : `${API_URL}/storage/${task.selfie_image}`)
-        }
+      }
+      
+      loadAll()
+    }
+  }, [open, task?.id])
+
+  const loadTaskData = async (taskId) => {
+    try {
+      const response = await api.get(`/admin/tasks/${taskId}`)
+      const taskData = response.data
+      
+      // Явно маппим каждое поле, проверяя его существование и тип
+      // Важно: конвертируем все ID в строки для Select компонентов
+      const mappedData = {
+        title: getStringValue(taskData.title),
+        description: getStringValue(taskData.description),
+        category_id: taskData.category_id ? String(taskData.category_id) : '',
+        template_id: taskData.template_id ? String(taskData.template_id) : '',
+        documentation_id: taskData.documentation_id ? String(taskData.documentation_id) : '',
+        tool_id: taskData.tool_id ? String(taskData.tool_id) : '',
+        first_name: getStringValue(taskData.first_name),
+        last_name: getStringValue(taskData.last_name),
+        country: getStringValue(taskData.country),
+        address: getStringValue(taskData.address),
+        phone_number: getStringValue(taskData.phone_number),
+        email: getStringValue(taskData.email),
+        date_of_birth: formatDate(taskData.date_of_birth),
+        id_type: getStringValue(taskData.id_type),
+        id_number: getStringValue(taskData.id_number),
+        price: getStringValue(taskData.price),
+        completion_hours: getStringValue(taskData.completion_hours),
+        status: getStringValue(taskData.status) || 'pending',
+        due_at: formatDate(taskData.due_at),
+        comment: getStringValue(taskData.comment),
+        document_image: null,
+        selfie_image: null,
+        is_main_task: Boolean(taskData.is_main_task),
+      }
+      
+      setFormData(mappedData)
+      
+      // Обработка изображений
+      if (taskData.document_image) {
+        const docImage = formatImageUrl(taskData.document_image)
+        setDocumentPreview(docImage)
       } else {
-        setFormData({
-          title: '',
-          category_id: '',
-          documentation_id: '',
-          tool_id: '',
-          first_name: '',
-          last_name: '',
-          country: '',
-          address: '',
-          phone_number: '',
-          email: '',
-          date_of_birth: '',
-          id_type: '',
-          id_number: '',
-          price: '',
-          comment: '',
-          document_image: null,
-          selfie_image: null,
-        })
         setDocumentPreview(null)
+      }
+      
+      if (taskData.selfie_image) {
+        const selfieImg = formatImageUrl(taskData.selfie_image)
+        setSelfiePreview(selfieImg)
+      } else {
         setSelfiePreview(null)
       }
+    } catch (error) {
+      console.error('Error loading task data:', error)
+      const errorMessage = error.response?.data?.message || error.message || 'Error loading task data'
+      showToast.error(errorMessage)
+      resetForm()
     }
-  }, [open, task])
+  }
+
+  const getStringValue = (value) => {
+    if (value === null || value === undefined) return ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'number') return String(value)
+    if (typeof value === 'boolean') return String(value)
+    return String(value)
+  }
+
+  const formatDate = (dateValue) => {
+    if (!dateValue) return ''
+    if (typeof dateValue === 'string') {
+      // Если это строка с датой
+      if (dateValue.includes('T')) {
+        return dateValue.split('T')[0]
+      }
+      if (dateValue.includes(' ')) {
+        return dateValue.split(' ')[0]
+      }
+      // Если это уже в формате YYYY-MM-DD
+      if (dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return dateValue
+      }
+    }
+    return ''
+  }
+
+  const formatImageUrl = (imagePath) => {
+    if (!imagePath) return null
+    if (imagePath.startsWith('http')) return imagePath
+    if (imagePath.startsWith('/storage/')) return `${API_URL}${imagePath}`
+    return `${API_URL}/storage/${imagePath}`
+  }
+
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      category_id: '',
+      template_id: '',
+      documentation_id: '',
+      tool_id: '',
+      first_name: '',
+      last_name: '',
+      country: '',
+      address: '',
+      phone_number: '',
+      email: '',
+      date_of_birth: '',
+      id_type: '',
+      id_number: '',
+      price: '',
+      completion_hours: '',
+      status: 'pending',
+      due_at: '',
+      comment: '',
+      document_image: null,
+      selfie_image: null,
+      is_main_task: false,
+    })
+    setDocumentPreview(null)
+    setSelfiePreview(null)
+  }
 
   const loadCategories = async () => {
     try {
       const response = await api.get('/admin/task-categories')
-      setCategories(response.data || [])
+      const categoriesData = response.data?.data || response.data || []
+      setCategories(categoriesData)
+      return categoriesData
     } catch (error) {
       console.error('Error loading categories:', error)
+      return []
     }
   }
 
   const loadDocumentations = async () => {
     try {
       const response = await api.get('/admin/documentation-pages')
-      setDocumentations(response.data?.data || response.data || [])
+      const docsData = response.data?.data || response.data || []
+      setDocumentations(docsData)
+      return docsData
     } catch (error) {
       console.error('Error loading documentations:', error)
+      return []
     }
   }
 
   const loadTools = async () => {
     try {
       const response = await api.get('/admin/tools')
-      setTools(response.data?.data || response.data || [])
+      const toolsData = response.data?.data || response.data || []
+      setTools(toolsData)
+      return toolsData
     } catch (error) {
       console.error('Error loading tools:', error)
+      return []
     }
   }
+
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -151,27 +253,65 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
 
   const handleSubmit = async () => {
     try {
+      // Валидация обязательных полей
+      if (!formData.title || !formData.title.trim()) {
+        showToast.error('Title is required')
+        return
+      }
+      if (!formData.category_id) {
+        showToast.error('Category is required')
+        return
+      }
+      if (!formData.price || formData.price === '0') {
+        showToast.error('Price is required')
+        return
+      }
+      if (!formData.completion_hours) {
+        showToast.error('Completion hours is required')
+        return
+      }
+
       const formDataToSend = new FormData()
       
-      Object.keys(formData).forEach(key => {
-        if (key === 'document_image' || key === 'selfie_image') {
-          if (formData[key]) {
-            formDataToSend.append(key, formData[key])
-          }
-        } else if (formData[key] !== null && formData[key] !== '') {
-          formDataToSend.append(key, formData[key])
-        }
-      })
-
-      // Add required fields if they're missing
-      if (!formDataToSend.has('price')) {
-        formDataToSend.append('price', '0')
+      // Явно добавляем каждое поле по отдельности для контроля
+      // Основные обязательные поля
+      formDataToSend.append('title', formData.title.trim())
+      formDataToSend.append('description', formData.description || '')
+      formDataToSend.append('category_id', String(formData.category_id))
+      formDataToSend.append('status', formData.status || 'pending')
+      formDataToSend.append('price', String(formData.price || '0'))
+      formDataToSend.append('completion_hours', String(formData.completion_hours || '24'))
+      
+      // Опциональные поля (отправляем пустую строку для nullable полей)
+      formDataToSend.append('template_id', formData.template_id || '')
+      formDataToSend.append('documentation_id', formData.documentation_id || '')
+      formDataToSend.append('tool_id', formData.tool_id || '')
+      formDataToSend.append('due_at', formData.due_at || '')
+      
+      // Поля пользователя
+      formDataToSend.append('first_name', formData.first_name || '')
+      formDataToSend.append('last_name', formData.last_name || '')
+      formDataToSend.append('country', formData.country || '')
+      formDataToSend.append('address', formData.address || '')
+      formDataToSend.append('phone_number', formData.phone_number || '')
+      formDataToSend.append('email', formData.email || '')
+      formDataToSend.append('date_of_birth', formData.date_of_birth || '')
+      formDataToSend.append('id_type', formData.id_type || '')
+      formDataToSend.append('id_number', formData.id_number || '')
+      formDataToSend.append('comment', formData.comment || '')
+      
+      // Boolean поля
+      formDataToSend.append('is_main_task', formData.is_main_task ? '1' : '0')
+      
+      // Файлы (только если загружены новые)
+      if (formData.document_image) {
+        formDataToSend.append('document_image', formData.document_image)
       }
-      if (!formDataToSend.has('completion_hours')) {
-        formDataToSend.append('completion_hours', '24')
+      if (formData.selfie_image) {
+        formDataToSend.append('selfie_image', formData.selfie_image)
       }
 
-      if (task) {
+      if (task && task.id) {
         await api.put(`/admin/tasks/${task.id}`, formDataToSend, {
           headers: {
             'Content-Type': 'multipart/form-data',
@@ -185,11 +325,21 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
         })
       }
 
-      onSave()
+      if (onSave) onSave()
+      showToast.success(task && task.id ? 'Task updated successfully' : 'Task created successfully')
       onClose()
     } catch (error) {
       console.error('Error saving task:', error)
-      alert('Error saving task: ' + (error.response?.data?.message || error.message))
+      const errorMessage = error.response?.data?.message || error.message || 'Unknown error'
+      const errors = error.response?.data?.errors
+      if (errors) {
+        const errorList = Object.entries(errors).map(([field, messages]) => 
+          `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`
+        ).join(', ')
+        showToast.error(`Error saving task: ${errorList}`)
+      } else {
+        showToast.error('Error saving task: ' + errorMessage)
+      }
     }
   }
 
@@ -210,18 +360,30 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
               />
             </Grid>
 
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                fullWidth
+                label="Description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                multiline
+                rows={3}
+              />
+            </Grid>
+
             <Grid size={{ xs: 12, md: 6 }}>
               <FormControl fullWidth>
                 <InputLabel>Category</InputLabel>
                 <Select
                   name="category_id"
-                  value={formData.category_id}
+                  value={formData.category_id ? String(formData.category_id) : ''}
                   onChange={handleChange}
                   label="Category"
                   required
                 >
                   {categories.map((cat) => (
-                    <MenuItem key={cat.id} value={cat.id}>
+                    <MenuItem key={cat.id} value={String(cat.id)}>
                       {cat.name}
                     </MenuItem>
                   ))}
@@ -231,16 +393,33 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
 
             <Grid size={{ xs: 12, md: 6 }}>
               <FormControl fullWidth>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  label="Status"
+                >
+                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="in_progress">In Progress</MenuItem>
+                  <MenuItem value="completed">Completed</MenuItem>
+                  <MenuItem value="cancelled">Cancelled</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormControl fullWidth>
                 <InputLabel>Documentation</InputLabel>
                 <Select
                   name="documentation_id"
-                  value={formData.documentation_id}
+                  value={formData.documentation_id ? String(formData.documentation_id) : ''}
                   onChange={handleChange}
                   label="Documentation"
                 >
                   <MenuItem value="">None</MenuItem>
                   {documentations.map((doc) => (
-                    <MenuItem key={doc.id} value={doc.id}>
+                    <MenuItem key={doc.id} value={String(doc.id)}>
                       {doc.title}
                     </MenuItem>
                   ))}
@@ -253,13 +432,13 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
                 <InputLabel>Tool</InputLabel>
                 <Select
                   name="tool_id"
-                  value={formData.tool_id}
+                  value={formData.tool_id ? String(formData.tool_id) : ''}
                   onChange={handleChange}
                   label="Tool"
                 >
                   <MenuItem value="">None</MenuItem>
                   {tools.map((tool) => (
-                    <MenuItem key={tool.id} value={tool.id}>
+                    <MenuItem key={tool.id} value={String(tool.id)}>
                       {tool.name}
                     </MenuItem>
                   ))}
@@ -276,6 +455,30 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
                 value={formData.price}
                 onChange={handleChange}
                 required
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Completion Hours"
+                name="completion_hours"
+                type="number"
+                value={formData.completion_hours}
+                onChange={handleChange}
+                required
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Due Date"
+                name="due_at"
+                type="date"
+                value={formData.due_at}
+                onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 

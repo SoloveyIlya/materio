@@ -17,6 +17,7 @@ import Grid from '@mui/material/Grid'
 // Component Imports
 import api from '@/lib/api'
 import { API_URL } from '@/lib/api'
+import { showToast } from '@/utils/toast'
 
 const TaskDrawer = props => {
   // Props
@@ -25,10 +26,11 @@ const TaskDrawer = props => {
   // States
   const [formData, setFormData] = useState({
     title: '',
+    description: '',
     category_id: '',
+    template_id: '',
     documentation_id: '',
     tool_id: '',
-    assigned_to: '',
     first_name: '',
     last_name: '',
     country: '',
@@ -39,15 +41,18 @@ const TaskDrawer = props => {
     id_type: '',
     id_number: '',
     price: '',
+    completion_hours: '',
+    status: 'pending',
+    due_at: '',
     comment: '',
     work_day: '',
+    is_main_task: false,
     document_image: null,
     selfie_image: null,
   })
   const [categories, setCategories] = useState([])
   const [documentations, setDocumentations] = useState([])
   const [tools, setTools] = useState([])
-  const [moderators, setModerators] = useState([])
   const [documentPreview, setDocumentPreview] = useState(null)
   const [selfiePreview, setSelfiePreview] = useState(null)
 
@@ -56,26 +61,30 @@ const TaskDrawer = props => {
       loadCategories()
       loadDocumentations()
       loadTools()
-      loadModerators()
       if (task) {
         setFormData({
-          title: task.title || '',
-          category_id: task.category_id || '',
-          documentation_id: task.documentation_id || '',
-          tool_id: task.tool_id || '',
-          assigned_to: task.assigned_to || '',
-          first_name: task.first_name || '',
-          last_name: task.last_name || '',
-          country: task.country || '',
-          address: task.address || '',
-          phone_number: task.phone_number || '',
-          email: task.email || '',
-          date_of_birth: task.date_of_birth || '',
-          id_type: task.id_type || '',
-          id_number: task.id_number || '',
-          price: task.price || '',
-          comment: task.comment || '',
-          work_day: task.work_day || '',
+          title: String(task.title || ''),
+          description: String(task.description || ''),
+          category_id: task.category_id ? String(task.category_id) : '',
+          template_id: task.template_id ? String(task.template_id) : '',
+          documentation_id: task.documentation_id ? String(task.documentation_id) : '',
+          tool_id: task.tool_id ? String(task.tool_id) : '',
+          first_name: String(task.first_name || ''),
+          last_name: String(task.last_name || ''),
+          country: String(task.country || ''),
+          address: String(task.address || ''),
+          phone_number: String(task.phone_number || ''),
+          email: String(task.email || ''),
+          date_of_birth: task.date_of_birth ? (task.date_of_birth.includes('T') ? task.date_of_birth.split('T')[0] : task.date_of_birth.split(' ')[0]) : '',
+          id_type: String(task.id_type || ''),
+          id_number: String(task.id_number || ''),
+          price: task.price !== null && task.price !== undefined ? String(task.price) : '',
+          completion_hours: task.completion_hours !== null && task.completion_hours !== undefined ? String(task.completion_hours) : '',
+          status: String(task.status || 'pending'),
+          due_at: task.due_at ? (task.due_at.includes('T') ? task.due_at.split('T')[0] : task.due_at.split(' ')[0]) : '',
+          comment: String(task.comment || ''),
+          work_day: task.work_day ? String(task.work_day) : '',
+          is_main_task: Boolean(task.is_main_task || false),
           document_image: null,
           selfie_image: null,
         })
@@ -94,10 +103,11 @@ const TaskDrawer = props => {
       } else {
         setFormData({
           title: '',
+          description: '',
           category_id: '',
+          template_id: '',
           documentation_id: '',
           tool_id: '',
-          assigned_to: '',
           first_name: '',
           last_name: '',
           country: '',
@@ -108,8 +118,12 @@ const TaskDrawer = props => {
           id_type: '',
           id_number: '',
           price: '',
+          completion_hours: '',
+          status: 'pending',
+          due_at: '',
           comment: '',
           work_day: column && column.id <= 5 ? column.id.toString() : '',
+          is_main_task: false,
           document_image: null,
           selfie_image: null,
         })
@@ -146,14 +160,6 @@ const TaskDrawer = props => {
     }
   }
 
-  const loadModerators = async () => {
-    try {
-      const response = await api.get('/admin/users?role=moderator')
-      setModerators(response.data || [])
-    } catch (error) {
-      console.error('Error loading moderators:', error)
-    }
-  }
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -185,55 +191,129 @@ const TaskDrawer = props => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
+      // Валидация обязательных полей с детальными проверками
+      const errors = []
+      
+      if (!formData.title || !formData.title.trim()) {
+        errors.push('Title is required')
+      }
+      if (!formData.category_id || formData.category_id === '' || formData.category_id === null || formData.category_id === undefined) {
+        errors.push('Category is required')
+      }
+      if (!formData.price || formData.price === '' || formData.price === '0' || formData.price === null || formData.price === undefined) {
+        errors.push('Price is required')
+      }
+      if (!formData.completion_hours || formData.completion_hours === '' || formData.completion_hours === null || formData.completion_hours === undefined) {
+        errors.push('Completion hours is required')
+      }
+      if (!formData.status || formData.status === '' || formData.status === null || formData.status === undefined) {
+        errors.push('Status is required')
+      }
+      
+      if (errors.length > 0) {
+        showToast.error('Please fill in all required fields: ' + errors.join(', '))
+        console.error('Validation errors:', errors)
+        console.error('Current formData:', formData)
+        return
+      }
+
       const formDataToSend = new FormData()
       
-      Object.keys(formData).forEach(key => {
-        if (key === 'document_image' || key === 'selfie_image') {
-          if (formData[key]) {
-            formDataToSend.append(key, formData[key])
-          }
-        } else if (formData[key] !== null && formData[key] !== '') {
-          // Convert work_day to number if it exists
-          if (key === 'work_day' && formData[key]) {
-            formDataToSend.append(key, parseInt(formData[key], 10))
-          } else if (key === 'assigned_to' && formData[key]) {
-            // Convert assigned_to to number if it exists
-            formDataToSend.append(key, parseInt(formData[key], 10))
-          } else {
-            formDataToSend.append(key, formData[key])
-          }
-        }
+      // Отладочная информация
+      console.log('FormData before sending:', {
+        title: formData.title,
+        category_id: formData.category_id,
+        price: formData.price,
+        completion_hours: formData.completion_hours,
+        status: formData.status
       })
-
-      // Add required fields if they're missing
-      if (!formDataToSend.has('price')) {
-        formDataToSend.append('price', '0')
+      
+      // Явно добавляем каждое поле по отдельности для контроля
+      // Основные обязательные поля - после валидации они точно заполнены
+      const titleValue = formData.title.trim()
+      const categoryIdValue = String(formData.category_id)
+      const priceValue = String(formData.price)
+      const completionHoursValue = String(formData.completion_hours)
+      const statusValue = String(formData.status)
+      
+      formDataToSend.append('title', titleValue)
+      formDataToSend.append('description', formData.description || '')
+      formDataToSend.append('category_id', categoryIdValue)
+      formDataToSend.append('status', statusValue)
+      formDataToSend.append('price', priceValue)
+      formDataToSend.append('completion_hours', completionHoursValue)
+      
+      // Проверяем, что обязательные поля добавлены
+      console.log('FormData values check:', {
+        title: formDataToSend.get('title'),
+        category_id: formDataToSend.get('category_id'),
+        price: formDataToSend.get('price'),
+        completion_hours: formDataToSend.get('completion_hours'),
+        status: formDataToSend.get('status')
+      })
+      
+      // Для отладки: выводим все значения FormData
+      console.log('All FormData entries:')
+      for (let pair of formDataToSend.entries()) {
+        console.log(pair[0] + ': ' + pair[1])
       }
-      if (!formDataToSend.has('completion_hours')) {
-        formDataToSend.append('completion_hours', '24')
+      
+      // Опциональные поля (отправляем пустую строку для nullable полей)
+      formDataToSend.append('template_id', formData.template_id || '')
+      formDataToSend.append('documentation_id', formData.documentation_id || '')
+      formDataToSend.append('tool_id', formData.tool_id || '')
+      formDataToSend.append('due_at', formData.due_at || '')
+      formDataToSend.append('work_day', formData.work_day || '')
+      
+      // Поля пользователя
+      formDataToSend.append('first_name', formData.first_name || '')
+      formDataToSend.append('last_name', formData.last_name || '')
+      formDataToSend.append('country', formData.country || '')
+      formDataToSend.append('address', formData.address || '')
+      formDataToSend.append('phone_number', formData.phone_number || '')
+      formDataToSend.append('email', formData.email || '')
+      formDataToSend.append('date_of_birth', formData.date_of_birth || '')
+      formDataToSend.append('id_type', formData.id_type || '')
+      formDataToSend.append('id_number', formData.id_number || '')
+      formDataToSend.append('comment', formData.comment || '')
+      
+      // Boolean поля
+      formDataToSend.append('is_main_task', formData.is_main_task ? '1' : '0')
+      
+      // Файлы (только если загружены новые)
+      if (formData.document_image) {
+        formDataToSend.append('document_image', formData.document_image)
+      }
+      if (formData.selfie_image) {
+        formDataToSend.append('selfie_image', formData.selfie_image)
       }
 
-      if (task) {
-        await api.put(`/admin/tasks/${task.id}`, formDataToSend, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        })
+      if (task && task.id) {
+        // Для PUT запросов с FormData в Laravel нужно использовать POST с _method: 'PUT'
+        // Это связано с тем, как Laravel обрабатывает multipart/form-data
+        formDataToSend.append('_method', 'PUT')
+        await api.post(`/admin/tasks/${task.id}`, formDataToSend)
       } else {
-        await api.post('/admin/tasks', formDataToSend, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        })
+        await api.post('/admin/tasks', formDataToSend)
       }
 
       if (onSave) {
         onSave()
       }
+      showToast.success(task && task.id ? 'Task updated successfully' : 'Task created successfully')
       handleClose()
     } catch (error) {
       console.error('Error saving task:', error)
-      alert('Error saving task: ' + (error.response?.data?.message || error.message))
+      const errorMessage = error.response?.data?.message || error.message || 'Unknown error'
+      const errors = error.response?.data?.errors
+      if (errors) {
+        const errorList = Object.entries(errors).map(([field, messages]) => 
+          `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`
+        ).join(', ')
+        showToast.error(`Error saving task: ${errorList}`)
+      } else {
+        showToast.error('Error saving task: ' + errorMessage)
+      }
     }
   }
 
@@ -267,31 +347,14 @@ const TaskDrawer = props => {
             <InputLabel>Category</InputLabel>
             <Select
               name='category_id'
-              value={formData.category_id}
+              value={formData.category_id ? String(formData.category_id) : ''}
               onChange={handleChange}
               label='Category'
               required
             >
               {categories.map((cat) => (
-                <MenuItem key={cat.id} value={cat.id}>
+                <MenuItem key={cat.id} value={String(cat.id)}>
                   {cat.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl fullWidth>
-            <InputLabel>Assign to Moderator</InputLabel>
-            <Select
-              name='assigned_to'
-              value={formData.assigned_to}
-              onChange={handleChange}
-              label='Assign to Moderator'
-            >
-              <MenuItem value=''>None</MenuItem>
-              {moderators.map((moderator) => (
-                <MenuItem key={moderator.id} value={moderator.id}>
-                  {moderator.name} ({moderator.email})
                 </MenuItem>
               ))}
             </Select>
@@ -301,13 +364,13 @@ const TaskDrawer = props => {
             <InputLabel>Documentation</InputLabel>
             <Select
               name='documentation_id'
-              value={formData.documentation_id}
+              value={formData.documentation_id ? String(formData.documentation_id) : ''}
               onChange={handleChange}
               label='Documentation'
             >
               <MenuItem value=''>None</MenuItem>
               {documentations.map((doc) => (
-                <MenuItem key={doc.id} value={doc.id}>
+                <MenuItem key={doc.id} value={String(doc.id)}>
                   {doc.title}
                 </MenuItem>
               ))}
@@ -318,13 +381,13 @@ const TaskDrawer = props => {
             <InputLabel>Tool</InputLabel>
             <Select
               name='tool_id'
-              value={formData.tool_id}
+              value={formData.tool_id ? String(formData.tool_id) : ''}
               onChange={handleChange}
               label='Tool'
             >
               <MenuItem value=''>None</MenuItem>
               {tools.map((tool) => (
-                <MenuItem key={tool.id} value={tool.id}>
+                <MenuItem key={tool.id} value={String(tool.id)}>
                   {tool.name}
                 </MenuItem>
               ))}
@@ -340,6 +403,33 @@ const TaskDrawer = props => {
             onChange={handleChange}
             required
           />
+
+          <TextField
+            fullWidth
+            label='Completion Hours'
+            name='completion_hours'
+            type='number'
+            value={formData.completion_hours}
+            onChange={handleChange}
+            required
+            inputProps={{ min: 1 }}
+          />
+
+          <FormControl fullWidth>
+            <InputLabel>Status</InputLabel>
+            <Select
+              name='status'
+              value={formData.status}
+              onChange={handleChange}
+              label='Status'
+              required
+            >
+              <MenuItem value='pending'>Pending</MenuItem>
+              <MenuItem value='in_progress'>In Progress</MenuItem>
+              <MenuItem value='completed'>Completed</MenuItem>
+              <MenuItem value='cancelled'>Cancelled</MenuItem>
+            </Select>
+          </FormControl>
 
           {!task && (
             <TextField

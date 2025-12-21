@@ -12,6 +12,7 @@ import TaskDrawer from '@/views/apps/tasks/kanban/TaskDrawer'
 // Util Imports
 import { commonLayoutClasses } from '@layouts/utils/layoutClasses'
 import api from '@/lib/api'
+import { showToast } from '@/utils/toast'
 
 // Styles Imports
 import styles from '@/views/apps/tasks/kanban/styles.module.css'
@@ -81,9 +82,11 @@ const KanbanPage = () => {
     try {
       await api.delete(`/admin/tasks/${task.id}`)
       loadTasks() // Reload tasks after deletion
+      showToast.success('Task deleted successfully')
     } catch (error) {
       console.error('Error deleting task:', error)
-      alert('Error deleting task: ' + (error.response?.data?.message || error.message))
+      const errorMessage = error.response?.data?.message || error.message || 'Error deleting task'
+      showToast.error(errorMessage)
     }
   }
 
@@ -220,10 +223,11 @@ const KanbanPage = () => {
               setCategoryDialogOpen(false)
               setNewCategoryName('')
               setNewCategorySlug('')
-              alert('Category created successfully')
+              showToast.success('Category created successfully')
             } catch (error) {
               console.error('Error creating category:', error)
-              alert('Error creating category: ' + (error.response?.data?.message || error.message))
+              const errorMessage = error.response?.data?.message || error.message || 'Error creating category'
+              showToast.error(errorMessage)
             }
           }} variant='contained'>Save</Button>
         </DialogActions>
