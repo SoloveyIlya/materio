@@ -23,6 +23,6 @@ class TestAnswer extends Model
 
     public function question()
     {
-        return $this->belongsTo(TestQuestion::class);
+        return $this->belongsTo(TestQuestion::class, 'question_id');
     }
 }

@@ -51,6 +51,11 @@ class DocumentationPageController extends Controller
         $validated['slug'] = Str::slug($validated['title']);
         $validated['order'] = $validated['order'] ?? 0;
         $validated['is_published'] = $validated['is_published'] ?? false;
+        
+        // Convert empty string to null for content
+        if (isset($validated['content']) && $validated['content'] === '') {
+            $validated['content'] = null;
+        }
 
         // Обработка content_blocks (JSON string)
         $contentBlocks = [];
@@ -227,6 +232,11 @@ class DocumentationPageController extends Controller
         // Преобразуем boolean значения
         if (isset($validated['is_published'])) {
             $validated['is_published'] = filter_var($validated['is_published'], FILTER_VALIDATE_BOOLEAN);
+        }
+        
+        // Convert empty string to null for content
+        if (isset($validated['content']) && $validated['content'] === '') {
+            $validated['content'] = null;
         }
 
         // Обновление slug если изменился title

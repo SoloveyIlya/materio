@@ -10,7 +10,7 @@ import UserListCards from '@/views/apps/user/list/UserListCards'
 
 export default function UsersPage() {
   const [users, setUsers] = useState([])
-  const [activeTab, setActiveTab] = useState(0)
+  const [activeTab, setActiveTab] = useState(0) // Default to Moderators (0 - first tab)
   const [filterOnline, setFilterOnline] = useState(false)
   const [filterRole, setFilterRole] = useState('')
   const [filterMy, setFilterMy] = useState(false)
@@ -24,12 +24,12 @@ export default function UsersPage() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (activeTab === 1) params.append('role', 'moderator')
+      if (activeTab === 0) params.append('role', 'moderator') // activeTab 0 is now Moderators
       if (filterOnline) params.append('online_only', 'true')
       if (filterMy) params.append('administrator_id', 'my')
       if (filterRole) params.append('role', filterRole)
 
-      const endpoint = activeTab === 0 ? '/admin/users' : '/admin/moderators'
+      const endpoint = activeTab === 0 ? '/admin/moderators' : '/admin/users' // Swapped
       const response = await api.get(`${endpoint}?${params}`)
       setUsers(response.data || [])
     } catch (error) {
@@ -53,12 +53,12 @@ export default function UsersPage() {
   return (
     <Box sx={{ p: 6 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant='h4'>{activeTab === 0 ? 'Users' : 'Moderators'}</Typography>
+        <Typography variant='h4'>{activeTab === 0 ? 'Moderators' : 'Users'}</Typography>
       </Box>
 
       <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 6 }}>
-        <Tab label='Users' />
         <Tab label='Moderators' />
+        <Tab label='Users' />
       </Tabs>
 
       <Grid container spacing={6}>

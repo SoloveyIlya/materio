@@ -35,7 +35,6 @@ import {
 
 // Component Imports
 import CustomAvatar from '@core/components/mui/Avatar'
-import OptionMenu from '@core/components/option-menu'
 import api from '@/lib/api'
 
 // Util Imports
@@ -209,6 +208,35 @@ const TaskListTable = ({ tableData, onViewResult, onMessageModerator }) => {
           </Typography>
         )
       }),
+      columnHelper.accessor('assigned_user', {
+        header: 'Moderator',
+        cell: ({ row }) => {
+          const user = row.original.assigned_user || row.original.assignedUser
+          if (!user) return <Typography color='text.secondary'>—</Typography>
+          
+          return (
+            <div className='flex items-center gap-3'>
+              {getAvatar({ avatar: user.avatar, name: user.name, email: user.email })}
+              <div className='flex flex-col'>
+                <Typography className='font-medium' color='text.primary'>
+                  {user.name || user.email || '—'}
+                </Typography>
+              </div>
+            </div>
+          )
+        }
+      }),
+      columnHelper.accessor('status', {
+        header: 'Status',
+        cell: ({ row }) => (
+          <Chip
+            label={getStatusLabel(row.original.status)}
+            color={getStatusColor(row.original.status)}
+            variant='tonal'
+            size='small'
+          />
+        )
+      }),
       columnHelper.accessor('title', {
         header: 'Title',
         cell: ({ row }) => {
@@ -231,24 +259,6 @@ const TaskListTable = ({ tableData, onViewResult, onMessageModerator }) => {
           )
         }
       }),
-      columnHelper.accessor('assigned_user', {
-        header: 'Moderator',
-        cell: ({ row }) => {
-          const user = row.original.assigned_user || row.original.assignedUser
-          if (!user) return <Typography color='text.secondary'>—</Typography>
-          
-          return (
-            <div className='flex items-center gap-3'>
-              {getAvatar({ avatar: user.avatar, name: user.name, email: user.email })}
-              <div className='flex flex-col'>
-                <Typography className='font-medium' color='text.primary'>
-                  {user.name || user.email || '—'}
-                </Typography>
-              </div>
-            </div>
-          )
-        }
-      }),
       columnHelper.accessor('category', {
         header: 'Category',
         cell: ({ row }) => (
@@ -261,17 +271,6 @@ const TaskListTable = ({ tableData, onViewResult, onMessageModerator }) => {
           <Typography className='font-medium' color='text.primary'>
             ${row.original.price || '0.00'}
           </Typography>
-        )
-      }),
-      columnHelper.accessor('status', {
-        header: 'Status',
-        cell: ({ row }) => (
-          <Chip
-            label={getStatusLabel(row.original.status)}
-            color={getStatusColor(row.original.status)}
-            variant='tonal'
-            size='small'
-          />
         )
       }),
       columnHelper.accessor('completed_at', {
@@ -295,7 +294,7 @@ const TaskListTable = ({ tableData, onViewResult, onMessageModerator }) => {
             task.status === 'completed_by_moderator') && task.result
 
           return (
-            <div className='flex items-center'>
+            <div className='flex items-center gap-1'>
               {canViewResult && (
                 <IconButton
                   size='small'
@@ -314,20 +313,6 @@ const TaskListTable = ({ tableData, onViewResult, onMessageModerator }) => {
                   <i className='ri-message-2-line text-textSecondary' />
                 </IconButton>
               )}
-              <OptionMenu
-                iconButtonProps={{ size: 'medium' }}
-                iconClassName='text-textSecondary'
-                options={[
-                  {
-                    text: 'View Details',
-                    icon: 'ri-eye-line',
-                    menuItemProps: {
-                      onClick: () => onViewResult(task),
-                      className: 'flex items-center gap-2 text-textSecondary'
-                    }
-                  }
-                ]}
-              />
             </div>
           )
         },

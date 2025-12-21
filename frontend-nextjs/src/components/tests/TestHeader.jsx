@@ -13,7 +13,7 @@ import classnames from 'classnames'
 // Component Imports
 import CustomIconButton from '@/@core/components/mui/IconButton'
 
-const TestHeader = ({ onAddTest }) => {
+const TestHeader = ({ onAddTest, onManageLevels }) => {
   // Vars
   const leftIllustration = '/images/apps/academy/hand-with-bulb-light.png'
 
@@ -39,6 +39,15 @@ const TestHeader = ({ onAddTest }) => {
             className='sm:is-auto max-sm:flex-1'
           >
             Add New Test
+          </Button>
+          <Button
+            variant='outlined'
+            color='primary'
+            startIcon={<i className='ri-settings-3-line' />}
+            onClick={onManageLevels}
+            className='sm:is-auto max-sm:flex-1'
+          >
+            Manage Levels
           </Button>
         </div>
       </div>

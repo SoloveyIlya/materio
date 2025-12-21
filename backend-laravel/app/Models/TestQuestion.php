@@ -28,6 +28,6 @@ class TestQuestion extends Model
 
     public function answers()
     {
-        return $this->hasMany(TestAnswer::class)->orderBy('order');
+        return $this->hasMany(TestAnswer::class, 'question_id')->orderBy('order');
     }
 }

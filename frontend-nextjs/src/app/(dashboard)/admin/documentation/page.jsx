@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Box, Grid, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, Button, Checkbox, FormControlLabel, Typography } from '@mui/material'
 import api from '@/lib/api'
+import { showToast } from '@/utils/toast'
 import ContentEditor from '@/components/documentation/ContentEditor'
 import DocumentationHeader from '@/components/documentation/DocumentationHeader'
 import Documentations from '@/components/documentation/Documentations'
@@ -27,6 +28,7 @@ export default function DocumentationPage() {
     parent_id: ''
   })
   const [editingPage, setEditingPage] = useState(null)
+  const [editingCategory, setEditingCategory] = useState(null)
 
   useEffect(() => {
     loadCategories()
@@ -152,7 +154,9 @@ export default function DocumentationPage() {
       formDataToSend.append('content_blocks', JSON.stringify(processedBlocks))
 
       if (editingPage) {
-        await api.put(`/admin/documentation-pages/${editingPage.id}`, formDataToSend, {
+        // Use POST with method spoofing for FormData
+        formDataToSend.append('_method', 'PUT')
+        await api.post(`/admin/documentation-pages/${editingPage.id}`, formDataToSend, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
       } else {
@@ -163,23 +167,35 @@ export default function DocumentationPage() {
       
       handleCloseDialog()
       loadPages()
+      showToast.success(editingPage ? 'Page updated successfully' : 'Page created successfully')
     } catch (error) {
       console.error('Error saving page:', error)
-      alert('Error saving page: ' + (error.response?.data?.message || error.message))
+      showToast.error('Error saving page: ' + (error.response?.data?.message || error.message))
     }
   }
 
-  const handleOpenCategoryDialog = () => {
-    setCategoryFormData({
-      name: '',
-      description: '',
-      parent_id: ''
-    })
+  const handleOpenCategoryDialog = (category = null) => {
+    if (category) {
+      setEditingCategory(category)
+      setCategoryFormData({
+        name: category.name || '',
+        description: category.description || '',
+        parent_id: category.parent_id?.toString() || ''
+      })
+    } else {
+      setEditingCategory(null)
+      setCategoryFormData({
+        name: '',
+        description: '',
+        parent_id: ''
+      })
+    }
     setCategoryDialogOpen(true)
   }
 
   const handleCloseCategoryDialog = () => {
     setCategoryDialogOpen(false)
+    setEditingCategory(null)
     setCategoryFormData({
       name: '',
       description: '',
@@ -195,13 +211,29 @@ export default function DocumentationPage() {
         parent_id: categoryFormData.parent_id || null
       }
 
-      await api.post('/admin/documentation-categories', dataToSend)
+      if (editingCategory) {
+        await api.put(`/admin/documentation-categories/${editingCategory.id}`, dataToSend)
+      } else {
+        await api.post('/admin/documentation-categories', dataToSend)
+      }
       
       handleCloseCategoryDialog()
       loadCategories()
+      showToast.success(editingCategory ? 'Category updated successfully' : 'Category created successfully')
     } catch (error) {
       console.error('Error saving category:', error)
-      alert('Error saving category: ' + (error.response?.data?.message || error.message))
+      showToast.error('Error saving category: ' + (error.response?.data?.message || error.message))
+    }
+  }
+
+  const handleDeleteCategory = async (category) => {
+    try {
+      await api.delete(`/admin/documentation-categories/${category.id}`)
+      loadCategories()
+      showToast.success('Category deleted successfully')
+    } catch (error) {
+      console.error('Error deleting category:', error)
+      showToast.error('Error deleting category: ' + (error.response?.data?.message || error.message))
     }
   }
 
@@ -219,6 +251,8 @@ export default function DocumentationPage() {
             categories={categories}
             pages={pages}
             onEditPage={handleOpenDialog}
+            onEditCategory={handleOpenCategoryDialog}
+            onDeleteCategory={handleDeleteCategory}
           />
         </Grid>
       </Grid>
@@ -307,9 +341,9 @@ export default function DocumentationPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Add Category Dialog */}
+      {/* Add/Edit Category Dialog */}
       <Dialog open={categoryDialogOpen} onClose={handleCloseCategoryDialog} maxWidth='sm' fullWidth>
-        <DialogTitle>Add Category</DialogTitle>
+        <DialogTitle>{editingCategory ? 'Edit Category' : 'Add Category'}</DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
@@ -336,18 +370,20 @@ export default function DocumentationPage() {
               label='Parent Category (optional)'
             >
               <MenuItem value=''>None (Root Category)</MenuItem>
-              {categories.map((cat) => (
-                <MenuItem key={cat.id} value={cat.id?.toString() || ''}>
-                  {cat.name}
-                </MenuItem>
-              ))}
+              {categories
+                .filter(cat => !editingCategory || cat.id !== editingCategory.id)
+                .map((cat) => (
+                  <MenuItem key={cat.id} value={cat.id?.toString() || ''}>
+                    {cat.name}
+                  </MenuItem>
+                ))}
             </Select>
           </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseCategoryDialog}>Cancel</Button>
           <Button onClick={handleSaveCategory} variant='contained' disabled={!categoryFormData.name}>
-            Create
+            {editingCategory ? 'Save' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -27,7 +27,6 @@ import {
 } from '@tanstack/react-table'
 
 // Component Imports
-import OptionMenu from '@core/components/option-menu'
 
 // Style Imports
 import tableStyles from '@core/styles/table.module.css'
@@ -168,35 +167,13 @@ const ToolsListTable = ({ tableData, onEdit, onDelete }) => {
         cell: ({ row }) => {
           const tool = row.original
           return (
-            <div className='flex items-center'>
-              <IconButton size='small' onClick={() => onEdit(tool)}>
+            <div className='flex items-center gap-1'>
+              <IconButton size='small' onClick={() => onEdit(tool)} title='Edit'>
                 <i className='ri-edit-box-line text-textSecondary' />
               </IconButton>
-              <IconButton size='small' color='error' onClick={() => onDelete(tool.id)}>
+              <IconButton size='small' color='error' onClick={() => onDelete(tool)} title='Delete'>
                 <i className='ri-delete-bin-7-line text-textSecondary' />
               </IconButton>
-              <OptionMenu
-                iconButtonProps={{ size: 'medium' }}
-                iconClassName='text-textSecondary'
-                options={[
-                  {
-                    text: 'Edit',
-                    icon: 'ri-edit-box-line',
-                    menuItemProps: {
-                      onClick: () => onEdit(tool),
-                      className: 'flex items-center gap-2 text-textSecondary'
-                    }
-                  },
-                  {
-                    text: 'Delete',
-                    icon: 'ri-delete-bin-7-line',
-                    menuItemProps: {
-                      onClick: () => onDelete(tool.id),
-                      className: 'flex items-center gap-2 text-textSecondary'
-                    }
-                  }
-                ]}
-              />
             </div>
           )
         },

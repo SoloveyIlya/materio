@@ -8,52 +8,21 @@ import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Chip from '@mui/material/Chip'
 import Button from '@mui/material/Button'
-import FormControl from '@mui/material/FormControl'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import InputLabel from '@mui/material/InputLabel'
-import LinearProgress from '@mui/material/LinearProgress'
-import MenuItem from '@mui/material/MenuItem'
 import Pagination from '@mui/material/Pagination'
-import Select from '@mui/material/Select'
-import Switch from '@mui/material/Switch'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
 import Box from '@mui/material/Box'
 
 const Tests = ({ testData, onEditTest }) => {
   // States
-  const [level, setLevel] = useState('All')
-  const [hideInactive, setHideInactive] = useState(false)
   const [data, setData] = useState([])
   const [activePage, setActivePage] = useState(0)
 
   useEffect(() => {
-    let newData = testData?.filter(testItem => {
-      if (level === 'All') return !hideInactive || testItem.is_active
-
-      return testItem.level_id?.toString() === level && (!hideInactive || testItem.is_active)
-    }) ?? []
-
+    const newData = testData ?? []
     if (activePage > Math.ceil(newData.length / 6)) setActivePage(0)
     setData(newData)
-  }, [activePage, level, hideInactive, testData])
-
-  const handleChange = e => {
-    setHideInactive(e.target.checked)
-    setActivePage(0)
-  }
-
-  const getLevels = () => {
-    const levels = new Set()
-    testData?.forEach(test => {
-      if (test.level) {
-        levels.add(JSON.stringify({ id: test.level.id, name: test.level.name }))
-      }
-    })
-    return Array.from(levels).map(l => JSON.parse(l))
-  }
-
-  const levels = getLevels()
+  }, [activePage, testData])
 
   return (
     <Card>
@@ -62,33 +31,6 @@ const Tests = ({ testData, onEditTest }) => {
           <div>
             <Typography variant='h5'>Tests</Typography>
             <Typography>Total {data.length} test{data.length !== 1 ? 's' : ''} available</Typography>
-          </div>
-          <div className='flex flex-wrap items-center gap-y-4 gap-x-6'>
-            <FormControl fullWidth size='small' className='is-[250px] flex-auto'>
-              <InputLabel id='level-select'>Level</InputLabel>
-              <Select
-                fullWidth
-                id='select-level'
-                value={level}
-                onChange={e => {
-                  setLevel(e.target.value)
-                  setActivePage(0)
-                }}
-                label='Level'
-                labelId='level-select'
-              >
-                <MenuItem value='All'>All Levels</MenuItem>
-                {levels.map((lvl) => (
-                  <MenuItem key={lvl.id} value={lvl.id.toString()}>
-                    {lvl.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControlLabel
-              control={<Switch onChange={handleChange} checked={hideInactive} />}
-              label='Hide inactive'
-            />
           </div>
         </div>
         {data.length > 0 ? (

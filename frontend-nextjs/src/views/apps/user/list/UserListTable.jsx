@@ -33,7 +33,6 @@ import {
 
 // Component Imports
 import TableFilters from './TableFilters'
-import OptionMenu from '@core/components/option-menu'
 import CustomAvatar from '@core/components/mui/Avatar'
 
 // Util Imports
@@ -129,173 +128,165 @@ const UserListTable = ({ tableData, activeTab, onSendTest }) => {
   }
 
   const columns = useMemo(
-    () => [
-      {
-        id: 'select',
-        header: ({ table }) => (
-          <Checkbox
-            {...{
-              checked: table.getIsAllRowsSelected(),
-              indeterminate: table.getIsSomeRowsSelected(),
-              onChange: table.getToggleAllRowsSelectedHandler()
-            }}
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            {...{
-              checked: row.getIsSelected(),
-              disabled: !row.getCanSelect(),
-              indeterminate: row.getIsSomeSelected(),
-              onChange: row.getToggleSelectedHandler()
-            }}
-          />
-        )
-      },
-      columnHelper.accessor('name', {
-        header: 'User',
-        cell: ({ row }) => {
-          const user = row.original
-          return (
-            <div className='flex items-center gap-4'>
-              {getAvatar({ avatar: user.avatar, name: user.name, email: user.email })}
-              <div className='flex flex-col'>
-                <Typography className='font-medium' color='text.primary'>
-                  {user.name || user.email || 'N/A'}
-                </Typography>
-                <Typography variant='body2' color='text.secondary'>
-                  ID: {user.id}
-                </Typography>
-              </div>
-            </div>
-          )
-        }
-      }),
-      columnHelper.accessor('email', {
-        header: 'Email',
-        cell: ({ row }) => <Typography>{row.original.email || '—'}</Typography>
-      }),
-      columnHelper.accessor('roles', {
-        header: 'Role',
-        cell: ({ row }) => {
-          const roles = row.original.roles || []
-          if (roles.length === 0) return <Typography>—</Typography>
-          
-          const primaryRole = roles[0]
-          const roleName = primaryRole.name
-          const roleConfig = userRoleObj[roleName] || userRoleObj.subscriber
-          
-          return (
-            <div className='flex items-center gap-2'>
-              <Icon
-                className={roleConfig.icon}
-                sx={{ color: `var(--mui-palette-${roleConfig.color}-main)`, fontSize: '1.375rem' }}
-              />
-              <Typography className='capitalize' color='text.primary'>
-                {roleName}
-              </Typography>
-              {roles.length > 1 && (
-                <Chip label={`+${roles.length - 1}`} size='small' variant='outlined' />
-              )}
-            </div>
-          )
-        }
-      }),
-      columnHelper.accessor('administrator', {
-        header: 'Administrator',
-        cell: ({ row }) => {
-          const admin = row.original.administrator
-          return admin ? (
-            <Chip label={admin.name || admin.email} size='small' color='primary' variant='tonal' />
-          ) : (
-            <Typography color='text.secondary'>—</Typography>
-          )
-        }
-      }),
-      columnHelper.accessor('created_at', {
-        header: 'Registered',
-        cell: ({ row }) => (
-          <Typography>
-            {new Date(row.original.created_at).toLocaleDateString()}
-          </Typography>
-        )
-      }),
-      columnHelper.accessor('location', {
-        header: 'Location',
-        cell: ({ row }) => (
-          <Typography>{row.original.location || '—'}</Typography>
-        )
-      }),
-      columnHelper.accessor('platform', {
-        header: 'Platform',
-        cell: ({ row }) => (
-          <Typography>{row.original.platform || '—'}</Typography>
-        )
-      }),
-      columnHelper.accessor('ip_address', {
-        header: 'IP',
-        cell: ({ row }) => (
-          <Typography variant='body2'>{row.original.ip_address || '—'}</Typography>
-        )
-      }),
-      columnHelper.accessor('is_online', {
-        header: 'Status',
-        cell: ({ row }) => {
-          const isOnline = row.original.is_online
-          return (
-            <Chip
-              variant='tonal'
-              label={isOnline ? 'Online' : 'Offline'}
-              size='small'
-              color={isOnline ? 'success' : 'secondary'}
+    () => {
+      const baseColumns = [
+        {
+          id: 'select',
+          header: ({ table }) => (
+            <Checkbox
+              {...{
+                checked: table.getIsAllRowsSelected(),
+                indeterminate: table.getIsSomeRowsSelected(),
+                onChange: table.getToggleAllRowsSelectedHandler()
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <Checkbox
+              {...{
+                checked: row.getIsSelected(),
+                disabled: !row.getCanSelect(),
+                indeterminate: row.getIsSomeSelected(),
+                onChange: row.getToggleSelectedHandler()
+              }}
             />
           )
-        }
-      }),
-      columnHelper.accessor('action', {
-        header: 'Action',
-        cell: ({ row }) => {
-          const user = row.original
-          return (
-            <div className='flex items-center'>
-              <IconButton onClick={() => router.push(`/admin/users/${user.id}`)}>
-                <i className='ri-eye-line text-textSecondary' />
-              </IconButton>
-              {activeTab === 1 && onSendTest && (
-                <IconButton
-                  onClick={() => onSendTest(user.id)}
-                  color='primary'
-                >
-                  <i className='ri-send-plane-line text-textSecondary' />
-                </IconButton>
-              )}
-              <OptionMenu
-                iconButtonProps={{ size: 'medium' }}
-                iconClassName='text-textSecondary'
-                options={[
-                  {
-                    text: 'View Details',
-                    icon: 'ri-eye-line',
-                    menuItemProps: {
-                      onClick: () => router.push(`/admin/users/${user.id}`),
-                      className: 'flex items-center gap-2 text-textSecondary'
-                    }
-                  },
-                  {
-                    text: 'Edit',
-                    icon: 'ri-edit-box-line',
-                    menuItemProps: { className: 'flex items-center gap-2 text-textSecondary' }
-                  }
-                ]}
-              />
-            </div>
-          )
         },
-        enableSorting: false
-      })
-    ],
+        columnHelper.accessor('name', {
+          header: 'User',
+          cell: ({ row }) => {
+            const user = row.original
+            return (
+              <div 
+                className='flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity'
+                onClick={() => router.push(`/admin/users/${user.id}`)}
+              >
+                {getAvatar({ avatar: user.avatar, name: user.name, email: user.email })}
+                <div className='flex flex-col'>
+                  <Typography className='font-medium' color='text.primary'>
+                    {user.name || user.email || 'N/A'}
+                  </Typography>
+                  <Typography variant='body2' color='text.secondary'>
+                    ID: {user.id}
+                  </Typography>
+                </div>
+              </div>
+            )
+          }
+        }),
+        columnHelper.accessor('email', {
+          header: 'Email',
+          cell: ({ row }) => <Typography>{row.original.email || '—'}</Typography>
+        }),
+        columnHelper.accessor('is_online', {
+          header: 'Status',
+          cell: ({ row }) => {
+            const isOnline = row.original.is_online
+            return (
+              <Chip
+                variant='tonal'
+                label={isOnline ? 'Online' : 'Offline'}
+                size='small'
+                color={isOnline ? 'success' : 'secondary'}
+              />
+            )
+          }
+        }),
+        columnHelper.accessor('roles', {
+          header: 'Role',
+          cell: ({ row }) => {
+            const roles = row.original.roles || []
+            if (roles.length === 0) return <Typography>—</Typography>
+            
+            const primaryRole = roles[0]
+            const roleName = primaryRole.name
+            const roleConfig = userRoleObj[roleName] || userRoleObj.subscriber
+            
+            return (
+              <div className='flex items-center gap-2'>
+                <Icon
+                  className={roleConfig.icon}
+                  sx={{ color: `var(--mui-palette-${roleConfig.color}-main)`, fontSize: '1.375rem' }}
+                />
+                <Typography className='capitalize' color='text.primary'>
+                  {roleName}
+                </Typography>
+                {roles.length > 1 && (
+                  <Chip label={`+${roles.length - 1}`} size='small' variant='outlined' />
+                )}
+              </div>
+            )
+          }
+        }),
+        columnHelper.accessor('administrator', {
+          header: 'Administrator',
+          cell: ({ row }) => {
+            const admin = row.original.administrator
+            return admin ? (
+              <Chip label={admin.name || admin.email} size='small' color='primary' variant='tonal' />
+            ) : (
+              <Typography color='text.secondary'>—</Typography>
+            )
+          }
+        }),
+        columnHelper.accessor('created_at', {
+          header: 'Registered',
+          cell: ({ row }) => (
+            <Typography>
+              {new Date(row.original.created_at).toLocaleDateString()}
+            </Typography>
+          )
+        }),
+        columnHelper.accessor('platform', {
+          header: 'Platform',
+          cell: ({ row }) => (
+            <Typography>{row.original.platform || '—'}</Typography>
+          )
+        }),
+        columnHelper.accessor('location', {
+          header: 'Location',
+          cell: ({ row }) => (
+            <Typography>{row.original.location || '—'}</Typography>
+          )
+        }),
+        columnHelper.accessor('ip_address', {
+          header: 'IP',
+          cell: ({ row }) => (
+            <Typography variant='body2'>{row.original.ip_address || '—'}</Typography>
+          )
+        })
+      ]
+
+      // Add Action column only for Moderators tab (activeTab === 0)
+      if (activeTab === 0) {
+        baseColumns.push(
+          columnHelper.accessor('action', {
+            header: 'Action',
+            cell: ({ row }) => {
+              const user = row.original
+              return (
+                <div className='flex items-center gap-1'>
+                  {onSendTest && (
+                    <IconButton
+                      onClick={() => onSendTest(user.id)}
+                      color='primary'
+                      title='Send test task'
+                    >
+                      <i className='ri-send-plane-line text-textSecondary' />
+                    </IconButton>
+                  )}
+                </div>
+              )
+            },
+            enableSorting: false
+          })
+        )
+      }
+
+      return baseColumns
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, filteredData, activeTab, router]
+    [data, filteredData, activeTab, router, onSendTest]
   )
 
   const table = useReactTable({

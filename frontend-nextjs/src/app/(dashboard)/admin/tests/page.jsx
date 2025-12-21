@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, Grid, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, Button, Checkbox, FormControlLabel, Typography, IconButton, Card } from '@mui/material'
+import { Box, Grid, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, Button, Checkbox, FormControlLabel, Typography, IconButton, Card, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material'
 import api from '@/lib/api'
+import { showToast } from '@/utils/toast'
 import TestHeader from '@/components/tests/TestHeader'
 import Tests from '@/components/tests/Tests'
 
@@ -10,6 +11,9 @@ export default function TestsPage() {
   const [tests, setTests] = useState([])
   const [levels, setLevels] = useState([])
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [levelsDialogOpen, setLevelsDialogOpen] = useState(false)
+  const [editingLevel, setEditingLevel] = useState(null)
+  const [levelFormData, setLevelFormData] = useState({ name: '', order: 0 })
   const [formData, setFormData] = useState({
     level_id: '',
     title: '',
@@ -148,9 +152,10 @@ export default function TestsPage() {
       
       handleCloseDialog()
       loadTests()
+      showToast.success(editingTest ? 'Test updated successfully' : 'Test created successfully')
     } catch (error) {
       console.error('Error saving test:', error)
-      alert('Error saving test: ' + (error.response?.data?.message || error.message))
+      showToast.error('Error saving test: ' + (error.response?.data?.message || error.message))
     }
   }
 
@@ -209,16 +214,58 @@ export default function TestsPage() {
     setFormData({ ...formData, questions: newQuestions })
   }
 
-  const handleAddLevel = async () => {
-    const name = prompt('Enter level name:')
-    if (name) {
-      try {
-        await api.post('/admin/test-levels', { name })
-        loadLevels()
-      } catch (error) {
-        console.error('Error creating level:', error)
-        alert('Error creating level')
+  const handleOpenLevelsDialog = () => {
+    setLevelsDialogOpen(true)
+    setEditingLevel(null)
+    setLevelFormData({ name: '', order: 0 })
+  }
+
+  const handleCloseLevelsDialog = () => {
+    setLevelsDialogOpen(false)
+    setEditingLevel(null)
+    setLevelFormData({ name: '', order: 0 })
+  }
+
+  const handleEditLevel = (level) => {
+    setEditingLevel(level)
+    setLevelFormData({ name: level.name || '', order: level.order || 0 })
+  }
+
+  const handleSaveLevel = async () => {
+    try {
+      if (!levelFormData.name.trim()) {
+        showToast.error('Level name is required')
+        return
       }
+
+      if (editingLevel) {
+        await api.put(`/admin/test-levels/${editingLevel.id}`, levelFormData)
+        showToast.success('Level updated successfully')
+      } else {
+        await api.post('/admin/test-levels', levelFormData)
+        showToast.success('Level created successfully')
+      }
+      
+      loadLevels()
+      handleCloseLevelsDialog()
+    } catch (error) {
+      console.error('Error saving level:', error)
+      showToast.error('Error saving level: ' + (error.response?.data?.message || error.message))
+    }
+  }
+
+  const handleDeleteLevel = async (level) => {
+    if (!confirm(`Are you sure you want to delete level "${level.name}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      await api.delete(`/admin/test-levels/${level.id}`)
+      showToast.success('Level deleted successfully')
+      loadLevels()
+    } catch (error) {
+      console.error('Error deleting level:', error)
+      showToast.error('Error deleting level: ' + (error.response?.data?.message || error.message))
     }
   }
 
@@ -226,7 +273,10 @@ export default function TestsPage() {
     <Box sx={{ p: 3 }}>
       <Grid container spacing={6}>
         <Grid size={{ xs: 12 }}>
-          <TestHeader onAddTest={() => handleOpenDialog()} />
+          <TestHeader 
+            onAddTest={() => handleOpenDialog()} 
+            onManageLevels={handleOpenLevelsDialog}
+          />
         </Grid>
         <Grid size={{ xs: 12 }}>
           <Tests testData={tests} onEditTest={handleOpenDialog} />
@@ -237,26 +287,21 @@ export default function TestsPage() {
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth='lg' fullWidth>
         <DialogTitle>{editingTest ? 'Edit' : 'Add'} Test</DialogTitle>
         <DialogContent>
-          <Box sx={{ mt: 2, display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-            <FormControl fullWidth>
-              <InputLabel>Level</InputLabel>
-              <Select
-                value={formData.level_id}
-                onChange={(e) => setFormData({ ...formData, level_id: e.target.value })}
-                label='Level'
-              >
-                <MenuItem value=''>None</MenuItem>
-                {levels.map((level) => (
-                  <MenuItem key={level.id} value={level.id.toString()}>
-                    {level.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Button variant='outlined' onClick={handleAddLevel} startIcon={<i className='ri-add-line' />}>
-              Add Level
-            </Button>
-          </Box>
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Level</InputLabel>
+            <Select
+              value={formData.level_id}
+              onChange={(e) => setFormData({ ...formData, level_id: e.target.value })}
+              label='Level'
+            >
+              <MenuItem value=''>None</MenuItem>
+              {levels.map((level) => (
+                <MenuItem key={level.id} value={level.id.toString()}>
+                  {level.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <TextField
             fullWidth
@@ -435,6 +480,104 @@ export default function TestsPage() {
           <Button onClick={handleSave} variant='contained' disabled={!formData.title || formData.questions.length === 0}>
             {editingTest ? 'Save' : 'Create'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Manage Levels Dialog */}
+      <Dialog open={levelsDialogOpen} onClose={handleCloseLevelsDialog} maxWidth='md' fullWidth>
+        <DialogTitle>Manage Test Levels</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant='h6' sx={{ mb: 2 }}>
+              {editingLevel ? 'Edit Level' : 'Add New Level'}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+              <TextField
+                fullWidth
+                label='Level Name'
+                value={levelFormData.name}
+                onChange={(e) => setLevelFormData({ ...levelFormData, name: e.target.value })}
+                required
+              />
+              <TextField
+                label='Order'
+                type='number'
+                value={levelFormData.order}
+                onChange={(e) => setLevelFormData({ ...levelFormData, order: parseInt(e.target.value) || 0 })}
+                sx={{ width: 120 }}
+              />
+              <Button
+                variant='contained'
+                onClick={handleSaveLevel}
+                disabled={!levelFormData.name.trim()}
+              >
+                {editingLevel ? 'Update' : 'Add'}
+              </Button>
+              {editingLevel && (
+                <Button
+                  variant='outlined'
+                  onClick={handleCloseLevelsDialog}
+                >
+                  Cancel
+                </Button>
+              )}
+            </Box>
+          </Box>
+
+          <TableContainer component={Paper} variant='outlined'>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Order</TableCell>
+                  <TableCell align='right'>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {levels.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align='center'>
+                      <Typography color='text.secondary'>No levels found. Create your first level above.</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  levels.map((level) => (
+                    <TableRow key={level.id} hover>
+                      <TableCell>{level.id}</TableCell>
+                      <TableCell>
+                        <Typography className='font-medium' color='text.primary'>
+                          {level.name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{level.order || 0}</TableCell>
+                      <TableCell align='right'>
+                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                          <IconButton
+                            size='small'
+                            color='primary'
+                            onClick={() => handleEditLevel(level)}
+                          >
+                            <i className='ri-edit-box-line' />
+                          </IconButton>
+                          <IconButton
+                            size='small'
+                            color='error'
+                            onClick={() => handleDeleteLevel(level)}
+                          >
+                            <i className='ri-delete-bin-7-line' />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseLevelsDialog}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>

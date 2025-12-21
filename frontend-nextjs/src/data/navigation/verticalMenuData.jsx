@@ -58,8 +58,8 @@ const verticalMenuData = (user = null) => {
         href: '/admin/documentation'
       },
       {
-        label: 'Tests',
-        icon: 'ri-questionnaire-line',
+        label: 'Academy',
+        icon: 'ri-graduation-cap-line',
         href: '/admin/tests'
       },
       {

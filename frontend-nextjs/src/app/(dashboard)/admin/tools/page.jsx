@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, Typography, Button, Dialog, DialogTitle, DialogContent, TextField, DialogActions, FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, Grid } from '@mui/material'
+import { Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogContentText, TextField, DialogActions, FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, Grid } from '@mui/material'
 import api from '@/lib/api'
+import { showToast } from '@/utils/toast'
 
 // Component Imports
 import ToolsListTable from '@/views/apps/tools/ToolsListTable'
@@ -11,6 +12,8 @@ export default function ToolsPage() {
   const [tools, setTools] = useState([])
   const [guides, setGuides] = useState([])
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [toolToDelete, setToolToDelete] = useState(null)
   const [formData, setFormData] = useState({ name: '', description: '', url: '', guide_id: '', is_active: true })
 
   useEffect(() => {
@@ -56,12 +59,13 @@ export default function ToolsPage() {
       setDialogOpen(false)
       setFormData({ name: '', description: '', url: '', guide_id: '', is_active: true })
       loadTools()
+      showToast.success(formData.id ? 'Tool updated successfully' : 'Tool created successfully')
     } catch (error) {
       console.error('Error saving tool:', error)
       const errorMessage = error.response?.data?.message || 
                           (error.response?.data?.errors ? JSON.stringify(error.response.data.errors) : error.message) ||
                           'Error saving tool'
-      alert(errorMessage)
+      showToast.error(errorMessage)
     }
   }
 
@@ -77,14 +81,29 @@ export default function ToolsPage() {
     setDialogOpen(true)
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete tool?')) return
+  const handleDelete = (tool) => {
+    setToolToDelete(tool)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!toolToDelete) return
+    
     try {
-      await api.delete(`/admin/tools/${id}`)
+      await api.delete(`/admin/tools/${toolToDelete.id}`)
       loadTools()
+      setDeleteDialogOpen(false)
+      setToolToDelete(null)
+      showToast.success('Tool deleted successfully')
     } catch (error) {
-      alert('Error deleting tool')
+      console.error('Error deleting tool:', error)
+      showToast.error('Error deleting tool: ' + (error.response?.data?.message || error.message))
     }
+  }
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false)
+    setToolToDelete(null)
   }
 
   return (
@@ -167,6 +186,62 @@ export default function ToolsPage() {
             setFormData({ name: '', description: '', url: '', guide_id: '', is_active: true })
           }}>Cancel</Button>
           <Button onClick={handleSave} variant="contained" disabled={!formData.name}>Save</Button>
+          </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog 
+        open={deleteDialogOpen} 
+        onClose={handleCancelDelete}
+        maxWidth='sm'
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2
+          }
+        }}
+      >
+        <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                bgcolor: 'error.lighter',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <i className='ri-delete-bin-7-line' style={{ fontSize: '32px', color: 'var(--mui-palette-error-main)' }} />
+            </Box>
+          </Box>
+          <Typography variant='h5' sx={{ fontWeight: 600 }}>
+            Delete Tool?
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ textAlign: 'center', fontSize: '1rem' }}>
+            Are you sure you want to delete <strong>{toolToDelete?.name}</strong>? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 4, gap: 2 }}>
+          <Button 
+            onClick={handleCancelDelete} 
+            variant='outlined'
+            sx={{ minWidth: 120 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmDelete} 
+            variant='contained' 
+            color='error'
+            sx={{ minWidth: 120 }}
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

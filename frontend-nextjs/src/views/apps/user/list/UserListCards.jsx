@@ -23,7 +23,7 @@ const UserListCards = ({ activeTab }) => {
 
   const loadStats = async () => {
     try {
-      const endpoint = activeTab === 0 ? '/admin/users' : '/admin/moderators'
+      const endpoint = activeTab === 0 ? '/admin/moderators' : '/admin/users' // Swapped: 0 is now Moderators
       const response = await api.get(endpoint)
       const users = response.data || []
       
@@ -38,44 +38,7 @@ const UserListCards = ({ activeTab }) => {
     }
   }
 
-  const data = activeTab === 0 ? [
-    {
-      title: 'Total Users',
-      stats: stats.total.toLocaleString(),
-      avatarIcon: 'ri-group-line',
-      avatarColor: 'primary',
-      trend: 'positive',
-      trendNumber: '0%',
-      subtitle: 'All registered users'
-    },
-    {
-      title: 'Online Users',
-      stats: stats.online.toLocaleString(),
-      avatarIcon: 'ri-user-follow-line',
-      avatarColor: 'success',
-      trend: 'positive',
-      trendNumber: '0%',
-      subtitle: 'Currently online'
-    },
-    {
-      title: 'Admins',
-      stats: stats.admins.toLocaleString(),
-      avatarIcon: 'ri-vip-crown-line',
-      avatarColor: 'error',
-      trend: 'positive',
-      trendNumber: '0%',
-      subtitle: 'Administrators'
-    },
-    {
-      title: 'Moderators',
-      stats: stats.moderators.toLocaleString(),
-      avatarIcon: 'ri-user-star-line',
-      avatarColor: 'warning',
-      trend: 'positive',
-      trendNumber: '0%',
-      subtitle: 'Moderators'
-    }
-  ] : [
+  const data = activeTab === 0 ? [ // activeTab 0 is now Moderators
     {
       title: 'Total Moderators',
       stats: stats.total.toLocaleString(),
@@ -111,6 +74,43 @@ const UserListCards = ({ activeTab }) => {
       trend: 'positive',
       trendNumber: '0%',
       subtitle: 'Pending tasks'
+    }
+  ] : [ // activeTab 1 is now Users
+    {
+      title: 'Total Users',
+      stats: stats.total.toLocaleString(),
+      avatarIcon: 'ri-group-line',
+      avatarColor: 'primary',
+      trend: 'positive',
+      trendNumber: '0%',
+      subtitle: 'All registered users'
+    },
+    {
+      title: 'Online Users',
+      stats: stats.online.toLocaleString(),
+      avatarIcon: 'ri-user-follow-line',
+      avatarColor: 'success',
+      trend: 'positive',
+      trendNumber: '0%',
+      subtitle: 'Currently online'
+    },
+    {
+      title: 'Admins',
+      stats: stats.admins.toLocaleString(),
+      avatarIcon: 'ri-vip-crown-line',
+      avatarColor: 'error',
+      trend: 'positive',
+      trendNumber: '0%',
+      subtitle: 'Administrators'
+    },
+    {
+      title: 'Moderators',
+      stats: stats.moderators.toLocaleString(),
+      avatarIcon: 'ri-user-star-line',
+      avatarColor: 'warning',
+      trend: 'positive',
+      trendNumber: '0%',
+      subtitle: 'Moderators'
     }
   ]
 

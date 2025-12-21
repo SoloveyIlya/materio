@@ -46,6 +46,8 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
     // Documentation
     Route::apiResource('documentation-categories', DocumentationCategoryController::class);
     Route::apiResource('documentation-pages', DocumentationPageController::class);
+    Route::post('/documentation-pages/{documentationPage}', [DocumentationPageController::class, 'update']); // For method spoofing with FormData
+    Route::post('/documentation-pages/{documentationPage}', [DocumentationPageController::class, 'update']); // For method spoofing with FormData
 
     // Tests
     Route::apiResource('test-levels', TestLevelController::class);

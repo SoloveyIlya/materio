@@ -15,6 +15,8 @@ import AccordionDetails from '@mui/material/AccordionDetails'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
 import Chip from '@mui/material/Chip'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
 
 // Third-party Imports
 import classnames from 'classnames'
@@ -23,9 +25,11 @@ import classnames from 'classnames'
 import CustomAvatar from '@/@core/components/mui/Avatar'
 import CustomTabList from '@/@core/components/mui/TabList'
 
-const Documentations = ({ categories, pages, onEditPage }) => {
+const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDeleteCategory }) => {
   // States
   const [activeTab, setActiveTab] = useState('')
+  const [categoryMenuAnchor, setCategoryMenuAnchor] = useState(null)
+  const [selectedCategory, setSelectedCategory] = useState(null)
 
   // Hooks
   useEffect(() => {
@@ -50,6 +54,33 @@ const Documentations = ({ categories, pages, onEditPage }) => {
     setActiveTab(newValue)
   }
 
+  const handleCategoryMenuOpen = (event, category) => {
+    event.stopPropagation()
+    setCategoryMenuAnchor(event.currentTarget)
+    setSelectedCategory(category)
+  }
+
+  const handleCategoryMenuClose = () => {
+    setCategoryMenuAnchor(null)
+    setSelectedCategory(null)
+  }
+
+  const handleEditCategory = () => {
+    if (selectedCategory && onEditCategory) {
+      onEditCategory(selectedCategory)
+    }
+    handleCategoryMenuClose()
+  }
+
+  const handleDeleteCategory = () => {
+    if (selectedCategory && onDeleteCategory) {
+      if (confirm(`Are you sure you want to delete category "${selectedCategory.name}"? This action cannot be undone.`)) {
+        onDeleteCategory(selectedCategory)
+      }
+    }
+    handleCategoryMenuClose()
+  }
+
   if (!groupedPages || groupedPages.length === 0) {
     return (
       <Box sx={{ textAlign: 'center', mt: 4 }}>
@@ -66,15 +97,43 @@ const Documentations = ({ categories, pages, onEditPage }) => {
         <Grid size={{ xs: 12, sm: 5, md: 4, xl: 3 }} className='flex !flex-col items-center'>
           <CustomTabList orientation='vertical' onChange={handleChange} className='!is-full' pill='true'>
             {groupedPages?.map((category) => (
-              <Tab
-                key={category.id}
-                label={category.name}
-                value={category.id?.toString() || ''}
-                icon={<i className={classnames('ri-file-text-line', 'mbe-0! mie-1.5')} />}
-                className='!flex-row !justify-start whitespace-nowrap min-is-full!'
-              />
+              <Box key={category.id} sx={{ position: 'relative', width: '100%' }}>
+                <Tab
+                  label={category.name}
+                  value={category.id?.toString() || ''}
+                  icon={<i className={classnames('ri-file-text-line', 'mbe-0! mie-1.5')} />}
+                  className='!flex-row !justify-start whitespace-nowrap min-is-full!'
+                />
+                <IconButton
+                  size='small'
+                  onClick={(e) => handleCategoryMenuOpen(e, category)}
+                  sx={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 1
+                  }}
+                >
+                  <i className='ri-more-2-line' />
+                </IconButton>
+              </Box>
             ))}
           </CustomTabList>
+          <Menu
+            anchorEl={categoryMenuAnchor}
+            open={Boolean(categoryMenuAnchor)}
+            onClose={handleCategoryMenuClose}
+          >
+            <MenuItem onClick={handleEditCategory}>
+              <i className='ri-edit-box-line mie-2' />
+              Edit Category
+            </MenuItem>
+            <MenuItem onClick={handleDeleteCategory} sx={{ color: 'error.main' }}>
+              <i className='ri-delete-bin-7-line mie-2' />
+              Delete Category
+            </MenuItem>
+          </Menu>
           <img
             src='/images/illustrations/characters-with-objects/2.png'
             className='max-md:hidden is-72'
