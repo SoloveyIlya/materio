@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material'
+import { Box, Typography, Button } from '@mui/material'
 import classnames from 'classnames'
+import { useRouter } from 'next/navigation'
 
 // Component Imports
 import KanbanList from '@/views/apps/tasks/kanban/KanbanList'
@@ -24,6 +25,7 @@ function getDateForDay(day) {
 }
 
 const KanbanPage = () => {
+  const router = useRouter()
   const [tasks, setTasks] = useState([])
   const [defaultColumns] = useState([
     { id: 1, name: 'Day 1', date: getDateForDay(1) },
@@ -36,9 +38,6 @@ const KanbanPage = () => {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState(null)
   const [selectedColumn, setSelectedColumn] = useState(null)
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
-  const [newCategoryName, setNewCategoryName] = useState('')
-  const [newCategorySlug, setNewCategorySlug] = useState('')
 
   useEffect(() => {
     loadTasks()
@@ -128,8 +127,12 @@ const KanbanPage = () => {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
           <Typography variant='h4'>Task Manager</Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button variant='outlined' onClick={() => setCategoryDialogOpen(true)} startIcon={<i className='ri-folder-add-line' />}>
-              Create Category
+            <Button 
+              variant='outlined' 
+              onClick={() => router.push('/admin/categories')} 
+              startIcon={<i className='ri-price-tag-3-line' />}
+            >
+              Category
             </Button>
           </Box>
         </Box>
@@ -186,52 +189,6 @@ const KanbanPage = () => {
         onSave={loadTasks}
       />
 
-      {/* Create Category Dialog */}
-      <Dialog open={categoryDialogOpen} onClose={() => setCategoryDialogOpen(false)}>
-        <DialogTitle>Create Task Category</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin='dense'
-            label='Category Name'
-            fullWidth
-            variant='outlined'
-            value={newCategoryName}
-            onChange={(e) => {
-              setNewCategoryName(e.target.value)
-              setNewCategorySlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))
-            }}
-          />
-          <TextField
-            margin='dense'
-            label='Slug'
-            fullWidth
-            variant='outlined'
-            value={newCategorySlug}
-            onChange={(e) => setNewCategorySlug(e.target.value)}
-            sx={{ mt: 2 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setCategoryDialogOpen(false); setNewCategoryName(''); setNewCategorySlug('') }}>Cancel</Button>
-          <Button onClick={async () => {
-            try {
-              await api.post('/admin/task-categories', {
-                name: newCategoryName,
-                slug: newCategorySlug,
-              })
-              setCategoryDialogOpen(false)
-              setNewCategoryName('')
-              setNewCategorySlug('')
-              showToast.success('Category created successfully')
-            } catch (error) {
-              console.error('Error creating category:', error)
-              const errorMessage = error.response?.data?.message || error.message || 'Error creating category'
-              showToast.error(errorMessage)
-            }
-          }} variant='contained'>Save</Button>
-        </DialogActions>
-      </Dialog>
     </div>
   )
 }

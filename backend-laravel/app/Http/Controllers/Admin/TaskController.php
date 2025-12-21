@@ -131,6 +131,11 @@ class TaskController extends Controller
                 $data['selfie_image'] = Storage::url($path);
             }
             
+            // Устанавливаем дефолтный статус, если не передан
+            if (!isset($data['status']) || $data['status'] === '') {
+                $data['status'] = 'pending';
+            }
+            
             // Конвертируем пустые строки в null для nullable полей
             $nullableFields = ['template_id', 'assigned_to', 'documentation_id', 'tool_id', 'description', 
                               'first_name', 'last_name', 'country', 'address', 'phone_number', 'email', 
@@ -213,7 +218,7 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
             'completion_hours' => 'required|integer|min:1',
-            'status' => 'required|in:pending,in_progress,completed,cancelled',
+            'status' => 'sometimes|in:pending,in_progress,completed,cancelled',
             'due_at' => 'nullable|date',
             'guides_links' => 'nullable|array',
             'attached_services' => 'nullable|array',

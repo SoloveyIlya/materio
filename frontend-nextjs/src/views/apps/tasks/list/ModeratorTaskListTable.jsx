@@ -117,14 +117,14 @@ const ModeratorTaskListTable = ({ tableData, onStart, onComplete, onMessage }) =
 
   const getStatusLabel = (status) => {
     const labels = {
-      pending: 'В очереди',
-      in_progress: 'В работе',
-      completed_by_moderator: 'Выполнен модератором',
-      under_admin_review: 'На проверке у админа',
-      approved: 'Принят',
-      rejected: 'Отклонён',
-      sent_for_revision: 'Отправлен на доп. проверку',
-      cancelled: 'Отменён',
+      pending: 'Pending',
+      in_progress: 'In Progress',
+      completed_by_moderator: 'Completed by Moderator',
+      under_admin_review: 'Under Admin Review',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      sent_for_revision: 'Sent for Revision',
+      cancelled: 'Cancelled',
     }
     return labels[status] || status
   }

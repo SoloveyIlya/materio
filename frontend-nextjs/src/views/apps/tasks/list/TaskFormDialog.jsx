@@ -38,7 +38,6 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
     id_number: '',
     price: '',
     completion_hours: '',
-    status: 'pending',
     due_at: '',
     comment: '',
     document_image: null,
@@ -98,7 +97,6 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
         id_number: getStringValue(taskData.id_number),
         price: getStringValue(taskData.price),
         completion_hours: getStringValue(taskData.completion_hours),
-        status: getStringValue(taskData.status) || 'pending',
         due_at: formatDate(taskData.due_at),
         comment: getStringValue(taskData.comment),
         document_image: null,
@@ -182,7 +180,6 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
       id_number: '',
       price: '',
       completion_hours: '',
-      status: 'pending',
       due_at: '',
       comment: '',
       document_image: null,
@@ -278,7 +275,6 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
       formDataToSend.append('title', formData.title.trim())
       formDataToSend.append('description', formData.description || '')
       formDataToSend.append('category_id', String(formData.category_id))
-      formDataToSend.append('status', formData.status || 'pending')
       formDataToSend.append('price', String(formData.price || '0'))
       formDataToSend.append('completion_hours', String(formData.completion_hours || '24'))
       
@@ -387,23 +383,6 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
                       {cat.name}
                     </MenuItem>
                   ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  label="Status"
-                >
-                  <MenuItem value="pending">Pending</MenuItem>
-                  <MenuItem value="in_progress">In Progress</MenuItem>
-                  <MenuItem value="completed">Completed</MenuItem>
-                  <MenuItem value="cancelled">Cancelled</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

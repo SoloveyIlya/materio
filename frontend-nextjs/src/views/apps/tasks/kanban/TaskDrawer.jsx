@@ -42,7 +42,6 @@ const TaskDrawer = props => {
     id_number: '',
     price: '',
     completion_hours: '',
-    status: 'pending',
     due_at: '',
     comment: '',
     work_day: '',
@@ -80,7 +79,6 @@ const TaskDrawer = props => {
           id_number: String(task.id_number || ''),
           price: task.price !== null && task.price !== undefined ? String(task.price) : '',
           completion_hours: task.completion_hours !== null && task.completion_hours !== undefined ? String(task.completion_hours) : '',
-          status: String(task.status || 'pending'),
           due_at: task.due_at ? (task.due_at.includes('T') ? task.due_at.split('T')[0] : task.due_at.split(' ')[0]) : '',
           comment: String(task.comment || ''),
           work_day: task.work_day ? String(task.work_day) : '',
@@ -119,7 +117,6 @@ const TaskDrawer = props => {
           id_number: '',
           price: '',
           completion_hours: '',
-          status: 'pending',
           due_at: '',
           comment: '',
           work_day: column && column.id <= 5 ? column.id.toString() : '',
@@ -206,9 +203,6 @@ const TaskDrawer = props => {
       if (!formData.completion_hours || formData.completion_hours === '' || formData.completion_hours === null || formData.completion_hours === undefined) {
         errors.push('Completion hours is required')
       }
-      if (!formData.status || formData.status === '' || formData.status === null || formData.status === undefined) {
-        errors.push('Status is required')
-      }
       
       if (errors.length > 0) {
         showToast.error('Please fill in all required fields: ' + errors.join(', '))
@@ -224,8 +218,7 @@ const TaskDrawer = props => {
         title: formData.title,
         category_id: formData.category_id,
         price: formData.price,
-        completion_hours: formData.completion_hours,
-        status: formData.status
+        completion_hours: formData.completion_hours
       })
       
       // Явно добавляем каждое поле по отдельности для контроля
@@ -234,12 +227,10 @@ const TaskDrawer = props => {
       const categoryIdValue = String(formData.category_id)
       const priceValue = String(formData.price)
       const completionHoursValue = String(formData.completion_hours)
-      const statusValue = String(formData.status)
       
       formDataToSend.append('title', titleValue)
       formDataToSend.append('description', formData.description || '')
       formDataToSend.append('category_id', categoryIdValue)
-      formDataToSend.append('status', statusValue)
       formDataToSend.append('price', priceValue)
       formDataToSend.append('completion_hours', completionHoursValue)
       
@@ -248,8 +239,7 @@ const TaskDrawer = props => {
         title: formDataToSend.get('title'),
         category_id: formDataToSend.get('category_id'),
         price: formDataToSend.get('price'),
-        completion_hours: formDataToSend.get('completion_hours'),
-        status: formDataToSend.get('status')
+        completion_hours: formDataToSend.get('completion_hours')
       })
       
       // Для отладки: выводим все значения FormData
@@ -415,21 +405,6 @@ const TaskDrawer = props => {
             inputProps={{ min: 1 }}
           />
 
-          <FormControl fullWidth>
-            <InputLabel>Status</InputLabel>
-            <Select
-              name='status'
-              value={formData.status}
-              onChange={handleChange}
-              label='Status'
-              required
-            >
-              <MenuItem value='pending'>Pending</MenuItem>
-              <MenuItem value='in_progress'>In Progress</MenuItem>
-              <MenuItem value='completed'>Completed</MenuItem>
-              <MenuItem value='cancelled'>Cancelled</MenuItem>
-            </Select>
-          </FormControl>
 
           {!task && (
             <TextField

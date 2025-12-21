@@ -6,6 +6,7 @@ import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Divider from '@mui/material/Divider'
 import Grid from '@mui/material/Grid'
+import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 
@@ -82,15 +83,39 @@ const TaskCard = ({ activeTab }) => {
   return (
     <Card>
       <CardContent>
-        <Grid container spacing={6}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: { xs: 2, sm: 3, md: 3 },
+            '@media (max-width: 600px)': {
+              flexDirection: 'column'
+            }
+          }}
+        >
           {data.map((item, index) => (
-            <Grid
-              size={{ xs: 12, sm: 6, md: 3 }}
+            <Box
               key={index}
+              sx={{
+                flex: { 
+                  xs: '1 1 100%', 
+                  sm: '1 1 calc(50% - 12px)', 
+                  md: '1 1 0',
+                  lg: '1 1 0'
+                },
+                maxWidth: { md: '20%', lg: '20%' },
+                minWidth: 0,
+                ...(index < data.length - 1 && {
+                  '@media (min-width: 900px)': {
+                    borderRight: '1px solid',
+                    borderColor: 'divider',
+                    paddingRight: 3
+                  }
+                })
+              }}
               className={classnames({
                 '[&:nth-of-type(odd)>div]:pie-6 [&:nth-of-type(odd)>div]:border-ie':
-                  isBelowMdScreen && !isBelowSmScreen,
-                '[&:not(:last-child)>div]:pie-6 [&:not(:last-child)>div]:border-ie': !isBelowMdScreen
+                  isBelowMdScreen && !isBelowSmScreen
               })}
             >
               <div className='flex justify-between gap-4'>
@@ -110,9 +135,9 @@ const TaskCard = ({ activeTab }) => {
                 />
               )}
               {isBelowSmScreen && index < data.length - 1 && <Divider className='mbs-6' />}
-            </Grid>
+            </Box>
           ))}
-        </Grid>
+        </Box>
       </CardContent>
     </Card>
   )
