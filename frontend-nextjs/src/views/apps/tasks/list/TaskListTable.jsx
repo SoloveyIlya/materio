@@ -295,13 +295,20 @@ const TaskListTable = ({ tableData, onViewResult, onMessageModerator }) => {
 
           return (
             <div className='flex items-center gap-1'>
+              <IconButton
+                size='small'
+                onClick={() => router.push(`/admin/tasks/${task.id}`)}
+                title='View task details'
+              >
+                <i className='ri-eye-line text-textSecondary' />
+              </IconButton>
               {canViewResult && (
                 <IconButton
                   size='small'
                   onClick={() => onViewResult(task)}
                   title='View result'
                 >
-                  <i className='ri-eye-line text-textSecondary' />
+                  <i className='ri-file-text-line text-textSecondary' />
                 </IconButton>
               )}
               {task.assigned_user && (
@@ -319,7 +326,7 @@ const TaskListTable = ({ tableData, onViewResult, onMessageModerator }) => {
         enableSorting: false
       })
     ],
-    [onViewResult, onMessageModerator]
+    [onViewResult, onMessageModerator, router]
   )
 
   const table = useReactTable({
@@ -417,7 +424,24 @@ const TaskListTable = ({ tableData, onViewResult, onMessageModerator }) => {
                 .rows.slice(0, table.getState().pagination.pageSize)
                 .map(row => {
                   return (
-                    <tr key={row.id} className={classnames({ selected: row.getIsSelected() })}>
+                    <tr 
+                      key={row.id} 
+                      className={classnames({ selected: row.getIsSelected() })}
+                      style={{
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.01)'
+                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)'
+                        e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.02)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)'
+                        e.currentTarget.style.boxShadow = 'none'
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
                       {row.getVisibleCells().map(cell => (
                         <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                       ))}

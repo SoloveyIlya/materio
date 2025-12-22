@@ -1,3 +1,8 @@
+'use client'
+
+// React Imports
+import { useState, useEffect } from 'react'
+
 // MUI Imports
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -12,6 +17,43 @@ import CustomAvatar from '@core/components/mui/Avatar'
 
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
+
+// Country from IP component
+const CountryFromIP = ({ ipAddress }) => {
+  const [country, setCountry] = useState('—')
+
+  useEffect(() => {
+    if (!ipAddress) {
+      setCountry('—')
+      return
+    }
+
+    // Используем бесплатный API для получения страны по IP
+    const fetchCountry = async () => {
+      try {
+        const response = await fetch(`https://ipapi.co/${ipAddress}/country_name/`)
+        if (response.ok) {
+          const data = await response.text()
+          setCountry(data.trim() || '—')
+        } else {
+          // Fallback на другой сервис
+          const fallbackResponse = await fetch(`https://ipapi.co/${ipAddress}/json/`)
+          if (fallbackResponse.ok) {
+            const data = await fallbackResponse.json()
+            setCountry(data.country_name || '—')
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching country:', error)
+        setCountry('—')
+      }
+    }
+
+    fetchCountry()
+  }, [ipAddress])
+
+  return <Typography>{country}</Typography>
+}
 
 const UserDetails = ({ user, stats }) => {
   if (!user) return null
@@ -41,7 +83,7 @@ const UserDetails = ({ user, stats }) => {
             <Chip label={primaryRole} color={roleColors[primaryRole] || 'primary'} size='small' variant='tonal' />
           </div>
           {stats && (
-            <div className='flex items-center justify-around flex-wrap gap-4'>
+            <div className='flex items-center justify-around gap-4' style={{ flexWrap: 'nowrap' }}>
               <div className='flex items-center gap-4'>
                 <CustomAvatar variant='rounded' color='success' skin='light'>
                   <i className='ri-check-line' />
@@ -62,26 +104,22 @@ const UserDetails = ({ user, stats }) => {
               </div>
             </div>
           )}
-          {user.administrator && (
-            <div>
-              <Typography variant='h6' sx={{ mb: 2 }}>Assigned Admin</Typography>
-              <Divider sx={{ mb: 2 }} />
-              <div className='flex items-center gap-2'>
-                <CustomAvatar size={40}>
-                  {getInitials(user.administrator.name || user.administrator.email || 'Admin')}
-                </CustomAvatar>
-                <div>
-                  <Typography className='font-medium'>{user.administrator.name || user.administrator.email}</Typography>
-                  <Typography variant='caption' color='text.secondary'>{user.administrator.email}</Typography>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
         <div>
           <Typography variant='h5'>Details</Typography>
           <Divider className='mlb-4' />
           <div className='flex flex-col gap-2'>
+            <div className='flex items-center flex-wrap gap-x-1.5'>
+              <Typography className='font-medium' color='text.primary'>
+                Status:
+              </Typography>
+              <Chip
+                label={user.is_online ? 'Online' : 'Offline'}
+                color={user.is_online ? 'success' : 'default'}
+                size='small'
+                variant='tonal'
+              />
+            </div>
             <div className='flex items-center flex-wrap gap-x-1.5'>
               <Typography className='font-medium' color='text.primary'>
                 Email:
@@ -122,27 +160,117 @@ const UserDetails = ({ user, stats }) => {
               <Typography className='font-medium' color='text.primary'>
                 Country (from IP):
               </Typography>
-              <Typography>{user.location || user.ip_address || '—'}</Typography>
+              <CountryFromIP ipAddress={user.ip_address} />
             </div>
             {user.moderatorProfile && (
               <>
-                <div className='flex items-center flex-wrap gap-x-1.5'>
+                <div className='flex items-center flex-wrap' style={{ gap: '8px' }}>
                   <Typography className='font-medium' color='text.primary'>
                     W-4:
                   </Typography>
-                  <Typography>{user.moderatorProfile.has_w4 ? '✅' : '❌'}</Typography>
+                  {user.moderatorProfile.has_w4 ? (
+                    <Box
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        bgcolor: 'success.main',
+                        color: 'success.contrastText'
+                      }}
+                    >
+                      <i className='ri-check-line' style={{ fontSize: '14px' }} />
+                    </Box>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        bgcolor: 'error.main',
+                        color: 'error.contrastText'
+                      }}
+                    >
+                      <i className='ri-close-line' style={{ fontSize: '14px' }} />
+                    </Box>
+                  )}
                 </div>
-                <div className='flex items-center flex-wrap gap-x-1.5'>
+                <div className='flex items-center flex-wrap' style={{ gap: '8px' }}>
                   <Typography className='font-medium' color='text.primary'>
                     I-9:
                   </Typography>
-                  <Typography>{user.moderatorProfile.has_i9 ? '✅' : '❌'}</Typography>
+                  {user.moderatorProfile.has_i9 ? (
+                    <Box
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        bgcolor: 'success.main',
+                        color: 'success.contrastText'
+                      }}
+                    >
+                      <i className='ri-check-line' style={{ fontSize: '14px' }} />
+                    </Box>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        bgcolor: 'error.main',
+                        color: 'error.contrastText'
+                      }}
+                    >
+                      <i className='ri-close-line' style={{ fontSize: '14px' }} />
+                    </Box>
+                  )}
                 </div>
-                <div className='flex items-center flex-wrap gap-x-1.5'>
+                <div className='flex items-center flex-wrap' style={{ gap: '8px' }}>
                   <Typography className='font-medium' color='text.primary'>
                     Direct:
                   </Typography>
-                  <Typography>{user.moderatorProfile.has_direct ? '✅' : '❌'}</Typography>
+                  {user.moderatorProfile.has_direct ? (
+                    <Box
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        bgcolor: 'success.main',
+                        color: 'success.contrastText'
+                      }}
+                    >
+                      <i className='ri-check-line' style={{ fontSize: '14px' }} />
+                    </Box>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        bgcolor: 'error.main',
+                        color: 'error.contrastText'
+                      }}
+                    >
+                      <i className='ri-close-line' style={{ fontSize: '14px' }} />
+                    </Box>
+                  )}
                 </div>
               </>
             )}
@@ -159,17 +287,6 @@ const UserDetails = ({ user, stats }) => {
                 Last Activity:
               </Typography>
               <Typography>{user.last_seen_at ? new Date(user.last_seen_at).toLocaleString() : '—'}</Typography>
-            </div>
-            <div className='flex items-center flex-wrap gap-x-1.5'>
-              <Typography className='font-medium' color='text.primary'>
-                Status:
-              </Typography>
-              <Chip
-                label={user.is_online ? 'Online' : 'Offline'}
-                color={user.is_online ? 'success' : 'default'}
-                size='small'
-                variant='tonal'
-              />
             </div>
           </div>
         </div>

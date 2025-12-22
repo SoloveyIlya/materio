@@ -56,21 +56,22 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments }) => {
   }
 
   const handleSave = async () => {
+    if (!formData.name || !formData.name.trim()) {
+      showToast.error('Document name is required')
+      return
+    }
+
     try {
       const formDataToSend = new FormData()
-      formDataToSend.append('name', formData.name)
+      formDataToSend.append('name', formData.name.trim())
       if (formData.file) {
         formDataToSend.append('file', formData.file)
       }
 
       if (editingDoc) {
-        await api.put(`/admin/required-documents/${editingDoc.id}`, formDataToSend, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        await api.put(`/admin/required-documents/${editingDoc.id}`, formDataToSend)
       } else {
-        await api.post('/admin/required-documents', formDataToSend, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        await api.post('/admin/required-documents', formDataToSend)
       }
 
       // Перезагружаем документы
@@ -81,7 +82,16 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments }) => {
       showToast.success(editingDoc ? 'Document updated successfully' : 'Document created successfully')
     } catch (error) {
       console.error('Error saving document:', error)
-      const errorMessage = error.response?.data?.message || error.message || 'Error saving document'
+      let errorMessage = 'Error saving document'
+      if (error.response?.data?.errors) {
+        // Если есть ошибки валидации, показываем первую
+        const firstError = Object.values(error.response.data.errors)[0]
+        errorMessage = Array.isArray(firstError) ? firstError[0] : firstError
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error.message) {
+        errorMessage = error.message
+      }
       showToast.error(errorMessage)
     }
   }
@@ -106,7 +116,11 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments }) => {
   const handleCheckDocument = (doc) => {
     const userDoc = userDocsMap[doc.id]
     if (userDoc && userDoc.file_path) {
-      window.open(userDoc.file_path, '_blank')
+      // Если путь относительный, добавляем базовый URL API
+      const filePath = userDoc.file_path.startsWith('http') 
+        ? userDoc.file_path 
+        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${userDoc.file_path}`
+      window.open(filePath, '_blank')
     }
   }
 
@@ -130,17 +144,49 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments }) => {
               <ListItem key={doc.id} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, mb: 1 }}>
                 <ListItemText
                   primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant='subtitle1'>{doc.name}</Typography>
-                      <Typography variant='h6' color={isUploaded ? 'success.main' : 'error.main'}>
-                        {isUploaded ? '✅' : '❌'}
-                      </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <Typography variant='subtitle1'>{doc.name}</Typography>
+                        {isUploaded ? (
+                          <Box
+                            sx={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              bgcolor: 'success.main',
+                              color: 'success.contrastText',
+                              flexShrink: 0
+                            }}
+                          >
+                            <i className='ri-check-line' style={{ fontSize: '16px' }} />
+                          </Box>
+                        ) : (
+                          <Box
+                            sx={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              bgcolor: 'error.main',
+                              color: 'error.contrastText',
+                              flexShrink: 0
+                            }}
+                          >
+                            <i className='ri-close-line' style={{ fontSize: '16px' }} />
+                          </Box>
+                        )}
+                      </Box>
                       {isUploaded && (
                         <Button
                           size='small'
                           variant='outlined'
                           onClick={() => handleCheckDocument(doc)}
-                          sx={{ ml: 1 }}
+                          sx={{ ml: 2 }}
                         >
                           Check
                         </Button>

@@ -72,6 +72,7 @@ class UserController extends Controller
         $tests = \App\Models\Test::where('domain_id', $request->user()->domain_id)
             ->where('is_active', true)
             ->with('level')
+            ->orderBy('order', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -80,6 +81,9 @@ class UserController extends Controller
             ->where('is_active', true)
             ->orderBy('order')
             ->get();
+
+        // Явно добавляем registration_password в ответ, так как он может быть скрыт
+        $user->makeVisible('registration_password');
 
         return response()->json([
             'user' => $user,
@@ -101,11 +105,25 @@ class UserController extends Controller
             'timezone' => 'nullable|string',
             'work_start_date' => 'nullable|date',
             'administrator_id' => 'nullable|exists:users,id',
+            'password' => 'sometimes|required|string|min:6',
         ]);
+
+        // Если передан пароль, хешируем его и обновляем registration_password
+        if (isset($validated['password'])) {
+            $validated['registration_password'] = $validated['password'];
+            $validated['password'] = Hash::make($validated['password']);
+        }
 
         $user->update($validated);
 
-        return response()->json($user->load(['roles', 'administrator']));
+        // Перезагружаем пользователя, чтобы вернуть актуальные данные, включая registration_password
+        $user->refresh();
+        $user->makeVisible('registration_password');
+
+        return response()->json([
+            'user' => $user->load(['roles', 'administrator']),
+            'registration_password' => $user->registration_password
+        ]);
     }
 
     public function sendTestTask(Request $request, User $user)

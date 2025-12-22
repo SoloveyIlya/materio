@@ -66,12 +66,28 @@ export default function DocumentationPage() {
   const handleOpenDialog = (page = null) => {
     if (page) {
       setEditingPage(page)
+      
+      // Парсим content_blocks, если это строка
+      let contentBlocks = []
+      if (page.content_blocks) {
+        if (typeof page.content_blocks === 'string') {
+          try {
+            contentBlocks = JSON.parse(page.content_blocks)
+          } catch (e) {
+            console.error('Error parsing content_blocks:', e)
+            contentBlocks = []
+          }
+        } else if (Array.isArray(page.content_blocks)) {
+          contentBlocks = page.content_blocks
+        }
+      }
+      
       setFormData({
         category_id: page.category_id?.toString() || '',
         tool_id: page.tools?.[0]?.toString() || '',
         title: page.title || '',
         content: page.content || '',
-        content_blocks: page.content_blocks || [],
+        content_blocks: contentBlocks,
         is_published: page.is_published || false
       })
     } else {

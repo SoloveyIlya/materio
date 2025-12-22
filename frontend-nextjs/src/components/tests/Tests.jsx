@@ -37,7 +37,21 @@ const Tests = ({ testData, onEditTest }) => {
           <Grid container spacing={6}>
             {data.slice(activePage * 6, activePage * 6 + 6).map((item, index) => (
               <Grid size={{ xs: 12, sm: 6, md: 4 }} key={item.id || index}>
-                <div className='border rounded bs-full'>
+                <div 
+                  className='border rounded bs-full'
+                  style={{
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s, box-shadow 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.02)'
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.15)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
                   <div className='pli-2 pbs-2'>
                     {item.image ? (
                       <img src={item.image} alt={item.title} className='is-full rounded' style={{ height: '200px', objectFit: 'cover' }} />

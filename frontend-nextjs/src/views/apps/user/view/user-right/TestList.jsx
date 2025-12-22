@@ -12,7 +12,8 @@ import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
 
 // Component Imports
-import api from '@/lib/api'
+import api, { API_URL } from '@/lib/api'
+import CustomAvatar from '@core/components/mui/Avatar'
 
 const TestList = ({ userId, tests, testResults }) => {
   if (!tests || tests.length === 0) {
@@ -26,6 +27,16 @@ const TestList = ({ userId, tests, testResults }) => {
     )
   }
 
+  // Сортировка по order (меньший order первым), затем по created_at
+  const sortedTests = [...tests].sort((a, b) => {
+    const orderA = a.order ?? 999999
+    const orderB = b.order ?? 999999
+    if (orderA !== orderB) {
+      return orderA - orderB
+    }
+    return new Date(b.created_at) - new Date(a.created_at)
+  })
+
   // Создаем мапу результатов тестов для быстрого поиска
   const resultsMap = {}
   if (testResults) {
@@ -34,14 +45,22 @@ const TestList = ({ userId, tests, testResults }) => {
     })
   }
 
+  const getImageUrl = (path) => {
+    if (!path) return null
+    if (path.startsWith('http')) return path
+    if (path.startsWith('/storage')) return `${API_URL}${path}`
+    return `${API_URL}/storage/${path}`
+  }
+
   return (
     <Card>
       <CardHeader title='Test List' />
       <CardContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {tests.map((test) => {
+          {sortedTests.map((test) => {
             const result = resultsMap[test.id]
             const isPassed = result?.is_passed || false
+            const imageUrl = getImageUrl(test.image)
             
             return (
               <Box
@@ -56,17 +75,57 @@ const TestList = ({ userId, tests, testResults }) => {
                   borderRadius: 1
                 }}
               >
-                <Box>
-                  <Typography variant='subtitle1' className='font-medium'>
-                    {test.title}
-                  </Typography>
-                  {test.level && (
-                    <Chip label={test.level.name} size='small' variant='outlined' sx={{ mt: 1 }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                  {imageUrl && (
+                    <CustomAvatar
+                      src={imageUrl}
+                      variant='rounded'
+                      size={40}
+                      sx={{ borderRadius: '50%', flexShrink: 0 }}
+                    >
+                      {test.title?.charAt(0)}
+                    </CustomAvatar>
                   )}
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant='subtitle1' className='font-medium'>
+                      {test.title}
+                    </Typography>
+                    {test.level && (
+                      <Chip label={test.level.name} size='small' variant='outlined' sx={{ mt: 1 }} />
+                    )}
+                  </Box>
                 </Box>
-                <Typography variant='h6' color={isPassed ? 'success.main' : 'error.main'}>
-                  {isPassed ? '✅' : '❌'}
-                </Typography>
+                {isPassed ? (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      bgcolor: 'success.main',
+                      color: 'success.contrastText'
+                    }}
+                  >
+                    <i className='ri-check-line' style={{ fontSize: '18px' }} />
+                  </Box>
+                ) : (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      bgcolor: 'error.main',
+                      color: 'error.contrastText'
+                    }}
+                  >
+                    <i className='ri-close-line' style={{ fontSize: '18px' }} />
+                  </Box>
+                )}
               </Box>
             )
           })}

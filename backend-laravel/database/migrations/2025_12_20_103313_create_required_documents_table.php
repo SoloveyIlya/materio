@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('domain_id')->constrained('domains')->onDelete('cascade');
             $table->string('name');
-            $table->string('file_path');
-            $table->string('file_name');
+            $table->string('file_path')->nullable();
+            $table->string('file_name')->nullable();
             $table->integer('order')->default(0);
             $table->boolean('is_active')->default(true);
             $table->timestamps();

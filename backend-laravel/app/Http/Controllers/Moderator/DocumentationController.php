@@ -171,6 +171,37 @@ class DocumentationController extends Controller
             );
         }
 
+        // Преобразуем пути к изображениям в content_blocks
+        if ($page->content_blocks && is_array($page->content_blocks)) {
+            $page->content_blocks = array_map(function ($block) use ($appUrl) {
+                if (isset($block['type']) && $block['type'] === 'image' && isset($block['url'])) {
+                    $imageUrl = $block['url'];
+                    // Если путь уже полный URL, оставляем как есть
+                    if (!filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+                        // Если путь начинается с /storage/, добавляем APP_URL
+                        if (Str::startsWith($imageUrl, '/storage/')) {
+                            $block['url'] = rtrim($appUrl, '/') . $imageUrl;
+                        } else {
+                            // Если путь относительный, добавляем /storage/
+                            $block['url'] = rtrim($appUrl, '/') . '/storage/' . ltrim($imageUrl, '/');
+                        }
+                    }
+                } elseif (isset($block['type']) && $block['type'] === 'video' && isset($block['url'])) {
+                    $videoUrl = $block['url'];
+                    // Преобразуем только локальные видео (не embed URL)
+                    if (!filter_var($videoUrl, FILTER_VALIDATE_URL) && 
+                        (!isset($block['videoType']) || $block['videoType'] === 'local')) {
+                        if (Str::startsWith($videoUrl, '/storage/')) {
+                            $block['url'] = rtrim($appUrl, '/') . $videoUrl;
+                        } else {
+                            $block['url'] = rtrim($appUrl, '/') . '/storage/' . ltrim($videoUrl, '/');
+                        }
+                    }
+                }
+                return $block;
+            }, $page->content_blocks);
+        }
+
         return response()->json($page);
     }
 }

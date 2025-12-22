@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Box, Typography, Button, TextField, IconButton, Paper, Select, MenuItem, FormControl, InputLabel, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 
 const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
@@ -12,8 +12,24 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
   const [tempVideo, setTempVideo] = useState({ type: 'embed', url: '', file: null })
   const [tempTool, setTempTool] = useState({ toolId: '' })
 
+  // Нормализуем contentBlocks - убеждаемся, что это массив
+  const normalizedBlocks = useMemo(() => {
+    if (!contentBlocks) return []
+    if (Array.isArray(contentBlocks)) return contentBlocks
+    if (typeof contentBlocks === 'string') {
+      try {
+        const parsed = JSON.parse(contentBlocks)
+        return Array.isArray(parsed) ? parsed : []
+      } catch (e) {
+        console.error('Error parsing contentBlocks:', e)
+        return []
+      }
+    }
+    return []
+  }, [contentBlocks])
+
   const handleAddText = () => {
-    const newBlocks = [...(contentBlocks || []), { type: 'text', content: '' }]
+    const newBlocks = [...normalizedBlocks, { type: 'text', content: '' }]
     onChange(newBlocks)
   }
 
@@ -39,10 +55,10 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
       type: 'tool',
       toolId: tempTool.toolId,
       toolName: selectedTool?.name || '',
-      position: currentIndex !== null ? currentIndex : contentBlocks?.length || 0
+      position: currentIndex !== null ? currentIndex : normalizedBlocks.length
     }
 
-    let newBlocks = [...(contentBlocks || [])]
+    let newBlocks = [...normalizedBlocks]
     if (currentIndex !== null) {
       newBlocks.splice(currentIndex, 0, newBlock)
     } else {
@@ -60,10 +76,10 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
       type: 'image',
       url: tempImage.url,
       file: tempImage.file,
-      position: currentIndex !== null ? currentIndex : contentBlocks?.length || 0
+      position: currentIndex !== null ? currentIndex : normalizedBlocks.length
     }
 
-    let newBlocks = [...(contentBlocks || [])]
+    let newBlocks = [...normalizedBlocks]
     if (currentIndex !== null) {
       newBlocks.splice(currentIndex, 0, newBlock)
     } else {
@@ -82,7 +98,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
       videoType: tempVideo.type,
       url: tempVideo.url,
       file: tempVideo.file,
-      position: currentIndex !== null ? currentIndex : contentBlocks?.length || 0
+      position: currentIndex !== null ? currentIndex : normalizedBlocks.length
     }
 
     let newBlocks = [...(contentBlocks || [])]
@@ -105,14 +121,14 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
   }
 
   const handleDeleteBlock = (index) => {
-    const newBlocks = [...(contentBlocks || [])]
+    const newBlocks = [...normalizedBlocks]
     newBlocks.splice(index, 1)
     onChange(newBlocks)
   }
 
   const handleMoveUp = (index) => {
     if (index === 0) return
-    const newBlocks = [...(contentBlocks || [])]
+    const newBlocks = [...normalizedBlocks]
     const temp = newBlocks[index]
     newBlocks[index] = newBlocks[index - 1]
     newBlocks[index - 1] = temp
@@ -120,8 +136,8 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
   }
 
   const handleMoveDown = (index) => {
-    if (index === (contentBlocks?.length || 0) - 1) return
-    const newBlocks = [...(contentBlocks || [])]
+    if (index === normalizedBlocks.length - 1) return
+    const newBlocks = [...normalizedBlocks]
     const temp = newBlocks[index]
     newBlocks[index] = newBlocks[index + 1]
     newBlocks[index + 1] = temp
@@ -148,7 +164,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
       </Box>
 
       <Box>
-        {contentBlocks?.map((block, index) => (
+        {normalizedBlocks.map((block, index) => (
           <Paper
             key={index}
             sx={{
@@ -163,7 +179,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
                 <IconButton size='small' onClick={() => handleMoveUp(index)} disabled={index === 0}>
                   <i className='ri-arrow-up-line' />
                 </IconButton>
-                <IconButton size='small' onClick={() => handleMoveDown(index)} disabled={index === (contentBlocks?.length || 0) - 1}>
+                <IconButton size='small' onClick={() => handleMoveDown(index)} disabled={index === normalizedBlocks.length - 1}>
                   <i className='ri-arrow-down-line' />
                 </IconButton>
               </Box>

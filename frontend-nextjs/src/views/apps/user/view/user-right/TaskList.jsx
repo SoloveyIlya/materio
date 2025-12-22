@@ -122,11 +122,20 @@ const TaskList = ({ tasks, userId }) => {
       }),
       columnHelper.accessor('created_at', {
         header: 'Created At',
-        cell: ({ row }) => (
-          <Typography variant='body2'>
-            {new Date(row.original.created_at).toLocaleString()}
-          </Typography>
-        )
+        cell: ({ row }) => {
+          const date = row.original.created_at
+          if (!date) return <Typography variant='body2'>—</Typography>
+          const dateObj = new Date(date)
+          // Проверяем, что дата валидна (не является эпохой Unix)
+          if (isNaN(dateObj.getTime()) || dateObj.getFullYear() < 1971) {
+            return <Typography variant='body2'>—</Typography>
+          }
+          return (
+            <Typography variant='body2'>
+              {dateObj.toLocaleString()}
+            </Typography>
+          )
+        }
       }),
       {
         id: 'actions',

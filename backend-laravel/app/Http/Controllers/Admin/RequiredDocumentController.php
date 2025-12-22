@@ -22,7 +22,7 @@ class RequiredDocumentController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'file' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,odt,ods,odp|max:10240', // 10MB max
+            'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,odt,ods,odp|max:10240', // 10MB max
             'order' => 'nullable|integer|min:0',
         ]);
 
@@ -36,6 +36,10 @@ class RequiredDocumentController extends Controller
             $path = $file->store('required-documents', 'public');
             $validated['file_path'] = Storage::url($path);
             $validated['file_name'] = $file->getClientOriginalName();
+        } else {
+            // Если файл не загружен, создаем документ без файла (можно добавить позже)
+            $validated['file_path'] = null;
+            $validated['file_name'] = null;
         }
 
         $document = RequiredDocument::create($validated);

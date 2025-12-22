@@ -339,12 +339,27 @@ export default function TestsPage() {
             </Button>
             {!formData.image && editingTest && editingTest.image && (
               <Box sx={{ mt: 2 }}>
-                <img src={editingTest.image} alt='Test' style={{ maxWidth: '100%', maxHeight: '200px' }} />
+                <img 
+                  src={editingTest.image.startsWith('http') || editingTest.image.startsWith('/storage') 
+                    ? (editingTest.image.startsWith('/storage') 
+                        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${editingTest.image}`
+                        : editingTest.image)
+                    : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/storage/${editingTest.image}`} 
+                  alt='Test' 
+                  style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px' }} 
+                />
               </Box>
             )}
             {formData.image && (
-              <Box sx={{ mt: 1 }}>
-                <Typography variant='caption'>New image selected</Typography>
+              <Box sx={{ mt: 2 }}>
+                <img 
+                  src={URL.createObjectURL(formData.image)} 
+                  alt='Test preview' 
+                  style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px', border: '1px solid #ddd' }} 
+                />
+                <Typography variant='caption' sx={{ display: 'block', mt: 1 }}>
+                  New image selected: {formData.image.name}
+                </Typography>
               </Box>
             )}
           </Box>
@@ -415,12 +430,30 @@ export default function TestsPage() {
                   </Button>
                   {!question.image && editingTest && editingTest.questions?.[qIndex]?.image && (
                     <Box sx={{ mt: 1 }}>
-                      <img src={editingTest.questions[qIndex].image} alt='Question' style={{ maxWidth: '200px', maxHeight: '150px' }} />
+                      <img 
+                        src={(() => {
+                          const imgUrl = editingTest.questions[qIndex].image
+                          if (imgUrl.startsWith('http')) return imgUrl
+                          if (imgUrl.startsWith('/storage')) {
+                            return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${imgUrl}`
+                          }
+                          return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/storage/${imgUrl}`
+                        })()}
+                        alt='Question' 
+                        style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '8px' }} 
+                      />
                     </Box>
                   )}
                   {question.image && (
                     <Box sx={{ mt: 1 }}>
-                      <Typography variant='caption'>New image selected</Typography>
+                      <img 
+                        src={URL.createObjectURL(question.image)} 
+                        alt='Question preview' 
+                        style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '8px', border: '1px solid #ddd' }} 
+                      />
+                      <Typography variant='caption' sx={{ display: 'block', mt: 0.5 }}>
+                        New image selected: {question.image.name}
+                      </Typography>
                     </Box>
                   )}
                 </Box>
