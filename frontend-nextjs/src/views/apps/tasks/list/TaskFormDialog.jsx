@@ -14,6 +14,7 @@ import {
   InputLabel,
   Grid,
   Box,
+  Typography,
 } from '@mui/material'
 import api from '@/lib/api'
 import { API_URL } from '@/lib/api'
@@ -48,6 +49,7 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
   const [documentations, setDocumentations] = useState([])
   const [tools, setTools] = useState([])
   const [documentPreview, setDocumentPreview] = useState(null)
+  const [documentFileName, setDocumentFileName] = useState(null)
   const [selfiePreview, setSelfiePreview] = useState(null)
 
   useEffect(() => {
@@ -106,12 +108,23 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
       
       setFormData(mappedData)
       
-      // Обработка изображений
+      // Обработка изображений и документов
       if (taskData.document_image) {
         const docImage = formatImageUrl(taskData.document_image)
-        setDocumentPreview(docImage)
+        // Проверяем, является ли это изображением (по расширению или URL)
+        const isImage = docImage.match(/\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/i)
+        if (isImage) {
+          setDocumentPreview(docImage)
+          setDocumentFileName(null)
+        } else {
+          // Для документов извлекаем имя файла из URL
+          const fileName = docImage.split('/').pop().split('?')[0]
+          setDocumentPreview(null)
+          setDocumentFileName(fileName)
+        }
       } else {
         setDocumentPreview(null)
+        setDocumentFileName(null)
       }
       
       if (taskData.selfie_image) {
@@ -187,6 +200,7 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
       is_main_task: false,
     })
     setDocumentPreview(null)
+    setDocumentFileName(null)
     setSelfiePreview(null)
   }
 
@@ -236,15 +250,27 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
     const file = e.target.files[0]
     if (file) {
       setFormData(prev => ({ ...prev, [field]: file }))
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        if (field === 'document_image') {
-          setDocumentPreview(reader.result)
-        } else if (field === 'selfie_image') {
+      if (field === 'document_image') {
+        // Проверяем, является ли файл изображением
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            setDocumentPreview(reader.result)
+            setDocumentFileName(null)
+          }
+          reader.readAsDataURL(file)
+        } else {
+          // Для документов показываем только имя файла
+          setDocumentPreview(null)
+          setDocumentFileName(file.name)
+        }
+      } else if (field === 'selfie_image') {
+        const reader = new FileReader()
+        reader.onloadend = () => {
           setSelfiePreview(reader.result)
         }
+        reader.readAsDataURL(file)
       }
-      reader.readAsDataURL(file)
     }
   }
 
@@ -308,17 +334,12 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
       }
 
       if (task && task.id) {
-        await api.put(`/admin/tasks/${task.id}`, formDataToSend, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        })
+        // Для PUT запросов с FormData в Laravel нужно использовать POST с _method: 'PUT'
+        // Это связано с тем, как Laravel обрабатывает multipart/form-data
+        formDataToSend.append('_method', 'PUT')
+        await api.post(`/admin/tasks/${task.id}`, formDataToSend)
       } else {
-        await api.post('/admin/tasks', formDataToSend, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        })
+        await api.post('/admin/tasks', formDataToSend)
       }
 
       if (onSave) onSave()
@@ -562,13 +583,20 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
                 <input
                   type="file"
                   hidden
-                  accept="image/*"
+                  accept="image/*,.pdf,.doc,.docx,.txt,.rtf"
                   onChange={(e) => handleFileChange(e, 'document_image')}
                 />
               </Button>
               {documentPreview && (
                 <Box sx={{ mt: 1 }}>
                   <img src={documentPreview} alt="Document preview" style={{ maxWidth: '100%', maxHeight: 200 }} />
+                </Box>
+              )}
+              {documentFileName && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    File: {documentFileName}
+                  </Typography>
                 </Box>
               )}
             </Grid>

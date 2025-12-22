@@ -17,7 +17,6 @@ import IconButton from '@mui/material/IconButton'
 import Chip from '@mui/material/Chip'
 import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
-import Button from '@mui/material/Button'
 
 // Third-party Imports
 import classnames from 'classnames'
@@ -96,28 +95,22 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
     <TabContext value={activeTab}>
       <Grid container spacing={6}>
         <Grid size={{ xs: 12, sm: 5, md: 4, xl: 3 }} className='flex !flex-col items-center'>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%' }}>
+          <CustomTabList orientation='vertical' onChange={handleChange} className='!is-full' pill='true'>
             {groupedPages?.map((category) => (
               <Box 
                 key={category.id} 
                 sx={{ 
                   position: 'relative', 
-                  width: '100%'
+                  width: '100%',
+                  mb: 1
                 }}
               >
-                <Button
-                  fullWidth
-                  variant={activeTab === category.id?.toString() ? 'contained' : 'outlined'}
-                  startIcon={<i className='ri-file-text-line' />}
-                  onClick={() => handleChange(null, category.id?.toString() || '')}
-                  sx={{
-                    justifyContent: 'flex-start',
-                    textTransform: 'none',
-                    minHeight: '48px'
-                  }}
-                >
-                  {category.name}
-                </Button>
+                <Tab
+                  label={category.name}
+                  value={category.id?.toString() || ''}
+                  icon={<i className={classnames('ri-file-text-line', 'mbe-0! mie-1.5')} />}
+                  className='!flex-row !justify-start whitespace-nowrap min-is-full!'
+                />
                 <IconButton
                   size='small'
                   onClick={(e) => handleCategoryMenuOpen(e, category)}
@@ -133,7 +126,7 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
                 </IconButton>
               </Box>
             ))}
-          </Box>
+          </CustomTabList>
           <Menu
             anchorEl={categoryMenuAnchor}
             open={Boolean(categoryMenuAnchor)}

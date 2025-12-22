@@ -53,6 +53,7 @@ const TaskDrawer = props => {
   const [documentations, setDocumentations] = useState([])
   const [tools, setTools] = useState([])
   const [documentPreview, setDocumentPreview] = useState(null)
+  const [documentFileName, setDocumentFileName] = useState(null)
   const [selfiePreview, setSelfiePreview] = useState(null)
 
   useEffect(() => {
@@ -88,9 +89,20 @@ const TaskDrawer = props => {
         })
         if (task.document_image) {
           const docUrl = task.document_image.startsWith('http') ? task.document_image : `${API_URL}/storage/${task.document_image}`
-          setDocumentPreview(docUrl)
+          // Проверяем, является ли это изображением (по расширению или URL)
+          const isImage = docUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/i)
+          if (isImage) {
+            setDocumentPreview(docUrl)
+            setDocumentFileName(null)
+          } else {
+            // Для документов извлекаем имя файла из URL
+            const fileName = docUrl.split('/').pop().split('?')[0]
+            setDocumentPreview(null)
+            setDocumentFileName(fileName)
+          }
         } else {
           setDocumentPreview(null)
+          setDocumentFileName(null)
         }
         if (task.selfie_image) {
           const selfieUrl = task.selfie_image.startsWith('http') ? task.selfie_image : `${API_URL}/storage/${task.selfie_image}`
@@ -125,6 +137,7 @@ const TaskDrawer = props => {
           selfie_image: null,
         })
         setDocumentPreview(null)
+        setDocumentFileName(null)
         setSelfiePreview(null)
       }
     }
@@ -167,15 +180,27 @@ const TaskDrawer = props => {
     const file = e.target.files[0]
     if (file) {
       setFormData(prev => ({ ...prev, [field]: file }))
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        if (field === 'document_image') {
-          setDocumentPreview(reader.result)
-        } else if (field === 'selfie_image') {
+      if (field === 'document_image') {
+        // Проверяем, является ли файл изображением
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            setDocumentPreview(reader.result)
+            setDocumentFileName(null)
+          }
+          reader.readAsDataURL(file)
+        } else {
+          // Для документов показываем только имя файла
+          setDocumentPreview(null)
+          setDocumentFileName(file.name)
+        }
+      } else if (field === 'selfie_image') {
+        const reader = new FileReader()
+        reader.onloadend = () => {
           setSelfiePreview(reader.result)
         }
+        reader.readAsDataURL(file)
       }
-      reader.readAsDataURL(file)
     }
   }
 
@@ -502,13 +527,20 @@ const TaskDrawer = props => {
               <input
                 hidden
                 type='file'
-                accept='image/*'
+                accept='image/*,.pdf,.doc,.docx,.txt,.rtf'
                 onChange={(e) => handleFileChange(e, 'document_image')}
               />
             </Button>
             {documentPreview && (
               <Box sx={{ mt: 1 }}>
                 <img src={documentPreview} alt='Document preview' style={{ maxWidth: '100%', maxHeight: 100 }} />
+              </Box>
+            )}
+            {documentFileName && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant='body2' sx={{ color: 'text.secondary' }}>
+                  File: {documentFileName}
+                </Typography>
               </Box>
             )}
           </Box>

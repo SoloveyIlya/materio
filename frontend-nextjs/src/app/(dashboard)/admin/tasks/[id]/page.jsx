@@ -833,7 +833,7 @@ export default function AdminTaskViewPage() {
                         disabled={task.status === 'approved' || task.status === 'rejected'}
                         startIcon={<i className='ri-check-line' />}
                       >
-                        Подтвердить
+                        Approve
                       </Button>
                       <Button 
                         variant='contained' 
@@ -842,7 +842,7 @@ export default function AdminTaskViewPage() {
                         disabled={task.status === 'approved' || task.status === 'rejected'}
                         startIcon={<i className='ri-close-line' />}
                       >
-                        Отменить
+                        Reject
                       </Button>
                       <Button 
                         variant='contained' 
@@ -851,7 +851,7 @@ export default function AdminTaskViewPage() {
                         disabled={task.status === 'approved' || task.status === 'rejected'}
                         startIcon={<i className='ri-send-plane-line' />}
                       >
-                        Отправить на доработку
+                        Send for Revision
                       </Button>
                     </Box>
                   </Box>
@@ -1359,11 +1359,11 @@ export default function AdminTaskViewPage() {
         }}
       >
         <DialogTitle>
-          Отправить на доработку
+          Send for Revision
         </DialogTitle>
         <DialogContent>
           <Typography variant='body2' sx={{ mb: 2 }}>
-            Укажите причину, по которой задача отправляется на доработку:
+            Please specify the reason why the task is being sent for revision:
           </Typography>
           <TextField
             fullWidth
