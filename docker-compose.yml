@@ -1,15 +1,13 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
     container_name: admin_mysql
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: admin_db
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_PASSWORD: root
-      MYSQL_USER: admin
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-admin_db}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
+      MYSQL_USER: ${MYSQL_USER:-admin}
     ports:
       - "3306:3306"
     volumes:
@@ -33,19 +31,24 @@ services:
       - ./backend-laravel:/var/www
       - /var/www/vendor
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     environment:
-      - APP_NAME=AdminBackend
-      - APP_ENV=local
-      - APP_DEBUG=true
-      - APP_URL=http://localhost:8000
-      - DB_CONNECTION=sqlite
-      - DB_DATABASE=/var/www/database/database.sqlite
-      - CACHE_DRIVER=database
-      - SESSION_DRIVER=database
-      - QUEUE_CONNECTION=database
-      - SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000
-      - SESSION_DOMAIN=localhost
+      - APP_NAME=${APP_NAME:-AdminBackend}
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - APP_URL=${APP_URL:-http://localhost:8000}
+      - APP_KEY=${APP_KEY}
+      - DB_CONNECTION=${DB_CONNECTION:-mysql}
+      - DB_HOST=${DB_HOST:-mysql}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_DATABASE=${DB_DATABASE:-${MYSQL_DATABASE:-admin_db}}
+      - DB_USERNAME=${DB_USERNAME:-${MYSQL_USER:-admin}}
+      - DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD:-root}}
+      - CACHE_DRIVER=${CACHE_DRIVER:-database}
+      - SESSION_DRIVER=${SESSION_DRIVER:-database}
+      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
+      - SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-localhost:3000,127.0.0.1:3000}
+      - SESSION_DOMAIN=${SESSION_DOMAIN:-localhost}
     networks:
       - admin_network
 
@@ -61,10 +64,11 @@ services:
       - /app/node_modules
       - /app/.next
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - WATCHPACK_POLLING=true
+      - NODE_ENV=${NODE_ENV:-development}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - WATCHPACK_POLLING=${WATCHPACK_POLLING:-true}
     depends_on:
       - backend
     networks:

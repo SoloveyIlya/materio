@@ -1,15 +1,21 @@
 #!/bin/sh
-set -e
+# Don't exit on error - we handle errors explicitly
+# set -e
 
-DB_CONNECTION=${DB_CONNECTION:-sqlite}
+DB_CONNECTION=${DB_CONNECTION:-mysql}
 
 if [ "$DB_CONNECTION" = "mysql" ]; then
+    DB_HOST=${DB_HOST:-mysql}
+    DB_PORT=${DB_PORT:-3306}
+    DB_DATABASE=${DB_DATABASE:-${MYSQL_DATABASE:-admin_db}}
+    DB_USERNAME=${DB_USERNAME:-${MYSQL_USER:-admin}}
+    DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD:-root}}
     echo "Waiting for MySQL database connection..."
     # Wait for MySQL to be ready (max 60 attempts = 2 minutes)
     max_attempts=60
     attempt=0
 
-    until php -r "try { \$pdo = new PDO('mysql:host=mysql;port=3306;dbname=admin_db', 'admin', 'root'); echo 'OK'; exit(0); } catch (PDOException \$e) { exit(1); }" 2>/dev/null; do
+    until php -r "try { \$pdo = new PDO('mysql:host=${DB_HOST};port=${DB_PORT};dbname=${DB_DATABASE}', '${DB_USERNAME}', '${DB_PASSWORD}'); echo 'OK'; exit(0); } catch (PDOException \$e) { exit(1); }" 2>/dev/null; do
         attempt=$((attempt + 1))
         if [ $attempt -ge $max_attempts ]; then
             echo "Failed to connect to database after $max_attempts attempts"
@@ -28,6 +34,17 @@ else
     echo "SQLite database file created/verified"
 fi
 
+# Set DB variables based on connection type
+if [ "$DB_CONNECTION" = "mysql" ]; then
+    DB_DATABASE_VAL=${DB_DATABASE:-${MYSQL_DATABASE:-admin_db}}
+    DB_USERNAME_VAL=${DB_USERNAME:-${MYSQL_USER:-admin}}
+    DB_PASSWORD_VAL=${DB_PASSWORD:-${MYSQL_PASSWORD:-root}}
+else
+    DB_DATABASE_VAL=${DB_DATABASE:-/var/www/database/database.sqlite}
+    DB_USERNAME_VAL=""
+    DB_PASSWORD_VAL=""
+fi
+
 # Create .env file from environment variables if it doesn't exist
 if [ ! -f /var/www/.env ]; then
     echo "Creating .env file from environment variables..."
@@ -39,8 +56,12 @@ APP_DEBUG=${APP_DEBUG:-true}
 APP_TIMEZONE=UTC
 APP_URL=${APP_URL:-http://localhost:8000}
 
-DB_CONNECTION=${DB_CONNECTION:-sqlite}
-DB_DATABASE=${DB_DATABASE:-/var/www/database/database.sqlite}
+DB_CONNECTION=${DB_CONNECTION:-mysql}
+DB_HOST=${DB_HOST:-mysql}
+DB_PORT=${DB_PORT:-3306}
+DB_DATABASE=${DB_DATABASE_VAL}
+DB_USERNAME=${DB_USERNAME_VAL}
+DB_PASSWORD=${DB_PASSWORD_VAL}
 
 CACHE_DRIVER=${CACHE_DRIVER:-database}
 SESSION_DRIVER=${SESSION_DRIVER:-database}
@@ -66,16 +87,11 @@ if [ "$DB_CONNECTION" = "sqlite" ]; then
     echo "SQLite database verified at: $DB_PATH"
 fi
 
-# Run migrations
-echo "Running migrations..."
-php artisan migrate --force 2>&1 || {
-    echo "Migration failed, recreating database..."
-    rm -f /var/www/database/database.sqlite
-    touch /var/www/database/database.sqlite
-    chmod 664 /var/www/database/database.sqlite
-    php artisan migrate --force
-    php artisan db:seed --force
-}
+# Note: Migrations should be run manually with:
+# docker-compose exec backend php artisan migrate:fresh --seed
+# Or just: docker-compose exec backend php artisan migrate
+echo "Skipping automatic migrations (run manually if needed)"
+echo "To run migrations: docker-compose exec backend php artisan migrate"
 
 echo "Setup complete! Starting server..."
 

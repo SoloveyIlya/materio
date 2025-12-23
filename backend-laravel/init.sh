@@ -13,8 +13,12 @@ APP_DEBUG=true
 APP_TIMEZONE=UTC
 APP_URL=http://localhost:8000
 
-DB_CONNECTION=sqlite
-DB_DATABASE=database/database.sqlite
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=admin_db
+DB_USERNAME=admin
+DB_PASSWORD=root
 
 SESSION_DRIVER=database
 CACHE_DRIVER=database
@@ -29,10 +33,8 @@ fi
 echo "🔑 Генерация ключа приложения..."
 php artisan key:generate
 
-# Создание базы данных SQLite
-echo "💾 Создание базы данных..."
-touch database/database.sqlite
-chmod 664 database/database.sqlite
+# База данных MySQL должна быть создана заранее
+echo "💾 Убедитесь, что база данных MySQL создана..."
 
 # Запуск миграций
 echo "📦 Запуск миграций..."

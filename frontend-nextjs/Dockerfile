@@ -1,21 +1,27 @@
-FROM node:20-alpine
-
+# --- build stage ---
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json* ./
+COPY package*.json ./
+RUN npm ci --ignore-scripts
 
-# Install dependencies without running postinstall scripts
-RUN if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi
-
-# Copy application files
 COPY . .
 
-# Run postinstall script after files are copied
+# теперь src уже есть — можно безопасно выполнить postinstall-логику
 RUN npm run build:icons
+RUN npm run build
 
-# Expose port
+# --- run stage ---
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+
 EXPOSE 3000
-
-# Start development server
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "start"]
