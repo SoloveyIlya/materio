@@ -36,6 +36,7 @@ class Task extends Model
         'id_type',
         'id_number',
         'document_image',
+        'document_image_name',
         'selfie_image',
         'comment',
         'documentation_id',

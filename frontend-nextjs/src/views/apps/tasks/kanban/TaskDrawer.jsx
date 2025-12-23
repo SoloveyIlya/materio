@@ -88,24 +88,46 @@ const TaskDrawer = props => {
           selfie_image: null,
         })
         if (task.document_image) {
-          const docUrl = task.document_image.startsWith('http') ? task.document_image : `${API_URL}/storage/${task.document_image}`
+          let docUrl
+          if (task.document_image.startsWith('http')) {
+            docUrl = task.document_image
+          } else if (task.document_image.startsWith('/storage/')) {
+            docUrl = `${API_URL}${task.document_image}`
+          } else {
+            docUrl = `${API_URL}/storage/${task.document_image}`
+          }
           // Проверяем, является ли это изображением (по расширению или URL)
           const isImage = docUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/i)
           if (isImage) {
             setDocumentPreview(docUrl)
             setDocumentFileName(null)
           } else {
-            // Для документов извлекаем имя файла из URL
-            const fileName = docUrl.split('/').pop().split('?')[0]
-            setDocumentPreview(null)
-            setDocumentFileName(fileName)
+            // Для документов используем сохраненное оригинальное имя файла
+            if (task.document_image_name) {
+              setDocumentPreview(null)
+              setDocumentFileName(task.document_image_name)
+            } else {
+              // Для старых файлов определяем расширение и показываем просто "Document"
+              const urlFileName = docUrl.split('/').pop().split('?')[0]
+              const extensionMatch = urlFileName.match(/\.([^.]+)$/)
+              const extension = extensionMatch ? extensionMatch[1] : 'pdf'
+              setDocumentPreview(null)
+              setDocumentFileName(`Document.${extension}`)
+            }
           }
         } else {
           setDocumentPreview(null)
           setDocumentFileName(null)
         }
         if (task.selfie_image) {
-          const selfieUrl = task.selfie_image.startsWith('http') ? task.selfie_image : `${API_URL}/storage/${task.selfie_image}`
+          let selfieUrl
+          if (task.selfie_image.startsWith('http')) {
+            selfieUrl = task.selfie_image
+          } else if (task.selfie_image.startsWith('/storage/')) {
+            selfieUrl = `${API_URL}${task.selfie_image}`
+          } else {
+            selfieUrl = `${API_URL}/storage/${task.selfie_image}`
+          }
           setSelfiePreview(selfieUrl)
         } else {
           setSelfiePreview(null)

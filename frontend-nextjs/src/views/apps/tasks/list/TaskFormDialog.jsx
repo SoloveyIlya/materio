@@ -117,10 +117,18 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
           setDocumentPreview(docImage)
           setDocumentFileName(null)
         } else {
-          // Для документов извлекаем имя файла из URL
-          const fileName = docImage.split('/').pop().split('?')[0]
-          setDocumentPreview(null)
-          setDocumentFileName(fileName)
+          // Для документов используем сохраненное оригинальное имя файла
+          if (taskData.document_image_name) {
+            setDocumentPreview(null)
+            setDocumentFileName(taskData.document_image_name)
+          } else {
+            // Для старых файлов определяем расширение и показываем просто "Document"
+            const urlFileName = docImage.split('/').pop().split('?')[0]
+            const extensionMatch = urlFileName.match(/\.([^.]+)$/)
+            const extension = extensionMatch ? extensionMatch[1] : 'pdf'
+            setDocumentPreview(null)
+            setDocumentFileName(`Document.${extension}`)
+          }
         }
       } else {
         setDocumentPreview(null)

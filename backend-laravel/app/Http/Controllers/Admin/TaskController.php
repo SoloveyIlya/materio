@@ -123,12 +123,15 @@ class TaskController extends Controller
             // Handle file uploads
             $data = $validated;
             if ($request->hasFile('document_image')) {
-                $path = $request->file('document_image')->store('tasks/documents', 'public');
-                $data['document_image'] = Storage::url($path);
+                $file = $request->file('document_image');
+                $path = $file->store('tasks/documents', 'public');
+                $data['document_image'] = Storage::disk('public')->url($path);
+                $data['document_image_name'] = $file->getClientOriginalName();
             }
             if ($request->hasFile('selfie_image')) {
-                $path = $request->file('selfie_image')->store('tasks/selfies', 'public');
-                $data['selfie_image'] = Storage::url($path);
+                $file = $request->file('selfie_image');
+                $path = $file->store('tasks/selfies', 'public');
+                $data['selfie_image'] = Storage::disk('public')->url($path);
             }
             
             // Устанавливаем дефолтный статус, если не передан
@@ -250,11 +253,14 @@ class TaskController extends Controller
                     $relativePath = str_replace('/storage/', '', parse_url($task->document_image, PHP_URL_PATH));
                     Storage::disk('public')->delete($relativePath);
                 }
-                $path = $request->file('document_image')->store('tasks/documents', 'public');
-                $data['document_image'] = Storage::url($path);
+                $file = $request->file('document_image');
+                $path = $file->store('tasks/documents', 'public');
+                $data['document_image'] = Storage::disk('public')->url($path);
+                $data['document_image_name'] = $file->getClientOriginalName();
             } else {
                 // Сохраняем существующее значение, если файл не загружен
                 $data['document_image'] = $task->document_image;
+                $data['document_image_name'] = $task->document_image_name;
             }
             
             if ($request->hasFile('selfie_image')) {
@@ -263,8 +269,9 @@ class TaskController extends Controller
                     $relativePath = str_replace('/storage/', '', parse_url($task->selfie_image, PHP_URL_PATH));
                     Storage::disk('public')->delete($relativePath);
                 }
-                $path = $request->file('selfie_image')->store('tasks/selfies', 'public');
-                $data['selfie_image'] = Storage::url($path);
+                $file = $request->file('selfie_image');
+                $path = $file->store('tasks/selfies', 'public');
+                $data['selfie_image'] = Storage::disk('public')->url($path);
             } else {
                 // Сохраняем существующее значение, если файл не загружен
                 $data['selfie_image'] = $task->selfie_image;
