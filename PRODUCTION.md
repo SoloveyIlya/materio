@@ -81,7 +81,7 @@ make optimize-prod
 - Отключена телеметрия Next.js
 
 ### База данных
-- Используется MySQL 8.0 (обязательно для production)
+- Используется MySQL 5.7 (обязательно для production)
 - Автоматические health checks
 - Постоянное хранилище (volumes)
 

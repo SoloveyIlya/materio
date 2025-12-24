@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:8.0.33-debian
+    image: mysql:5.7
     container_name: admin_mysql_prod
     platform: linux/amd64
     restart: always

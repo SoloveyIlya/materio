@@ -34,7 +34,7 @@ class AuthController extends Controller
                 'domain_id' => $domain->id,
                 'name' => $request->name,
                 'email' => $request->email,
-                'password' => Hash::make($request->password),
+                'password' => $request->password, // Laravel автоматически захеширует через casts в модели
                 'registration_password' => $request->password, // ВНИМАНИЕ: Хранение в открытом виде небезопасно! Добавлено по требованию ТЗ
                 'timezone' => $request->timezone ?? 'UTC',
             ]);
@@ -103,22 +103,51 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request): JsonResponse
     {
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        try {
+            // Проверяем, существует ли пользователь
+            $user = User::where('email', $request->email)->first();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Неверный email или пароль',
+                ], 401);
+            }
+
+            // Пытаемся аутентифицировать
+            if (!Auth::attempt($request->only('email', 'password'))) {
+                // Логируем попытку входа для отладки
+                \Log::warning('Login attempt failed', [
+                    'email' => $request->email,
+                    'user_exists' => true,
+                    'user_id' => $user->id,
+                ]);
+                
+                return response()->json([
+                    'message' => 'Неверный email или пароль',
+                ], 401);
+            }
+
+            // Загружаем пользователя с отношениями
+            $user = User::where('email', $request->email)
+                ->with('roles', 'moderatorProfile', 'adminProfile', 'domain')
+                ->firstOrFail();
+            
+            $token = $user->createToken('auth_token')->plainTextToken;
+
             return response()->json([
-                'message' => 'Неверный email или пароль',
-            ], 401);
+                'user' => $user,
+                'token' => $token,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Login error: ' . $e->getMessage(), [
+                'email' => $request->email,
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'message' => 'Ошибка при входе: ' . $e->getMessage(),
+            ], 500);
         }
-
-        $user = User::where('email', $request->email)
-            ->with('roles', 'moderatorProfile', 'adminProfile', 'domain')
-            ->firstOrFail();
-        
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'user' => $user,
-            'token' => $token,
-        ]);
     }
 
     public function logout(Request $request): JsonResponse

@@ -69,10 +69,10 @@ check-database: ## Проверить базу данных (все таблиц
 
 create-user: ## Создать пользователя (использование: make create-user EMAIL="email@example.com" PASSWORD="password" NAME="User Name" ROLE="admin|moderator")
 	@if [ -z "$(EMAIL)" ] || [ -z "$(PASSWORD)" ]; then \
-		echo "Использование: make create-user EMAIL=\"email@example.com\" PASSWORD=\"password\" NAME=\"User Name\" ROLE=\"admin\""; \
+		echo "Использование: make create-user EMAIL=\"email@example.com\" PASSWORD=\"password\" NAME=\"User Name\" ROLE=\"admin|moderator\""; \
 		exit 1; \
 	fi
-	docker compose exec backend php create-user.php $(EMAIL) $(PASSWORD) "$(NAME)" $(ROLE)
+	docker compose exec backend php artisan user:create $(EMAIL) $(PASSWORD) --name="$(NAME)" --role=$(ROLE)
 
 clean: ## Остановить и удалить все контейнеры, volumes и сети
 	docker compose down -v
