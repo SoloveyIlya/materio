@@ -160,18 +160,6 @@ const UserListTable = ({ tableData, activeTab, onSendTest }) => {
               <div 
                 className='flex items-center gap-4 cursor-pointer'
                 onClick={() => router.push(`/admin/users/${user.id}`)}
-                style={{
-                  transition: 'transform 0.2s, opacity 0.2s',
-                  display: 'inline-flex'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.02)'
-                  e.currentTarget.style.opacity = '0.9'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)'
-                  e.currentTarget.style.opacity = '1'
-                }}
               >
                 {getAvatar({ avatar: user.avatar, name: user.name, email: user.email })}
                 <div className='flex flex-col'>
@@ -402,15 +390,13 @@ const UserListTable = ({ tableData, activeTab, onSendTest }) => {
                       className={classnames({ selected: row.getIsSelected() })}
                       style={{
                         cursor: 'pointer',
-                        transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.2s'
+                        transition: 'box-shadow 0.2s, background-color 0.2s'
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'scale(1.01)'
                         e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)'
                         e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.02)'
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'scale(1)'
                         e.currentTarget.style.boxShadow = 'none'
                         e.currentTarget.style.backgroundColor = 'transparent'
                       }}

@@ -27,14 +27,16 @@ class TrainingController extends Controller
             ]);
         }
 
-        $query = Task::where('category_id', $testCategory->id)
+        $query = Task::whereHas('categories', function ($q) use ($testCategory) {
+                $q->where('task_categories.id', $testCategory->id);
+            })
             ->where(function ($q) use ($user) {
                 $q->where('assigned_to', $user->id)
                   ->orWhereHas('assignments', function ($assignmentQuery) use ($user) {
                       $assignmentQuery->where('assigned_to', $user->id);
                   });
             })
-            ->with(['category', 'template', 'result']);
+            ->with(['categories', 'template', 'result']);
 
         $tasks = $query->orderBy('created_at', 'desc')->get();
 

@@ -22,7 +22,7 @@ class TaskController extends Controller
         }
 
         $query = Task::where('domain_id', $user->domain_id)
-            ->with(['category', 'template', 'assignedUser', 'documentation', 'tool', 'result']);
+            ->with(['categories', 'template', 'assignedUser', 'documentations', 'tools', 'result']);
 
         if ($request->has('status')) {
             $status = $request->status;
@@ -53,11 +53,11 @@ class TaskController extends Controller
         }
 
         $task->load([
-            'category', 
+            'categories', 
             'template', 
             'assignedUser', 
-            'documentation',
-            'tool',
+            'documentations',
+            'tools',
             'result.moderator',
             'result' => function($query) {
                 $query->with('moderator');
@@ -88,35 +88,101 @@ class TaskController extends Controller
             return response()->json(['message' => 'User domain not set'], 400);
         }
 
-        $validated = $request->validate([
-            'template_id' => 'nullable|exists:task_templates,id',
-            'category_id' => 'required|exists:task_categories,id',
-            'assigned_to' => 'nullable|exists:users,id',
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'completion_hours' => 'required|integer|min:1',
-            'status' => 'sometimes|in:pending,in_progress,completed,cancelled',
-            'due_at' => 'nullable|date',
-            'guides_links' => 'nullable|array',
-            'attached_services' => 'nullable|array',
-            'work_day' => 'nullable|integer',
-            'is_main_task' => 'boolean',
-            'first_name' => 'nullable|string|max:255',
-            'last_name' => 'nullable|string|max:255',
-            'country' => 'nullable|string|max:255',
-            'address' => 'nullable|string',
-            'phone_number' => 'nullable|string|max:255',
-            'email' => 'nullable|email|max:255',
-            'date_of_birth' => 'nullable|date',
-            'id_type' => 'nullable|string|max:255',
-            'id_number' => 'nullable|string|max:255',
-            'document_image' => 'nullable|file|mimes:jpeg,jpg,png,gif,pdf,doc,docx,txt,rtf|max:10240',
-            'selfie_image' => 'nullable|file|image|max:10240',
-            'comment' => 'nullable|string',
-            'documentation_id' => 'nullable|exists:documentation_pages,id',
-            'tool_id' => 'nullable|exists:tools,id',
-        ]);
+        // Обрабатываем массивы из FormData
+        // Поддерживаем и новые массивы (category_ids[]), и старые одиночные значения (category_id)
+        $allData = $request->all();
+        
+        // Обрабатываем category_ids - сначала проверяем старые поля для обратной совместимости
+        $categoryIds = [];
+        if (isset($allData['category_id']) && $allData['category_id'] && $allData['category_id'] !== '') {
+            // Старый формат - одиночное значение (преобразуем в массив)
+            $categoryIds = [is_array($allData['category_id']) ? $allData['category_id'][0] : $allData['category_id']];
+        } elseif (isset($allData['category_ids']) && is_array($allData['category_ids']) && !empty($allData['category_ids'])) {
+            // Новый формат - массив
+            $categoryIds = array_filter($allData['category_ids'], function($id) {
+                return $id !== '' && $id !== null;
+            });
+        }
+        
+        // Если все еще пусто, пытаемся получить из input (на случай если Laravel не распознал массив)
+        if (empty($categoryIds)) {
+            $categoryIdsInput = $request->input('category_ids', []);
+            if (is_array($categoryIdsInput) && !empty($categoryIdsInput)) {
+                $categoryIds = array_filter($categoryIdsInput, function($id) {
+                    return $id !== '' && $id !== null;
+                });
+            }
+        }
+        
+        $request->merge(['category_ids' => array_values($categoryIds)]);
+        
+        // Аналогично для tool_ids (но это опциональное поле)
+        $toolIds = [];
+        if (isset($allData['tool_id']) && $allData['tool_id'] && $allData['tool_id'] !== '') {
+            $toolIds = [is_array($allData['tool_id']) ? $allData['tool_id'][0] : $allData['tool_id']];
+        } elseif (isset($allData['tool_ids']) && is_array($allData['tool_ids']) && !empty($allData['tool_ids'])) {
+            $toolIds = array_filter($allData['tool_ids'], function($id) {
+                return $id !== '' && $id !== null;
+            });
+        }
+        $request->merge(['tool_ids' => array_values($toolIds)]);
+        
+        // Обрабатываем documentation_ids (опциональное поле)
+        $documentationIds = [];
+        if (isset($allData['documentation_id']) && $allData['documentation_id'] && $allData['documentation_id'] !== '') {
+            $documentationIds = [is_array($allData['documentation_id']) ? $allData['documentation_id'][0] : $allData['documentation_id']];
+        } elseif (isset($allData['documentation_ids']) && is_array($allData['documentation_ids']) && !empty($allData['documentation_ids'])) {
+            $documentationIds = array_filter($allData['documentation_ids'], function($id) {
+                return $id !== '' && $id !== null;
+            });
+        }
+        $request->merge(['documentation_ids' => array_values($documentationIds)]);
+
+        try {
+            $validated = $request->validate([
+                'template_id' => 'nullable|exists:task_templates,id',
+                'category_ids' => 'required|array|min:1',
+                'category_ids.*' => 'exists:task_categories,id',
+                'assigned_to' => 'nullable|exists:users,id',
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'price' => 'required|numeric|min:0|max:99999999.99',
+                'completion_hours' => 'required|integer|min:1|max:87600',
+                'status' => 'sometimes|in:pending,in_progress,completed,cancelled',
+                'due_at' => 'nullable|date',
+                'guides_links' => 'nullable|array',
+                'attached_services' => 'nullable|array',
+                'work_day' => 'nullable|integer',
+                'is_main_task' => 'boolean',
+                'first_name' => 'nullable|string|max:255',
+                'last_name' => 'nullable|string|max:255',
+                'country' => 'nullable|string|max:255',
+                'address' => 'nullable|string',
+                'phone_number' => 'nullable|string|max:255',
+                'email' => 'nullable|email|max:255',
+                'date_of_birth' => 'nullable|date',
+                'id_type' => 'nullable|string|max:255',
+                'id_number' => 'nullable|string|max:255',
+                'document_image' => 'nullable|file|mimes:jpeg,jpg,png,gif,pdf,doc,docx,txt,rtf|max:10240',
+                'selfie_image' => 'nullable|file|image|max:10240',
+                'comment' => 'nullable|string',
+                'documentation_ids' => 'nullable|array',
+                'documentation_ids.*' => 'exists:documentation_pages,id',
+                'tool_ids' => 'nullable|array',
+                'tool_ids.*' => 'exists:tools,id',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Task validation failed', [
+                'errors' => $e->errors(),
+                'input_data' => $request->except(['document_image', 'selfie_image']),
+                'category_ids_input' => $request->input('category_ids'),
+                'category_ids_type' => gettype($request->input('category_ids')),
+            ]);
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
         DB::beginTransaction();
         try {
@@ -139,8 +205,14 @@ class TaskController extends Controller
                 $data['status'] = 'pending';
             }
             
+            // Извлекаем category_ids, tool_ids и documentation_ids для синхронизации связей many-to-many
+            $categoryIds = $data['category_ids'] ?? [];
+            $toolIds = $data['tool_ids'] ?? [];
+            $documentationIds = $data['documentation_ids'] ?? [];
+            unset($data['category_ids'], $data['tool_ids'], $data['documentation_ids']);
+
             // Конвертируем пустые строки в null для nullable полей
-            $nullableFields = ['template_id', 'assigned_to', 'documentation_id', 'tool_id', 'description', 
+            $nullableFields = ['template_id', 'assigned_to', 'documentation_id', 'description', 
                               'first_name', 'last_name', 'country', 'address', 'phone_number', 'email', 
                               'date_of_birth', 'id_type', 'id_number', 'comment', 'due_at'];
             foreach ($nullableFields as $field) {
@@ -150,7 +222,7 @@ class TaskController extends Controller
                         $data[$field] = null;
                     }
                     // Для foreign keys также конвертируем '0' в null
-                    if (in_array($field, ['template_id', 'assigned_to', 'documentation_id', 'tool_id']) && ($data[$field] === '0' || $data[$field] === 0)) {
+                    if (in_array($field, ['template_id', 'assigned_to', 'documentation_id']) && ($data[$field] === '0' || $data[$field] === 0)) {
                         $data[$field] = null;
                     }
                 }
@@ -162,20 +234,36 @@ class TaskController extends Controller
                     ->where('is_main_task', true)
                     ->update(['is_main_task' => false]);
             }
-
-            // Конвертируем пустые строки в null для nullable полей
-            $nullableFields = ['template_id', 'assigned_to', 'documentation_id', 'tool_id', 'description', 
-                              'first_name', 'last_name', 'country', 'address', 'phone_number', 'email', 
-                              'date_of_birth', 'id_type', 'id_number', 'comment', 'due_at'];
-            foreach ($nullableFields as $field) {
-                if (isset($data[$field]) && $data[$field] === '') {
-                    $data[$field] = null;
-                }
-            }
             
             // Устанавливаем due_at на основе completion_hours, если не указан явно
-            if (!isset($data['due_at']) && isset($data['completion_hours']) && $data['completion_hours']) {
-                $data['due_at'] = now()->addHours($data['completion_hours']);
+            // Ограничиваем максимальное количество часов, чтобы избежать выхода за пределы допустимого диапазона дат MySQL
+            if (!isset($data['due_at']) || $data['due_at'] === null) {
+                if (isset($data['completion_hours']) && $data['completion_hours'] && $data['completion_hours'] > 0) {
+                    // Ограничиваем до разумного максимума (например, 10 лет = 87600 часов)
+                    $maxHours = min((int)$data['completion_hours'], 87600);
+                    try {
+                        $calculatedDueAt = now()->addHours($maxHours);
+                        // Проверяем, что дата не выходит за пределы допустимого диапазона MySQL (до 9999-12-31 23:59:59)
+                        if ($calculatedDueAt->year <= 9999) {
+                            $data['due_at'] = $calculatedDueAt->format('Y-m-d H:i:s');
+                        }
+                    } catch (\Exception $e) {
+                        // Если не удалось вычислить дату, оставляем null
+                        $data['due_at'] = null;
+                    }
+                }
+            } elseif (isset($data['due_at']) && $data['due_at'] !== null) {
+                // Проверяем, что переданная дата не выходит за пределы допустимого диапазона
+                try {
+                    $dueAtDate = \Carbon\Carbon::parse($data['due_at']);
+                    if ($dueAtDate->year > 9999) {
+                        // Если дата выходит за пределы, сбрасываем в null
+                        $data['due_at'] = null;
+                    }
+                } catch (\Exception $e) {
+                    // Если не удалось распарсить дату, сбрасываем в null
+                    $data['due_at'] = null;
+                }
             }
 
             $task = Task::create([
@@ -184,9 +272,14 @@ class TaskController extends Controller
                 ...$data,
             ]);
 
+            // Синхронизируем категории, тулзы и документации
+            $task->categories()->sync($categoryIds);
+            $task->tools()->sync($toolIds);
+            $task->documentations()->sync($documentationIds);
+
             DB::commit();
 
-            return response()->json($task->load(['category', 'template', 'assignedUser', 'documentation', 'tool']), 201);
+            return response()->json($task->load(['categories', 'template', 'assignedUser', 'documentations', 'tools']), 201);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error creating task: ' . $e->getMessage()], 500);
@@ -215,7 +308,8 @@ class TaskController extends Controller
 
         $validated = $request->validate([
             'template_id' => 'nullable|exists:task_templates,id',
-            'category_id' => 'required|exists:task_categories,id',
+            'category_ids' => 'required|array|min:1',
+            'category_ids.*' => 'exists:task_categories,id',
             'assigned_to' => 'nullable|exists:users,id',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -239,9 +333,23 @@ class TaskController extends Controller
             'document_image' => 'nullable|file|mimes:jpeg,jpg,png,gif,pdf,doc,docx,txt,rtf|max:10240',
             'selfie_image' => 'nullable|file|image|max:10240',
             'comment' => 'nullable|string',
-            'documentation_id' => 'nullable|exists:documentation_pages,id',
-            'tool_id' => 'nullable|exists:tools,id',
+            'documentation_ids' => 'nullable|array',
+            'documentation_ids.*' => 'exists:documentation_pages,id',
+            'tool_ids' => 'nullable|array',
+            'tool_ids.*' => 'exists:tools,id',
         ]);
+
+        // Обрабатываем documentation_ids перед валидацией (аналогично store)
+        $allData = $request->all();
+        $documentationIds = [];
+        if (isset($allData['documentation_id']) && $allData['documentation_id'] && $allData['documentation_id'] !== '') {
+            $documentationIds = [is_array($allData['documentation_id']) ? $allData['documentation_id'][0] : $allData['documentation_id']];
+        } elseif (isset($allData['documentation_ids']) && is_array($allData['documentation_ids']) && !empty($allData['documentation_ids'])) {
+            $documentationIds = array_filter($allData['documentation_ids'], function($id) {
+                return $id !== '' && $id !== null;
+            });
+        }
+        $request->merge(['documentation_ids' => array_values($documentationIds)]);
 
         DB::beginTransaction();
         try {
@@ -277,8 +385,14 @@ class TaskController extends Controller
                 $data['selfie_image'] = $task->selfie_image;
             }
             
+            // Извлекаем category_ids, tool_ids и documentation_ids для синхронизации связей many-to-many
+            $categoryIds = $data['category_ids'] ?? null;
+            $toolIds = $data['tool_ids'] ?? null;
+            $documentationIds = $data['documentation_ids'] ?? null;
+            unset($data['category_ids'], $data['tool_ids'], $data['documentation_ids']);
+
             // Конвертируем пустые строки в null для nullable полей
-            $nullableFields = ['template_id', 'assigned_to', 'documentation_id', 'tool_id', 'description', 
+            $nullableFields = ['template_id', 'assigned_to', 'description', 
                               'first_name', 'last_name', 'country', 'address', 'phone_number', 'email', 
                               'date_of_birth', 'id_type', 'id_number', 'comment', 'due_at'];
             foreach ($nullableFields as $field) {
@@ -288,7 +402,7 @@ class TaskController extends Controller
                         $data[$field] = null;
                     }
                     // Для foreign keys также конвертируем '0' в null
-                    if (in_array($field, ['template_id', 'assigned_to', 'documentation_id', 'tool_id']) && ($data[$field] === '0' || $data[$field] === 0)) {
+                    if (in_array($field, ['template_id', 'assigned_to', 'documentation_id']) && ($data[$field] === '0' || $data[$field] === 0)) {
                         $data[$field] = null;
                     }
                 }
@@ -314,9 +428,20 @@ class TaskController extends Controller
             // Обновляем задачу
             $task->update($data);
 
+            // Синхронизируем категории, тулзы и документации, если они были переданы
+            if ($categoryIds !== null) {
+                $task->categories()->sync($categoryIds);
+            }
+            if ($toolIds !== null) {
+                $task->tools()->sync($toolIds);
+            }
+            if ($documentationIds !== null) {
+                $task->documentations()->sync($documentationIds);
+            }
+
             DB::commit();
 
-            return response()->json($task->fresh()->load(['category', 'template', 'assignedUser', 'documentation', 'tool', 'result']));
+            return response()->json($task->fresh()->load(['categories', 'template', 'assignedUser', 'documentations', 'tools', 'result']));
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error updating task: ' . $e->getMessage()], 500);
@@ -376,7 +501,7 @@ class TaskController extends Controller
 
             return response()->json([
                 'message' => 'Task moderated successfully',
-                'task' => $task->fresh()->load(['category', 'template', 'assignedUser', 'result']),
+                'task' => $task->fresh()->load(['categories', 'template', 'assignedUser', 'result']),
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

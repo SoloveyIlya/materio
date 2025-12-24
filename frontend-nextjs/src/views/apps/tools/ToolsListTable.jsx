@@ -270,15 +270,13 @@ const ToolsListTable = ({ tableData, onEdit, onDelete }) => {
                       className={classnames({ selected: row.getIsSelected() })}
                       style={{
                         cursor: 'pointer',
-                        transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.2s'
+                        transition: 'box-shadow 0.2s, background-color 0.2s'
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'scale(1.01)'
                         e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)'
                         e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.02)'
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'scale(1)'
                         e.currentTarget.style.boxShadow = 'none'
                         e.currentTarget.style.backgroundColor = 'transparent'
                       }}

@@ -191,7 +191,8 @@ export default function DocumentationPage() {
   }
 
   const handleOpenCategoryDialog = (category = null) => {
-    if (category) {
+    // Явно очищаем editingCategory, если category не передан
+    if (category && category.id && typeof category.id !== 'undefined' && category.id !== null) {
       setEditingCategory(category)
       setCategoryFormData({
         name: category.name || '',
@@ -199,6 +200,7 @@ export default function DocumentationPage() {
         parent_id: category.parent_id?.toString() || ''
       })
     } else {
+      // Явно устанавливаем null для создания новой категории
       setEditingCategory(null)
       setCategoryFormData({
         name: '',
@@ -221,21 +223,54 @@ export default function DocumentationPage() {
 
   const handleSaveCategory = async () => {
     try {
+      if (!categoryFormData.name || categoryFormData.name.trim() === '') {
+        showToast.error('Category name is required')
+        return
+      }
+
       const dataToSend = {
-        name: categoryFormData.name,
-        description: categoryFormData.description || null,
+        name: categoryFormData.name.trim(),
+        description: categoryFormData.description?.trim() || null,
         parent_id: categoryFormData.parent_id || null
       }
 
-      if (editingCategory) {
-        await api.put(`/admin/documentation-categories/${editingCategory.id}`, dataToSend)
+      // ПРОСТОЕ ПРАВИЛО: По умолчанию ВСЕГДА используем POST (создание)
+      // PUT используем ТОЛЬКО если editingCategory существует И имеет валидный числовой ID
+      
+      // Явно проверяем editingCategory
+      const isEditing = editingCategory !== null && 
+                       editingCategory !== undefined &&
+                       typeof editingCategory === 'object' &&
+                       editingCategory.id !== null &&
+                       editingCategory.id !== undefined &&
+                       editingCategory.id !== '' &&
+                       String(editingCategory.id) !== 'undefined' &&
+                       String(editingCategory.id) !== 'null' &&
+                       !isNaN(Number(editingCategory.id)) &&
+                       Number(editingCategory.id) > 0 &&
+                       Number.isInteger(Number(editingCategory.id))
+
+      if (isEditing) {
+        const categoryId = Number(editingCategory.id)
+        const urlId = String(categoryId)
+        
+        // Последняя проверка перед отправкой PUT
+        if (urlId && urlId.length > 0 && urlId !== 'undefined' && urlId !== 'null' && !urlId.includes('undefined')) {
+          await api.put(`/admin/documentation-categories/${urlId}`, dataToSend)
+          showToast.success('Category updated successfully')
+        } else {
+          // Если что-то не так с URL, используем POST
+          await api.post('/admin/documentation-categories', dataToSend)
+          showToast.success('Category created successfully')
+        }
       } else {
+        // Создание новой категории - ВСЕГДА POST
         await api.post('/admin/documentation-categories', dataToSend)
+        showToast.success('Category created successfully')
       }
       
       handleCloseCategoryDialog()
       loadCategories()
-      showToast.success(editingCategory ? 'Category updated successfully' : 'Category created successfully')
     } catch (error) {
       console.error('Error saving category:', error)
       showToast.error('Error saving category: ' + (error.response?.data?.message || error.message))
@@ -259,7 +294,7 @@ export default function DocumentationPage() {
         <Grid size={{ xs: 12 }}>
           <DocumentationHeader
             onAddDocumentation={() => handleOpenDialog()}
-            onAddCategory={handleOpenCategoryDialog}
+            onAddCategory={() => handleOpenCategoryDialog(null)}
           />
         </Grid>
         <Grid size={{ xs: 12 }}>
@@ -359,7 +394,7 @@ export default function DocumentationPage() {
 
       {/* Add/Edit Category Dialog */}
       <Dialog open={categoryDialogOpen} onClose={handleCloseCategoryDialog} maxWidth='sm' fullWidth>
-        <DialogTitle>{editingCategory ? 'Edit Category' : 'Add Category'}</DialogTitle>
+        <DialogTitle>{editingCategory && editingCategory.id ? 'Edit Category' : 'Add Category'}</DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
@@ -399,7 +434,7 @@ export default function DocumentationPage() {
         <DialogActions>
           <Button onClick={handleCloseCategoryDialog}>Cancel</Button>
           <Button onClick={handleSaveCategory} variant='contained' disabled={!categoryFormData.name}>
-            {editingCategory ? 'Save' : 'Create'}
+            {editingCategory && editingCategory.id ? 'Save' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>

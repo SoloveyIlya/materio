@@ -13,6 +13,13 @@ import IconButton from '@mui/material/IconButton'
 import Button from '@mui/material/Button'
 import Box from '@mui/material/Box'
 import Grid from '@mui/material/Grid'
+import Checkbox from '@mui/material/Checkbox'
+import ListItemText from '@mui/material/ListItemText'
+import Paper from '@mui/material/Paper'
+import Popover from '@mui/material/Popover'
+import OutlinedInput from '@mui/material/OutlinedInput'
+import FormGroup from '@mui/material/FormGroup'
+import FormControlLabel from '@mui/material/FormControlLabel'
 
 // Component Imports
 import api from '@/lib/api'
@@ -27,10 +34,10 @@ const TaskDrawer = props => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category_id: '',
+    category_ids: [],
     template_id: '',
-    documentation_id: '',
-    tool_id: '',
+    documentation_ids: [],
+    tool_ids: [],
     first_name: '',
     last_name: '',
     country: '',
@@ -55,6 +62,9 @@ const TaskDrawer = props => {
   const [documentPreview, setDocumentPreview] = useState(null)
   const [documentFileName, setDocumentFileName] = useState(null)
   const [selfiePreview, setSelfiePreview] = useState(null)
+  const [categoriesAnchorEl, setCategoriesAnchorEl] = useState(null)
+  const [documentationsAnchorEl, setDocumentationsAnchorEl] = useState(null)
+  const [toolsAnchorEl, setToolsAnchorEl] = useState(null)
 
   useEffect(() => {
     if (drawerOpen) {
@@ -65,10 +75,16 @@ const TaskDrawer = props => {
         setFormData({
           title: String(task.title || ''),
           description: String(task.description || ''),
-          category_id: task.category_id ? String(task.category_id) : '',
+          category_ids: task.categories && Array.isArray(task.categories) 
+            ? task.categories.map(cat => String(cat.id))
+            : (task.category_id ? [String(task.category_id)] : []),
           template_id: task.template_id ? String(task.template_id) : '',
-          documentation_id: task.documentation_id ? String(task.documentation_id) : '',
-          tool_id: task.tool_id ? String(task.tool_id) : '',
+          documentation_ids: task.documentations && Array.isArray(task.documentations)
+            ? task.documentations.map(doc => String(doc.id))
+            : (task.documentation_id ? [String(task.documentation_id)] : []),
+          tool_ids: task.tools && Array.isArray(task.tools)
+            ? task.tools.map(tool => String(tool.id))
+            : (task.tool_id ? [String(task.tool_id)] : []),
           first_name: String(task.first_name || ''),
           last_name: String(task.last_name || ''),
           country: String(task.country || ''),
@@ -136,10 +152,10 @@ const TaskDrawer = props => {
         setFormData({
           title: '',
           description: '',
-          category_id: '',
+          category_ids: [],
           template_id: '',
-          documentation_id: '',
-          tool_id: '',
+          documentation_ids: [],
+          tool_ids: [],
           first_name: '',
           last_name: '',
           country: '',
@@ -198,6 +214,35 @@ const TaskDrawer = props => {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  const handleMultipleChange = (e) => {
+    const { name, value } = e.target
+    // MUI Select с multiple всегда возвращает массив выбранных значений
+    // value уже является массивом
+    const arrayValue = Array.isArray(value) ? value.map(v => String(v)) : [String(value)]
+    setFormData(prev => ({ ...prev, [name]: arrayValue }))
+  }
+
+  const handleCheckboxChange = (field, id) => {
+    const idStr = String(id)
+    setFormData(prev => {
+      const currentArray = prev[field] || []
+      const isSelected = currentArray.includes(idStr)
+      const newArray = isSelected
+        ? currentArray.filter(item => item !== idStr)
+        : [...currentArray, idStr]
+      return { ...prev, [field]: newArray }
+    })
+  }
+
+  const getSelectedNames = (field, items) => {
+    const selectedIds = formData[field] || []
+    if (selectedIds.length === 0) return field === 'category_ids' ? '' : 'None'
+    return items
+      .filter(item => selectedIds.includes(String(item.id)))
+      .map(item => item.name || item.title)
+      .join(', ')
+  }
+
   const handleFileChange = (e, field) => {
     const file = e.target.files[0]
     if (file) {
@@ -241,8 +286,8 @@ const TaskDrawer = props => {
       if (!formData.title || !formData.title.trim()) {
         errors.push('Title is required')
       }
-      if (!formData.category_id || formData.category_id === '' || formData.category_id === null || formData.category_id === undefined) {
-        errors.push('Category is required')
+      if (!formData.category_ids || formData.category_ids.length === 0) {
+        errors.push('At least one category is required')
       }
       if (!formData.price || formData.price === '' || formData.price === '0' || formData.price === null || formData.price === undefined) {
         errors.push('Price is required')
@@ -263,7 +308,7 @@ const TaskDrawer = props => {
       // Отладочная информация
       console.log('FormData before sending:', {
         title: formData.title,
-        category_id: formData.category_id,
+        category_ids: formData.category_ids,
         price: formData.price,
         completion_hours: formData.completion_hours
       })
@@ -271,20 +316,26 @@ const TaskDrawer = props => {
       // Явно добавляем каждое поле по отдельности для контроля
       // Основные обязательные поля - после валидации они точно заполнены
       const titleValue = formData.title.trim()
-      const categoryIdValue = String(formData.category_id)
       const priceValue = String(formData.price)
       const completionHoursValue = String(formData.completion_hours)
       
       formDataToSend.append('title', titleValue)
       formDataToSend.append('description', formData.description || '')
-      formDataToSend.append('category_id', categoryIdValue)
+      
+      // Добавляем массивы категорий и тулзов
+      if (formData.category_ids && Array.isArray(formData.category_ids)) {
+        formData.category_ids.forEach(id => {
+          formDataToSend.append('category_ids[]', String(id))
+        })
+      }
+      
       formDataToSend.append('price', priceValue)
       formDataToSend.append('completion_hours', completionHoursValue)
       
       // Проверяем, что обязательные поля добавлены
       console.log('FormData values check:', {
         title: formDataToSend.get('title'),
-        category_id: formDataToSend.get('category_id'),
+        category_ids: formDataToSend.getAll('category_ids[]'),
         price: formDataToSend.get('price'),
         completion_hours: formDataToSend.get('completion_hours')
       })
@@ -297,8 +348,20 @@ const TaskDrawer = props => {
       
       // Опциональные поля (отправляем пустую строку для nullable полей)
       formDataToSend.append('template_id', formData.template_id || '')
-      formDataToSend.append('documentation_id', formData.documentation_id || '')
-      formDataToSend.append('tool_id', formData.tool_id || '')
+      
+      // Добавляем массив документаций
+      if (formData.documentation_ids && Array.isArray(formData.documentation_ids)) {
+        formData.documentation_ids.forEach(id => {
+          formDataToSend.append('documentation_ids[]', String(id))
+        })
+      }
+      
+      // Добавляем массив тулзов
+      if (formData.tool_ids && Array.isArray(formData.tool_ids)) {
+        formData.tool_ids.forEach(id => {
+          formDataToSend.append('tool_ids[]', String(id))
+        })
+      }
       formDataToSend.append('due_at', formData.due_at || '')
       formDataToSend.append('work_day', formData.work_day || '')
       
@@ -381,54 +444,186 @@ const TaskDrawer = props => {
           />
 
           <FormControl fullWidth>
-            <InputLabel>Category</InputLabel>
-            <Select
-              name='category_id'
-              value={formData.category_id ? String(formData.category_id) : ''}
-              onChange={handleChange}
-              label='Category'
+            <InputLabel shrink={!!formData.category_ids?.length}>Categories *</InputLabel>
+            <OutlinedInput
+              readOnly
+              label="Categories *"
+              value={getSelectedNames('category_ids', categories)}
+              onClick={(e) => setCategoriesAnchorEl(e.currentTarget)}
+              endAdornment={
+                <Box sx={{ cursor: 'pointer', userSelect: 'none', pr: 1 }} onClick={(e) => {
+                  e.stopPropagation()
+                  setCategoriesAnchorEl(e.currentTarget)
+                }}>
+                  ▼
+                </Box>
+              }
               required
+              sx={{ cursor: 'pointer' }}
+            />
+            <Popover
+              open={Boolean(categoriesAnchorEl)}
+              anchorEl={categoriesAnchorEl}
+              onClose={() => setCategoriesAnchorEl(null)}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'left',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'left',
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
             >
-              {categories.map((cat) => (
-                <MenuItem key={cat.id} value={String(cat.id)}>
-                  {cat.name}
-                </MenuItem>
-              ))}
-            </Select>
+              <Paper 
+                sx={{ p: 2, minWidth: 250, maxHeight: 300, overflow: 'auto' }}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <FormGroup>
+                  {categories.map((cat) => {
+                    const catIdStr = String(cat.id)
+                    const isSelected = (formData.category_ids || []).includes(catIdStr)
+                    return (
+                      <FormControlLabel
+                        key={cat.id}
+                        control={
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              handleCheckboxChange('category_ids', cat.id)
+                            }}
+                          />
+                        }
+                        label={cat.name}
+                        sx={{ cursor: 'pointer' }}
+                      />
+                    )
+                  })}
+                </FormGroup>
+              </Paper>
+            </Popover>
           </FormControl>
 
           <FormControl fullWidth>
-            <InputLabel>Documentation</InputLabel>
-            <Select
-              name='documentation_id'
-              value={formData.documentation_id ? String(formData.documentation_id) : ''}
-              onChange={handleChange}
-              label='Documentation'
+            <InputLabel shrink={!!formData.documentation_ids?.length}>Documentations</InputLabel>
+            <OutlinedInput
+              readOnly
+              label="Documentations"
+              value={getSelectedNames('documentation_ids', documentations)}
+              onClick={(e) => setDocumentationsAnchorEl(e.currentTarget)}
+              endAdornment={
+                <Box sx={{ cursor: 'pointer', userSelect: 'none', pr: 1 }} onClick={(e) => {
+                  e.stopPropagation()
+                  setDocumentationsAnchorEl(e.currentTarget)
+                }}>
+                  ▼
+                </Box>
+              }
+              sx={{ cursor: 'pointer' }}
+            />
+            <Popover
+              open={Boolean(documentationsAnchorEl)}
+              anchorEl={documentationsAnchorEl}
+              onClose={() => setDocumentationsAnchorEl(null)}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'left',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'left',
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
             >
-              <MenuItem value=''>None</MenuItem>
-              {documentations.map((doc) => (
-                <MenuItem key={doc.id} value={String(doc.id)}>
-                  {doc.title}
-                </MenuItem>
-              ))}
-            </Select>
+              <Paper 
+                sx={{ p: 2, minWidth: 250, maxHeight: 300, overflow: 'auto' }}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <FormGroup>
+                  {documentations.map((doc) => {
+                    const docIdStr = String(doc.id)
+                    const isSelected = (formData.documentation_ids || []).includes(docIdStr)
+                    return (
+                      <FormControlLabel
+                        key={doc.id}
+                        control={
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              handleCheckboxChange('documentation_ids', doc.id)
+                            }}
+                          />
+                        }
+                        label={doc.title}
+                        sx={{ cursor: 'pointer' }}
+                      />
+                    )
+                  })}
+                </FormGroup>
+              </Paper>
+            </Popover>
           </FormControl>
 
           <FormControl fullWidth>
-            <InputLabel>Tool</InputLabel>
-            <Select
-              name='tool_id'
-              value={formData.tool_id ? String(formData.tool_id) : ''}
-              onChange={handleChange}
-              label='Tool'
+            <InputLabel shrink={!!formData.tool_ids?.length}>Tools</InputLabel>
+            <OutlinedInput
+              readOnly
+              label="Tools"
+              value={getSelectedNames('tool_ids', tools)}
+              onClick={(e) => setToolsAnchorEl(e.currentTarget)}
+              endAdornment={
+                <Box sx={{ cursor: 'pointer', userSelect: 'none', pr: 1 }} onClick={(e) => {
+                  e.stopPropagation()
+                  setToolsAnchorEl(e.currentTarget)
+                }}>
+                  ▼
+                </Box>
+              }
+              sx={{ cursor: 'pointer' }}
+            />
+            <Popover
+              open={Boolean(toolsAnchorEl)}
+              anchorEl={toolsAnchorEl}
+              onClose={() => setToolsAnchorEl(null)}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'left',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'left',
+              }}
             >
-              <MenuItem value=''>None</MenuItem>
-              {tools.map((tool) => (
-                <MenuItem key={tool.id} value={String(tool.id)}>
-                  {tool.name}
-                </MenuItem>
-              ))}
-            </Select>
+              <Paper sx={{ p: 2, minWidth: 250, maxHeight: 300, overflow: 'auto' }}>
+                <FormGroup>
+                  {tools.map((tool) => {
+                    const toolIdStr = String(tool.id)
+                    const isSelected = (formData.tool_ids || []).includes(toolIdStr)
+                    return (
+                      <FormControlLabel
+                        key={tool.id}
+                        control={
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              handleCheckboxChange('tool_ids', tool.id)
+                            }}
+                          />
+                        }
+                        label={tool.name}
+                      />
+                    )
+                  })}
+                </FormGroup>
+              </Paper>
+            </Popover>
           </FormControl>
 
           <TextField

@@ -12,7 +12,6 @@ class Task extends Model
     protected $fillable = [
         'domain_id',
         'template_id',
-        'category_id',
         'assigned_to',
         'title',
         'description',
@@ -39,8 +38,6 @@ class Task extends Model
         'document_image_name',
         'selfie_image',
         'comment',
-        'documentation_id',
-        'tool_id',
     ];
 
     protected $casts = [
@@ -67,9 +64,9 @@ class Task extends Model
         return $this->belongsTo(TaskTemplate::class);
     }
 
-    public function category()
+    public function categories()
     {
-        return $this->belongsTo(TaskCategory::class);
+        return $this->belongsToMany(TaskCategory::class, 'task_category', 'task_id', 'category_id');
     }
 
     public function assignedUser()
@@ -87,15 +84,50 @@ class Task extends Model
         return $this->hasOne(TaskResult::class);
     }
 
-    public function documentation()
+    public function documentations()
     {
-        return $this->belongsTo(DocumentationPage::class, 'documentation_id');
+        return $this->belongsToMany(DocumentationPage::class, 'task_documentation', 'task_id', 'documentation_id');
     }
 
-    public function tool()
+    /**
+     * Получить первую документацию (для обратной совместимости)
+     * @deprecated Используйте documentations() для получения всех документаций
+     */
+    public function documentation()
     {
-        return $this->belongsTo(Tool::class, 'tool_id');
+        if ($this->relationLoaded('documentations')) {
+            return $this->getRelation('documentations')->first();
+        }
+        return $this->documentations()->first();
     }
+
+    public function tools()
+    {
+        return $this->belongsToMany(Tool::class, 'task_tool', 'task_id', 'tool_id');
+    }
+
+    /**
+     * Аксессор для получения первой категории (для обратной совместимости)
+     */
+    public function getCategoryAttribute()
+    {
+        if ($this->relationLoaded('categories')) {
+            return $this->getRelation('categories')->first();
+        }
+        return $this->categories()->first();
+    }
+
+    /**
+     * Аксессор для получения первого тулза (для обратной совместимости)
+     */
+    public function getToolAttribute()
+    {
+        if ($this->relationLoaded('tools')) {
+            return $this->getRelation('tools')->first();
+        }
+        return $this->tools()->first();
+    }
+
 
     /**
      * Проверяет, назначена ли задача пользователю (напрямую или через TaskAssignment)

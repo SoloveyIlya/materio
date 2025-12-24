@@ -5,9 +5,6 @@ import { useMemo, useState, useEffect } from 'react'
 
 // MUI Imports
 import Grid from '@mui/material/Grid'
-import Tab from '@mui/material/Tab'
-import TabPanel from '@mui/lab/TabPanel'
-import TabContext from '@mui/lab/TabContext'
 import Accordion from '@mui/material/Accordion'
 import Typography from '@mui/material/Typography'
 import AccordionSummary from '@mui/material/AccordionSummary'
@@ -17,13 +14,13 @@ import IconButton from '@mui/material/IconButton'
 import Chip from '@mui/material/Chip'
 import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
+import Button from '@mui/material/Button'
 
 // Third-party Imports
 import classnames from 'classnames'
 
 // Component Imports
 import CustomAvatar from '@/@core/components/mui/Avatar'
-import CustomTabList from '@/@core/components/mui/TabList'
 
 const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDeleteCategory }) => {
   // States
@@ -33,10 +30,18 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
 
   // Hooks
   useEffect(() => {
-    if (categories.length > 0 && !activeTab) {
-      setActiveTab(categories[0].id?.toString() || '')
+    if (categories.length > 0) {
+      if (!activeTab) {
+        setActiveTab(categories[0].id?.toString() || '')
+      } else {
+        // Проверяем, что активная категория еще существует
+        const categoryExists = categories.some(cat => cat.id?.toString() === activeTab)
+        if (!categoryExists && categories[0]) {
+          setActiveTab(categories[0].id?.toString() || '')
+        }
+      }
     }
-  }, [categories, activeTab])
+  }, [categories])
 
   const groupedPages = useMemo(() => {
     return categories.map(category => ({
@@ -45,13 +50,8 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
     }))
   }, [categories, pages])
 
-  const activeCategoryPages = useMemo(() => {
-    const category = groupedPages.find(cat => cat.id?.toString() === activeTab)
-    return category?.pages || []
-  }, [groupedPages, activeTab])
-
-  const handleChange = (event, newValue) => {
-    setActiveTab(newValue)
+  const handleCategoryClick = (categoryId) => {
+    setActiveTab(categoryId?.toString() || '')
   }
 
   const handleCategoryMenuOpen = (event, category) => {
@@ -81,6 +81,12 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
     handleCategoryMenuClose()
   }
 
+  const activeCategory = useMemo(() => {
+    if (!groupedPages || groupedPages.length === 0) return null
+    if (!activeTab) return groupedPages[0] || null
+    return groupedPages.find(cat => cat.id?.toString() === activeTab) || groupedPages[0]
+  }, [groupedPages, activeTab])
+
   if (!groupedPages || groupedPages.length === 0) {
     return (
       <Box sx={{ textAlign: 'center', mt: 4 }}>
@@ -92,76 +98,83 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
   }
 
   return (
-    <TabContext value={activeTab}>
-      <Grid container spacing={6}>
-        <Grid size={{ xs: 12, sm: 5, md: 4, xl: 3 }} className='flex !flex-col items-center'>
-          <CustomTabList orientation='vertical' onChange={handleChange} className='!is-full' pill='true'>
-            {groupedPages?.map((category) => (
-              <Box 
-                key={category.id} 
-                sx={{ 
-                  position: 'relative', 
-                  width: '100%',
-                  mb: 1
+    <Grid container spacing={6}>
+      <Grid size={{ xs: 12, sm: 5, md: 4, xl: 3 }} className='flex !flex-col items-center'>
+        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {groupedPages?.map((category) => (
+            <Box 
+              key={category.id} 
+              sx={{ 
+                position: 'relative', 
+                width: '100%'
+              }}
+            >
+              <Button
+                fullWidth
+                variant={activeTab === (category.id?.toString() || '') ? 'contained' : 'outlined'}
+                onClick={() => handleCategoryClick(category.id)}
+                startIcon={<i className='ri-file-text-line' />}
+                sx={{
+                  justifyContent: 'flex-start',
+                  textTransform: 'none',
+                  py: 1.5,
+                  px: 2,
+                  fontWeight: activeTab === (category.id?.toString() || '') ? 600 : 400
                 }}
               >
-                <Tab
-                  label={category.name}
-                  value={category.id?.toString() || ''}
-                  icon={<i className={classnames('ri-file-text-line', 'mbe-0! mie-1.5')} />}
-                  className='!flex-row !justify-start whitespace-nowrap min-is-full!'
-                />
-                <IconButton
-                  size='small'
-                  onClick={(e) => handleCategoryMenuOpen(e, category)}
-                  sx={{
-                    position: 'absolute',
-                    right: 8,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 1
-                  }}
-                >
-                  <i className='ri-more-2-line' />
-                </IconButton>
-              </Box>
-            ))}
-          </CustomTabList>
-          <Menu
-            anchorEl={categoryMenuAnchor}
-            open={Boolean(categoryMenuAnchor)}
-            onClose={handleCategoryMenuClose}
-          >
-            <MenuItem onClick={handleEditCategory}>
-              <i className='ri-edit-box-line mie-2' />
-              Edit Category
-            </MenuItem>
-            <MenuItem onClick={handleDeleteCategory} sx={{ color: 'error.main' }}>
-              <i className='ri-delete-bin-7-line mie-2' />
-              Delete Category
-            </MenuItem>
-          </Menu>
-          <img
-            src='/images/illustrations/characters-with-objects/2.png'
-            className='max-md:hidden is-72'
-            alt='documentation illustration'
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 7, md: 8, xl: 9 }}>
-          {groupedPages?.map((category) => (
-            <TabPanel key={category.id} value={category.id?.toString() || ''} className='p-0'>
+                {category.name}
+              </Button>
+              <IconButton
+                size='small'
+                onClick={(e) => handleCategoryMenuOpen(e, category)}
+                sx={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 1
+                }}
+              >
+                <i className='ri-more-2-line' />
+              </IconButton>
+            </Box>
+          ))}
+        </Box>
+        <Menu
+          anchorEl={categoryMenuAnchor}
+          open={Boolean(categoryMenuAnchor)}
+          onClose={handleCategoryMenuClose}
+        >
+          <MenuItem onClick={handleEditCategory}>
+            <i className='ri-edit-box-line mie-2' />
+            Edit Category
+          </MenuItem>
+          <MenuItem onClick={handleDeleteCategory} sx={{ color: 'error.main' }}>
+            <i className='ri-delete-bin-7-line mie-2' />
+            Delete Category
+          </MenuItem>
+        </Menu>
+        <img
+          src='/images/illustrations/characters-with-objects/2.png'
+          className='max-md:hidden is-72'
+          alt='documentation illustration'
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 7, md: 8, xl: 9 }}>
+          {activeCategory && (
+            <Box>
               <div className='flex items-center gap-4 mbe-4'>
                 <CustomAvatar skin='light' color='primary' variant='rounded' size={50}>
                   <i className={classnames('ri-file-text-line', 'text-3xl')} />
                 </CustomAvatar>
                 <div>
-                  <Typography variant='h5'>{category.name}</Typography>
-                  <Typography>{category.description || 'Documentation category'}</Typography>
+                  <Typography variant='h5'>{activeCategory.name}</Typography>
+                  <Typography>{activeCategory.description || 'Documentation category'}</Typography>
                 </div>
               </div>
               <div>
-                {activeCategoryPages.length > 0 ? (
-                  activeCategoryPages.map((page, index) => (
+                {activeCategory.pages && activeCategory.pages.length > 0 ? (
+                  activeCategory.pages.map((page, index) => (
                     <Accordion key={page.id || index}>
                       <AccordionSummary
                         expandIcon={<i className='ri-arrow-down-s-line' />}
@@ -430,11 +443,10 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
                   <Typography color='text.secondary'>No pages in this category yet</Typography>
                 )}
               </div>
-            </TabPanel>
-          ))}
+            </Box>
+          )}
         </Grid>
       </Grid>
-    </TabContext>
   )
 }
 

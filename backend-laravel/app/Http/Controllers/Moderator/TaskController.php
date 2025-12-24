@@ -32,7 +32,7 @@ class TaskController extends Controller
                       $assignmentQuery->where('assigned_to', $user->id);
                   });
             })
-            ->with(['category', 'template', 'assignments', 'result']);
+            ->with(['categories', 'template', 'assignments', 'result']);
 
         // Фильтрация по группе статусов для модератора
         if ($request->has('group')) {
@@ -60,7 +60,7 @@ class TaskController extends Controller
 
         // Training center - задачи с категорией Test
         if ($request->has('training')) {
-            $query->whereHas('category', function ($q) {
+            $query->whereHas('categories', function ($q) {
                 $q->where('name', 'Test');
             });
         }
@@ -78,13 +78,13 @@ class TaskController extends Controller
                 ? now($user->timezone ?? 'UTC')->diffInSeconds($task->due_at, false) 
                 : null;
             
-            // Убеждаемся, что категория загружена
-            if (!$task->relationLoaded('category')) {
-                $task->load('category');
+            // Убеждаемся, что категории загружены
+            if (!$task->relationLoaded('categories')) {
+                $task->load('categories');
             }
             
-            // Подгруппа - это название категории (или можно использовать slug)
-            $task->subgroup = $task->category ? $task->category->name : null;
+            // Подгруппа - это название первой категории (или можно использовать slug)
+            $task->subgroup = $task->categories->first() ? $task->categories->first()->name : null;
             
             return $task;
         });
@@ -115,7 +115,7 @@ class TaskController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        return response()->json($task->load(['category', 'template', 'assignments', 'documentation', 'tool', 'result']));
+        return response()->json($task->load(['categories', 'template', 'assignments', 'documentations', 'tools', 'result']));
     }
 
     public function start(Task $task, Request $request): JsonResponse
@@ -141,7 +141,7 @@ class TaskController extends Controller
             $assignment->update(['started_at' => now()]);
         }
 
-        return response()->json($task->fresh()->load(['category', 'template', 'assignments']));
+        return response()->json($task->fresh()->load(['categories', 'template', 'assignments']));
     }
 
     public function complete(Task $task, Request $request): JsonResponse
@@ -217,7 +217,7 @@ class TaskController extends Controller
 
             DB::commit();
 
-            return response()->json($task->fresh()->load(['category', 'template', 'assignments', 'result']));
+            return response()->json($task->fresh()->load(['categories', 'template', 'assignments', 'result']));
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error completing task: ' . $e->getMessage()], 500);
