@@ -1,27 +1,23 @@
-# --- build stage ---
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 WORKDIR /app
 
+# Копируем package файлы
 COPY package*.json ./
+
+# Устанавливаем зависимости
 RUN npm ci --ignore-scripts
 
+# Копируем исходный код
 COPY . .
 
-# теперь src уже есть — можно безопасно выполнить postinstall-логику
+# Собираем иконки
 RUN npm run build:icons
-RUN npm run build
 
-# --- run stage ---
-FROM node:20-alpine AS runner
-WORKDIR /app
-
-ENV NODE_ENV=production
-
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/next.config.js ./next.config.js
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
+# Устанавливаем переменные окружения для development
+ENV NODE_ENV=development
+ENV WATCHPACK_POLLING=true
 
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+
+# Запускаем dev сервер
+CMD ["npm", "run", "dev"]

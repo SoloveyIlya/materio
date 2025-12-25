@@ -247,25 +247,139 @@ export default function ModeratorTaskViewPage() {
             <Grid size={{ xs: 12 }}>
               <Card>
                 <CardContent>
-                  <Typography variant='h6' gutterBottom>Additional Materials</Typography>
-                  {task.documentation && (
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant='subtitle2'>Documentation:</Typography>
-                      <Typography>{task.documentation.title}</Typography>
-                    </Box>
-                  )}
-                  {task.tool && (
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant='subtitle2'>Tool:</Typography>
-                      <Typography>{task.tool.name}</Typography>
-                    </Box>
-                  )}
-                  {task.result?.admin_comment && task.status === 'sent_for_revision' && (
-                    <Box sx={{ mt: 2, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
-                      <Typography variant='subtitle2' color='warning.dark'>Sent for re-checking</Typography>
-                      <Typography variant='body2' sx={{ mt: 1 }}>{task.result.admin_comment}</Typography>
-                    </Box>
-                  )}
+                  <Typography variant='h6' gutterBottom sx={{ mb: 4 }}>Additional Materials</Typography>
+                  
+                  <Box sx={{ position: 'relative', pl: 2 }}>
+                    {/* Documentation Section */}
+                    {task.documentation && (
+                      <Box sx={{ mb: 4, position: 'relative' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                          <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                bgcolor: '#4CAF50',
+                                flexShrink: 0,
+                                zIndex: 2
+                              }}
+                            />
+                            {(task.tool || (task.result?.admin_comment && task.status === 'sent_for_revision')) && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  left: 5,
+                                  top: 12,
+                                  width: 2,
+                                  height: task.tool ? 80 : 60,
+                                  bgcolor: '#E0E0E0',
+                                  zIndex: 1
+                                }}
+                              />
+                            )}
+                          </Box>
+                          <Typography 
+                            variant='h6' 
+                            sx={{ 
+                              fontWeight: 700, 
+                              color: '#000',
+                              fontSize: '1.1rem'
+                            }}
+                          >
+                            Документация
+                          </Typography>
+                        </Box>
+                        <Box sx={{ pl: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <i className='ri-file-text-line' style={{ fontSize: '20px', color: '#4CAF50' }} />
+                            <Typography variant='body1'>{task.documentation.title}</Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                    )}
+
+                    {/* Tools Section */}
+                    {task.tool && (
+                      <Box sx={{ mb: 4, position: 'relative' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                          <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                bgcolor: '#2196F3',
+                                flexShrink: 0,
+                                zIndex: 2
+                              }}
+                            />
+                            {task.result?.admin_comment && task.status === 'sent_for_revision' && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  left: 5,
+                                  top: 12,
+                                  width: 2,
+                                  height: 40,
+                                  bgcolor: '#E0E0E0',
+                                  zIndex: 1
+                                }}
+                              />
+                            )}
+                          </Box>
+                          <Typography 
+                            variant='h6' 
+                            sx={{ 
+                              fontWeight: 700, 
+                              color: '#000',
+                              fontSize: '1.1rem'
+                            }}
+                          >
+                            Тулз
+                          </Typography>
+                        </Box>
+                        <Box sx={{ pl: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <i className='ri-tools-line' style={{ fontSize: '20px', color: '#2196F3' }} />
+                            <Typography variant='body1'>{task.tool.name}</Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                    )}
+
+                    {/* Revision Section */}
+                    {task.result?.admin_comment && task.status === 'sent_for_revision' && (
+                      <Box sx={{ position: 'relative' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                          <Box
+                            sx={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: '50%',
+                              bgcolor: '#FF9800',
+                              flexShrink: 0
+                            }}
+                          />
+                          <Typography 
+                            variant='h6' 
+                            sx={{ 
+                              fontWeight: 700, 
+                              color: '#000',
+                              fontSize: '1.1rem'
+                            }}
+                          >
+                            Отправка на исправление
+                          </Typography>
+                        </Box>
+                        <Box sx={{ pl: 4, mt: 1 }}>
+                          <Typography variant='body2' sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
+                            {task.result.admin_comment}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
+                  </Box>
                 </CardContent>
               </Card>
             </Grid>

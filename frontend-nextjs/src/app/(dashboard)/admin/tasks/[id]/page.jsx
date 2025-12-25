@@ -818,7 +818,7 @@ export default function AdminTaskViewPage() {
                   <div className='flex flex-col items-center sm:items-start gap-2'>
                     <Typography variant='h4'>{task.assigned_user?.name || task.assigned_user?.email || 'Moderator'}</Typography>
                   </div>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center', sm: { alignItems: 'flex-end' } }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'row', gap: 2, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', sm: { justifyContent: 'flex-end' } }}>
                     <Chip 
                       label={getStatusLabel(task.status)} 
                       color={getStatusColor(task.status)}
@@ -981,74 +981,280 @@ export default function AdminTaskViewPage() {
               <Grid size={{ xs: 12 }}>
                 <Card>
                   <CardContent>
-                    <Typography variant='h6' gutterBottom>Additional Materials</Typography>
-                    {task.documentation && (
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant='subtitle2'>Documentation:</Typography>
-                        <Typography>{task.documentation.title}</Typography>
-                      </Box>
-                    )}
-                    {tools.length > 0 && (
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant='subtitle2'>Tools:</Typography>
-                        {tools.map((tool, index) => (
-                          <Typography key={tool.id || index}>{tool.name}</Typography>
-                        ))}
-                      </Box>
-                    )}
-                    {task.result?.admin_comment && task.status === 'sent_for_revision' && (
-                      <Box sx={{ mt: 2, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
-                        <Typography variant='subtitle2' color='warning.dark'>Sent for re-checking</Typography>
-                        <Typography variant='body2' sx={{ mt: 1 }}>{task.result.admin_comment}</Typography>
-                      </Box>
-                    )}
-                    {task.result?.moderator_comment && (
-                      <Box sx={{ mt: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
-                        <Typography variant='subtitle2' color='info.dark'>Moderator Comment</Typography>
-                        <Typography variant='body2' sx={{ mt: 1 }}>{task.result.moderator_comment}</Typography>
-                      </Box>
-                    )}
-                    {task.result?.answers && (
-                      <Box sx={{ mt: 2 }}>
-                        <Typography variant='subtitle2' gutterBottom>Answers:</Typography>
-                        <Typography variant='body2' sx={{ whiteSpace: 'pre-wrap', bgcolor: 'action.hover', p: 2, borderRadius: 1 }}>
-                          {typeof task.result.answers === 'object' 
-                            ? JSON.stringify(task.result.answers, null, 2)
-                            : task.result.answers}
-                        </Typography>
-                      </Box>
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
+                    <Typography variant='h6' gutterBottom sx={{ mb: 4 }}>Additional Materials</Typography>
+                    
+                    <Box sx={{ position: 'relative', pl: 2 }}>
+                      {/* Documentation Section */}
+                      {task.documentation && (
+                        <Box sx={{ mb: 4, position: 'relative' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  bgcolor: '#4CAF50',
+                                  flexShrink: 0,
+                                  zIndex: 2
+                                }}
+                              />
+                              {(() => {
+                                const hasNextSections = (task.result?.admin_comment && task.status === 'sent_for_revision') || 
+                                                       task.result?.moderator_comment || 
+                                                       task.result?.answers;
+                                if (!hasNextSections) return null;
+                                
+                                let height = 60; // Base height
+                                if (task.result?.admin_comment && task.status === 'sent_for_revision') height += 40;
+                                if (task.result?.moderator_comment) height += 40;
+                                if (task.result?.answers) height += 40;
+                                
+                                return (
+                                  <Box
+                                    sx={{
+                                      position: 'absolute',
+                                      left: 5,
+                                      top: 12,
+                                      width: 2,
+                                      height: height,
+                                      bgcolor: '#E0E0E0',
+                                      zIndex: 1
+                                    }}
+                                  />
+                                );
+                              })()}
+                            </Box>
+                            <Typography 
+                              variant='h6' 
+                              sx={{ 
+                                fontWeight: 700, 
+                                color: '#000',
+                                fontSize: '1.1rem'
+                              }}
+                            >
+                              Документация
+                            </Typography>
+                          </Box>
+                          <Box sx={{ pl: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <i className='ri-file-text-line' style={{ fontSize: '20px', color: '#4CAF50' }} />
+                              <Typography variant='body1'>{task.documentation.title}</Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      )}
 
-              {/* Overview Card */}
-              <Grid size={{ xs: 12 }}>
-                <Card>
-                  <CardContent>
-                    <div className='flex flex-col gap-4'>
-                      <Typography variant='caption' className='uppercase'>
-                        Overview
-                      </Typography>
-                      {task.id_type && (
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-file-text-line text-textSecondary' />
-                          <div className='flex items-center flex-wrap gap-2'>
-                            <Typography className='font-medium'>ID type:</Typography>
-                            <Typography>{task.id_type}</Typography>
-                          </div>
-                        </div>
+                      {/* Tools Section */}
+                      {tools.length > 0 && (
+                        <Box sx={{ mb: 4, position: 'relative' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  bgcolor: '#2196F3',
+                                  flexShrink: 0,
+                                  zIndex: 2
+                                }}
+                              />
+                              {(() => {
+                                const hasNextSections = (task.result?.admin_comment && task.status === 'sent_for_revision') || 
+                                                       task.result?.moderator_comment || 
+                                                       task.result?.answers;
+                                if (!hasNextSections) return null;
+                                
+                                let height = 60; // Base height
+                                if (task.result?.admin_comment && task.status === 'sent_for_revision') height += 40;
+                                if (task.result?.moderator_comment) height += 40;
+                                if (task.result?.answers) height += 40;
+                                
+                                return (
+                                  <Box
+                                    sx={{
+                                      position: 'absolute',
+                                      left: 5,
+                                      top: 12,
+                                      width: 2,
+                                      height: height,
+                                      bgcolor: '#E0E0E0',
+                                      zIndex: 1
+                                    }}
+                                  />
+                                );
+                              })()}
+                            </Box>
+                            <Typography 
+                              variant='h6' 
+                              sx={{ 
+                                fontWeight: 700, 
+                                color: '#000',
+                                fontSize: '1.1rem'
+                              }}
+                            >
+                              Тулз
+                            </Typography>
+                          </Box>
+                          <Box sx={{ pl: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            {tools.map((tool, index) => (
+                              <Box key={tool.id || index} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <i className='ri-tools-line' style={{ fontSize: '20px', color: '#2196F3' }} />
+                                <Typography variant='body1'>{tool.name}</Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        </Box>
                       )}
-                      {task.id_number && (
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-file-list-line text-textSecondary' />
-                          <div className='flex items-center flex-wrap gap-2'>
-                            <Typography className='font-medium'>ID number:</Typography>
-                            <Typography>{task.id_number}</Typography>
-                          </div>
-                        </div>
+
+                      {/* Revision Section */}
+                      {task.result?.admin_comment && task.status === 'sent_for_revision' && (
+                        <Box sx={{ mb: 4, position: 'relative' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  bgcolor: '#FF9800',
+                                  flexShrink: 0,
+                                  zIndex: 2
+                                }}
+                              />
+                              {(task.result?.moderator_comment || task.result?.answers) && (
+                                <Box
+                                  sx={{
+                                    position: 'absolute',
+                                    left: 5,
+                                    top: 12,
+                                    width: 2,
+                                    height: task.result?.moderator_comment && task.result?.answers ? 100 : 60,
+                                    bgcolor: '#E0E0E0',
+                                    zIndex: 1
+                                  }}
+                                />
+                              )}
+                            </Box>
+                            <Typography 
+                              variant='h6' 
+                              sx={{ 
+                                fontWeight: 700, 
+                                color: '#000',
+                                fontSize: '1.1rem'
+                              }}
+                            >
+                              Отправка на исправление
+                            </Typography>
+                          </Box>
+                          <Box sx={{ pl: 4, mt: 1 }}>
+                            <Typography variant='body2' sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
+                              {task.result.admin_comment}
+                            </Typography>
+                          </Box>
+                        </Box>
                       )}
-                    </div>
+
+                      {/* Moderator Comment Section */}
+                      {task.result?.moderator_comment && (
+                        <Box sx={{ mb: 4, position: 'relative' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  bgcolor: '#9C27B0',
+                                  flexShrink: 0,
+                                  zIndex: 2
+                                }}
+                              />
+                              {task.result?.answers && (
+                                <Box
+                                  sx={{
+                                    position: 'absolute',
+                                    left: 5,
+                                    top: 12,
+                                    width: 2,
+                                    height: 60,
+                                    bgcolor: '#E0E0E0',
+                                    zIndex: 1
+                                  }}
+                                />
+                              )}
+                            </Box>
+                            <Typography 
+                              variant='h6' 
+                              sx={{ 
+                                fontWeight: 700, 
+                                color: '#000',
+                                fontSize: '1.1rem'
+                              }}
+                            >
+                              Moderator Comment
+                            </Typography>
+                          </Box>
+                          <Box sx={{ pl: 4, mt: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                              <i className='ri-message-3-line' style={{ fontSize: '20px', color: '#9C27B0', marginTop: '2px' }} />
+                              <Typography variant='body2' sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
+                                {task.result.moderator_comment}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Answers Section */}
+                      {task.result?.answers && (
+                        <Box sx={{ position: 'relative' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                bgcolor: '#3F51B5',
+                                flexShrink: 0
+                              }}
+                            />
+                            <Typography 
+                              variant='h6' 
+                              sx={{ 
+                                fontWeight: 700, 
+                                color: '#000',
+                                fontSize: '1.1rem'
+                              }}
+                            >
+                              Answers
+                            </Typography>
+                          </Box>
+                          <Box sx={{ pl: 4, mt: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                              <i className='ri-question-answer-line' style={{ fontSize: '20px', color: '#3F51B5', marginTop: '2px' }} />
+                              <Typography 
+                                variant='body2' 
+                                sx={{ 
+                                  whiteSpace: 'pre-wrap', 
+                                  bgcolor: 'action.hover', 
+                                  p: 2, 
+                                  borderRadius: 1,
+                                  color: 'text.secondary',
+                                  lineHeight: 1.7,
+                                  flex: 1
+                                }}
+                              >
+                                {typeof task.result.answers === 'object' 
+                                  ? JSON.stringify(task.result.answers, null, 2)
+                                  : task.result.answers}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      )}
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>
