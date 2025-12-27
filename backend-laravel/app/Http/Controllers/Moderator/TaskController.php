@@ -25,33 +25,34 @@ class TaskController extends Controller
     {
         $user = $request->user();
         
-        // Получаем задачи, где пользователь назначен напрямую или через TaskAssignment
-        $query = Task::where(function ($q) use ($user) {
-                $q->where('assigned_to', $user->id)
-                  ->orWhereHas('assignments', function ($assignmentQuery) use ($user) {
-                      $assignmentQuery->where('assigned_to', $user->id);
-                  });
-            })
-            ->with(['categories', 'template', 'assignments', 'result']);
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        
+        // Получаем задачи из домена модератора
+        $query = Task::where('domain_id', $user->domain_id)
+            ->with(['categories', 'template', 'assignments', 'result', 'assignedUser']);
 
         // Фильтрация по группе статусов для модератора
         if ($request->has('group')) {
             $group = $request->get('group');
             switch ($group) {
-                case 'waiting': // Ожидают
+                case 'waiting': // Ожидают - все задачи со статусом pending (любой модератор может откликнуться)
                     $query->where('status', 'pending');
                     break;
-                case 'in_work': // В работе
-                    $query->where('status', 'in_progress');
+                case 'in_work': // В работе - только задачи, которые взял этот модератор
+                    $query->where('status', 'in_progress')
+                          ->where('assigned_to', $user->id);
                     break;
-                case 'history': // История
-                    $query->whereIn('status', [
-                        'completed_by_moderator',
-                        'under_admin_review',
-                        'approved',
-                        'rejected',
-                        'sent_for_revision',
-                    ]);
+                case 'history': // История - только задачи, которые выполнил этот модератор
+                    $query->where('assigned_to', $user->id)
+                          ->whereIn('status', [
+                              'completed_by_moderator',
+                              'under_admin_review',
+                              'approved',
+                              'rejected',
+                              'sent_for_revision',
+                          ]);
                     break;
             }
         } elseif ($request->has('status')) {
@@ -69,7 +70,9 @@ class TaskController extends Controller
             $query->where('work_day', $request->work_day);
         }
 
-        $tasks = $query->orderBy('assigned_at', 'desc')->get();
+        $tasks = $query->orderBy('assigned_at', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         // Добавляем информацию о дедлайне и таймере, а также категорию и подгруппу
         $tasks = $tasks->map(function ($task) use ($user) {
@@ -110,29 +113,43 @@ class TaskController extends Controller
     {
         $user = $request->user();
         
-        // Проверяем, что таск принадлежит текущему пользователю (напрямую или через TaskAssignment)
-        if (!$task->isAssignedTo($user->id)) {
+        // Проверяем, что задача в том же домене
+        if ($task->domain_id !== $user->domain_id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        return response()->json($task->load(['categories', 'template', 'assignments', 'documentations', 'tools', 'result']));
+        // Для pending задач - любой модератор может просматривать
+        // Для других статусов - только назначенный модератор
+        if ($task->status !== 'pending' && $task->assigned_to !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        return response()->json($task->load(['categories', 'template', 'assignments', 'documentations', 'tools', 'result', 'assignedUser']));
     }
 
     public function start(Task $task, Request $request): JsonResponse
     {
         $user = $request->user();
         
-        // Проверяем, что таск принадлежит текущему пользователю (напрямую или через TaskAssignment)
-        if (!$task->isAssignedTo($user->id)) {
+        // Проверяем, что задача в том же домене
+        if ($task->domain_id !== $user->domain_id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         if ($task->status !== 'pending') {
-            return response()->json(['message' => 'Task cannot be started'], 400);
+            return response()->json(['message' => 'Task cannot be started. Only pending tasks can be claimed.'], 400);
         }
 
+        // Проверяем, не взята ли уже задача другим модератором
+        if ($task->assigned_to && $task->assigned_to !== $user->id) {
+            return response()->json(['message' => 'Task is already assigned to another moderator'], 400);
+        }
+
+        // Модератор "откликается" на задачу - назначаем её ему
         $task->update([
             'status' => 'in_progress',
+            'assigned_to' => $user->id,
+            'assigned_at' => now(),
         ]);
         
         // Обновляем started_at в TaskAssignment, если есть
@@ -141,15 +158,15 @@ class TaskController extends Controller
             $assignment->update(['started_at' => now()]);
         }
 
-        return response()->json($task->fresh()->load(['categories', 'template', 'assignments']));
+        return response()->json($task->fresh()->load(['categories', 'template', 'assignments', 'assignedUser']));
     }
 
     public function complete(Task $task, Request $request): JsonResponse
     {
         $user = $request->user();
         
-        // Проверяем, что таск принадлежит текущему пользователю (напрямую или через TaskAssignment)
-        if (!$task->isAssignedTo($user->id)) {
+        // Проверяем, что задача в том же домене и назначена этому модератору
+        if ($task->domain_id !== $user->domain_id || $task->assigned_to !== $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -239,8 +256,8 @@ class TaskController extends Controller
     {
         $user = $request->user();
         
-        // Проверяем, что таск принадлежит текущему пользователю
-        if (!$task->isAssignedTo($user->id)) {
+        // Проверяем, что задача в том же домене и назначена этому модератору
+        if ($task->domain_id !== $user->domain_id || $task->assigned_to !== $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -292,6 +309,104 @@ class TaskController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error creating report: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function updateToolData(Task $task, Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        // Проверяем, что задача в том же домене и назначена этому модератору
+        if ($task->domain_id !== $user->domain_id || $task->assigned_to !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'tool_id' => 'required|integer',
+            'description' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Получаем или создаем результат задачи
+            $result = TaskResult::firstOrCreate(
+                ['task_id' => $task->id],
+                ['moderator_id' => $user->id]
+            );
+
+            // Получаем текущие данные по тулзам
+            $toolData = $result->tool_data ?? [];
+            
+            // Ищем существующую запись для этого тулза
+            $existingIndex = false;
+            if (!empty($toolData) && is_array($toolData)) {
+                foreach ($toolData as $index => $tool) {
+                    if (isset($tool['tool_id']) && $tool['tool_id'] == $validated['tool_id']) {
+                        $existingIndex = $index;
+                        break;
+                    }
+                }
+            }
+            
+            if ($existingIndex !== false) {
+                // Обновляем существующую запись
+                $toolData[$existingIndex]['description'] = $validated['description'] ?? '';
+            } else {
+                // Добавляем новую запись
+                $toolData[] = [
+                    'tool_id' => $validated['tool_id'],
+                    'description' => $validated['description'] ?? '',
+                ];
+            }
+
+            // Сохраняем обновленные данные
+            $result->update(['tool_data' => $toolData]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Tool data updated successfully',
+                'result' => $result->fresh(),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error updating tool data: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function updateAdditionalInfo(Task $task, Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        // Проверяем, что задача в том же домене и назначена этому модератору
+        if ($task->domain_id !== $user->domain_id || $task->assigned_to !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'additional_info' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Получаем или создаем результат задачи
+            $result = TaskResult::firstOrCreate(
+                ['task_id' => $task->id],
+                ['moderator_id' => $user->id]
+            );
+
+            // Обновляем дополнительную информацию
+            $result->update(['additional_info' => $validated['additional_info'] ?? null]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Additional info updated successfully',
+                'result' => $result->fresh(),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error updating additional info: ' . $e->getMessage()], 500);
         }
     }
 

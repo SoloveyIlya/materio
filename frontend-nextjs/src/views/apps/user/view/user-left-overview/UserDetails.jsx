@@ -11,12 +11,16 @@ import Chip from '@mui/material/Chip'
 import Divider from '@mui/material/Divider'
 import Button from '@mui/material/Button'
 import Box from '@mui/material/Box'
+import IconButton from '@mui/material/IconButton'
+import Tooltip from '@mui/material/Tooltip'
 
 // Component Imports
 import CustomAvatar from '@core/components/mui/Avatar'
 
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
+import api from '@/lib/api'
+import { API_URL } from '@/lib/api'
 
 // Country from IP component
 const CountryFromIP = ({ ipAddress }) => {
@@ -55,14 +59,50 @@ const CountryFromIP = ({ ipAddress }) => {
   return <Typography>{country}</Typography>
 }
 
-const UserDetails = ({ user, stats }) => {
+const UserDetails = ({ user, stats, onUserUpdate }) => {
+  const [uploading, setUploading] = useState(false)
+  
   if (!user) return null
 
   const primaryRole = user.roles?.[0]?.name || 'User'
+  const isAdmin = primaryRole === 'admin'
   const roleColors = {
     admin: 'error',
     moderator: 'warning',
     user: 'primary'
+  }
+
+  const getAvatarUrl = (avatar) => {
+    if (!avatar) return null
+    if (avatar.startsWith('http')) return avatar
+    if (avatar.startsWith('/storage')) return `${API_URL}${avatar}`
+    return `${API_URL}/storage/${avatar}`
+  }
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setUploading(true)
+      const formData = new FormData()
+      formData.append('avatar', file)
+
+      const response = await api.put(`/admin/users/${user.id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      if (onUserUpdate) {
+        onUserUpdate(response.data.user)
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error)
+      alert('Error uploading avatar: ' + (error.response?.data?.message || error.message))
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
@@ -71,13 +111,42 @@ const UserDetails = ({ user, stats }) => {
         <div className='flex flex-col gap-6'>
           <div className='flex items-center justify-center flex-col gap-4'>
             <div className='flex flex-col items-center gap-4'>
-              {user.avatar ? (
-                <CustomAvatar alt={user.name || user.email} src={user.avatar} variant='rounded' size={120} />
-              ) : (
-                <CustomAvatar alt={user.name || user.email} variant='rounded' size={120}>
-                  {getInitials(user.name || user.email || 'User')}
-                </CustomAvatar>
-              )}
+              <Box sx={{ position: 'relative' }}>
+                {user.avatar ? (
+                  <CustomAvatar alt={user.name || user.email} src={getAvatarUrl(user.avatar)} variant='rounded' size={120} />
+                ) : (
+                  <CustomAvatar alt={user.name || user.email} variant='rounded' size={120}>
+                    {getInitials(user.name || user.email || 'User')}
+                  </CustomAvatar>
+                )}
+                {isAdmin && (
+                  <Tooltip title='Upload Avatar'>
+                    <IconButton
+                      component='label'
+                      sx={{
+                        position: 'absolute',
+                        bottom: 0,
+                        right: 0,
+                        bgcolor: 'primary.main',
+                        color: 'primary.contrastText',
+                        '&:hover': {
+                          bgcolor: 'primary.dark',
+                        },
+                      }}
+                      size='small'
+                      disabled={uploading}
+                    >
+                      <i className='ri-camera-line' />
+                      <input
+                        type='file'
+                        hidden
+                        accept='image/*'
+                        onChange={handleAvatarUpload}
+                      />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Box>
               <Typography variant='h5'>{user.name || user.email}</Typography>
             </div>
             <Chip label={primaryRole} color={roleColors[primaryRole] || 'primary'} size='small' variant='tonal' />

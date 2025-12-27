@@ -2,10 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { Box, Typography, Grid, Card, CardContent, Chip, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton } from '@mui/material'
+import { Box, Typography, Grid, Card, CardContent, CardMedia, Chip, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton, List, ListItem, ListItemButton, ListItemText, ListItemIcon, Divider } from '@mui/material'
+import Tab from '@mui/material/Tab'
+import TabContext from '@mui/lab/TabContext'
+import TabPanel from '@mui/lab/TabPanel'
 import api from '@/lib/api'
 import { API_URL } from '@/lib/api'
 import CustomAvatar from '@core/components/mui/Avatar'
+import CustomTabList from '@/@core/components/mui/TabList'
+import classnames from 'classnames'
 
 export default function ModeratorTaskViewPage() {
   const params = useParams()
@@ -19,12 +24,33 @@ export default function ModeratorTaskViewPage() {
     text: '',
     files: [],
   })
+  const [currentTime, setCurrentTime] = useState(Date.now())
+  const [activeTab, setActiveTab] = useState(0) // 0 = Task, 1 = Report
+  const [selectedTool, setSelectedTool] = useState(null) // Для выбранного инструмента
 
   useEffect(() => {
     if (taskId) {
       loadTask()
     }
   }, [taskId])
+
+  // Автоматически выбираем первый тулз при загрузке задачи или переключении на вкладку Report
+  useEffect(() => {
+    if (task && activeTab === 1) {
+      const taskTools = task.tools || (task.tool ? [task.tool] : [])
+      if (taskTools.length > 0 && !selectedTool) {
+        setSelectedTool(taskTools[0])
+      }
+    }
+  }, [task, activeTab])
+
+  // Обновляем время каждую секунду для таймера
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   const loadTask = async () => {
     try {
@@ -107,6 +133,26 @@ export default function ModeratorTaskViewPage() {
     return labels[status] || status
   }
 
+  // Вычисляем оставшееся время до дедлайна (от момента получения задачи модератором)
+  const getRemainingTime = () => {
+    if (!task.assigned_at || !task.completion_hours) return null
+    
+    const assignedAt = new Date(task.assigned_at)
+    const deadline = new Date(assignedAt.getTime() + task.completion_hours * 60 * 60 * 1000)
+    const now = new Date(currentTime)
+    const remainingMs = deadline.getTime() - now.getTime()
+    
+    if (remainingMs <= 0) return 'Expired'
+    
+    const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60))
+    const remainingMinutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60))
+    
+    if (remainingHours > 0) {
+      return `${remainingHours}h ${remainingMinutes}m`
+    }
+    return `${remainingMinutes}m`
+  }
+
   if (loading) {
     return <Box sx={{ p: 6 }}>Loading...</Box>
   }
@@ -123,9 +169,99 @@ export default function ModeratorTaskViewPage() {
     images.push(task.selfie_image.startsWith('http') ? task.selfie_image : `${API_URL}/storage/${task.selfie_image}`)
   }
 
+  // Получаем список инструментов (может быть task.tools или task.tool)
+  const tools = task.tools || (task.tool ? [task.tool] : [])
+
+  // Функция для получения URL изображения
+  const getImageUrl = (path) => {
+    if (!path) return ''
+    if (path.startsWith('http')) return path
+    if (path.startsWith('/storage')) return `${API_URL}${path}`
+    return `${API_URL}/storage/${path}`
+  }
+
+  // Получаем первую категорию для отображения
+  const category = task.categories?.length > 0 ? task.categories[0] : (task.category || null)
+
+  // Получаем данные для выбранного инструмента из результата
+  const getToolData = (toolId) => {
+    if (!task.result?.tool_data || !Array.isArray(task.result.tool_data)) return null
+    return task.result.tool_data.find(td => td.tool_id === toolId)
+  }
+
   return (
     <Box sx={{ p: 6 }}>
-      <Grid container spacing={6}>
+      {/* Header Section - баннер с title и категорией */}
+      <Card sx={{ mb: 4, overflow: 'hidden' }}>
+        <CardMedia 
+          image='/images/pages/profile-banner.png'
+          sx={{ 
+            height: 250,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5))',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 4,
+              textAlign: 'center',
+            }}
+          >
+            <Typography 
+              variant='h3' 
+              sx={{ 
+                color: 'white', 
+                fontWeight: 700,
+                mb: 2,
+                textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+              }}
+            >
+              {task.title || 'Task'}
+            </Typography>
+            {category && (
+              <Chip
+                label={category.name}
+                sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.9)',
+                  color: 'primary.main',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  height: 32,
+                }}
+              />
+            )}
+          </Box>
+        </CardMedia>
+      </Card>
+
+      {/* Tabs */}
+      <TabContext value={activeTab.toString()}>
+        <CustomTabList
+          onChange={(e, newValue) => setActiveTab(parseInt(newValue))}
+          aria-label='task tabs'
+        >
+          <Tab value='0' label='Task' />
+          <Tab value='1' label='Report' />
+        </CustomTabList>
+
+        {/* Tab: Task */}
+        <TabPanel value='0' className='p-0'>
+          <Grid container spacing={6}>
         {/* Left Side - Task Info */}
         <Grid size={{ xs: 12, lg: 4, md: 5 }}>
           <Card>
@@ -134,12 +270,25 @@ export default function ModeratorTaskViewPage() {
                 <div className='flex items-center justify-center flex-col gap-4'>
                   <div className='flex flex-col items-center gap-4'>
                     <Typography variant='h5'>{task.title}</Typography>
-                    <Chip 
-                      label={getStatusLabel(task.status)} 
-                      color={getStatusColor(task.status)}
-                      size='small'
-                      variant='tonal'
-                    />
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <Chip 
+                        label={getStatusLabel(task.status)} 
+                        color={getStatusColor(task.status)}
+                        size='small'
+                        variant='tonal'
+                      />
+                      {task.assigned_at && task.completion_hours && (
+                        <Chip 
+                          label={`Completions Time: ${getRemainingTime()}`}
+                          size='small'
+                          variant='tonal'
+                          sx={{
+                            bgcolor: 'action.hover',
+                            color: 'text.primary',
+                          }}
+                        />
+                      )}
+                    </Box>
                   </div>
                 </div>
               </div>
@@ -300,7 +449,7 @@ export default function ModeratorTaskViewPage() {
                     )}
 
                     {/* Tools Section */}
-                    {task.tool && (
+                    {tools.length > 0 && (
                       <Box sx={{ mb: 4, position: 'relative' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                           <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -336,14 +485,16 @@ export default function ModeratorTaskViewPage() {
                               fontSize: '1.1rem'
                             }}
                           >
-                            Тулз
+                            Tools
                           </Typography>
                         </Box>
                         <Box sx={{ pl: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <i className='ri-tools-line' style={{ fontSize: '20px', color: '#2196F3' }} />
-                            <Typography variant='body1'>{task.tool.name}</Typography>
-                          </Box>
+                          {tools.map((tool, index) => (
+                            <Box key={tool.id || index} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <i className='ri-tools-line' style={{ fontSize: '20px', color: '#2196F3' }} />
+                              <Typography variant='body1'>{tool.name}</Typography>
+                            </Box>
+                          ))}
                         </Box>
                       </Box>
                     )}
@@ -384,6 +535,219 @@ export default function ModeratorTaskViewPage() {
               </Card>
             </Grid>
 
+            {/* ID Type - Separate Card */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Box
+                sx={{
+                  backgroundColor: 'background.paper',
+                  borderRadius: '8px',
+                  padding: '24px',
+                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Typography 
+                  variant='h6' 
+                  gutterBottom
+                  sx={{
+                    fontSize: '1.25rem',
+                    fontWeight: 600,
+                    marginBottom: '16px',
+                    color: 'text.primary',
+                  }}
+                >
+                  ID Type
+                </Typography>
+                <Typography 
+                  variant='body1'
+                  sx={{
+                    marginBottom: '16px',
+                    color: 'text.secondary',
+                    fontSize: '1rem',
+                  }}
+                >
+                  {task.id_type || 'N/A'}
+                </Typography>
+                <Box
+                  onClick={() => task.document_image && handleImageClick(getImageUrl(task.document_image))}
+                  sx={{
+                    width: '100%',
+                    maxHeight: '400px',
+                    cursor: task.document_image ? 'pointer' : 'default',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '200px',
+                    backgroundColor: 'action.hover',
+                    transition: 'opacity 0.2s',
+                    '&:hover': {
+                      opacity: task.document_image ? 0.8 : 1,
+                    },
+                  }}
+                >
+                  {task.document_image ? (
+                    <img
+                      src={getImageUrl(task.document_image)}
+                      alt='Passport photo'
+                      style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <Box sx={{ textAlign: 'center', padding: '16px' }}>
+                      <i className='ri-image-line' style={{ fontSize: '48px', color: 'rgba(0, 0, 0, 0.38)', opacity: 0.5 }} />
+                      <Typography 
+                        variant='body2'
+                        sx={{
+                          marginTop: '8px',
+                          color: 'text.secondary',
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        No image available
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            </Grid>
+
+            {/* ID Number - Separate Card */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Box
+                sx={{
+                  backgroundColor: 'background.paper',
+                  borderRadius: '8px',
+                  padding: '24px',
+                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Typography 
+                  variant='h6' 
+                  gutterBottom
+                  sx={{
+                    fontSize: '1.25rem',
+                    fontWeight: 600,
+                    marginBottom: '16px',
+                    color: 'text.primary',
+                  }}
+                >
+                  ID Number
+                </Typography>
+                <Typography 
+                  variant='body1'
+                  sx={{
+                    marginBottom: '16px',
+                    color: 'text.secondary',
+                    fontSize: '1rem',
+                  }}
+                >
+                  {task.id_number || 'N/A'}
+                </Typography>
+                <Box
+                  onClick={() => task.document_image && handleImageClick(getImageUrl(task.document_image))}
+                  sx={{
+                    width: '100%',
+                    maxHeight: '400px',
+                    cursor: task.document_image ? 'pointer' : 'default',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '200px',
+                    backgroundColor: 'action.hover',
+                    transition: 'opacity 0.2s',
+                    '&:hover': {
+                      opacity: task.document_image ? 0.8 : 1,
+                    },
+                  }}
+                >
+                  {task.document_image ? (
+                    <img
+                      src={getImageUrl(task.document_image)}
+                      alt='ID number photo'
+                      style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <Box sx={{ textAlign: 'center', padding: '16px' }}>
+                      <i className='ri-image-line' style={{ fontSize: '48px', color: 'rgba(0, 0, 0, 0.38)', opacity: 0.5 }} />
+                      <Typography 
+                        variant='body2'
+                        sx={{
+                          marginTop: '8px',
+                          color: 'text.secondary',
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        No image available
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            </Grid>
+
+            {/* Moderator Comment and Answers */}
+            {task.result && (
+              <>
+                {/* Moderator Comment */}
+                {task.result.moderator_comment && (
+                  <Grid size={{ xs: 12 }}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant='h6' gutterBottom>Moderator Comment</Typography>
+                        <Typography variant='body1' sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
+                          {task.result.moderator_comment}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+
+                {/* Answers */}
+                {task.result.answers && (
+                  <Grid size={{ xs: 12 }}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant='h6' gutterBottom>Answers</Typography>
+                        <Box
+                          sx={{
+                            bgcolor: 'action.hover',
+                            p: 2,
+                            borderRadius: 1,
+                            mt: 2,
+                          }}
+                        >
+                          <Typography
+                            variant='body2'
+                            component='pre'
+                            sx={{
+                              whiteSpace: 'pre-wrap',
+                              fontFamily: 'monospace',
+                              color: 'text.secondary',
+                              margin: 0,
+                            }}
+                          >
+                            {typeof task.result.answers === 'object'
+                              ? JSON.stringify(task.result.answers, null, 2)
+                              : task.result.answers}
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+              </>
+            )}
+
             {/* Images */}
             {images.length > 0 && (
               <Grid size={{ xs: 12 }}>
@@ -421,20 +785,152 @@ export default function ModeratorTaskViewPage() {
               </Grid>
             )}
 
-            {/* Create Report Button */}
-            <Grid size={{ xs: 12 }}>
-              <Button
-                variant='contained'
-                fullWidth
-                onClick={handleCreateReport}
-                startIcon={<i className='ri-file-add-line' />}
-              >
-                Create Report
-              </Button>
-            </Grid>
           </Grid>
         </Grid>
       </Grid>
+      </TabPanel>
+
+      {/* Tab: Report */}
+      <TabPanel value='1' className='p-0'>
+        <Box>
+          <Grid container spacing={4}>
+            {/* Left Column - Tools */}
+            <Grid size={{ xs: 12, md: 4, lg: 3 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant='h6' gutterBottom sx={{ mb: 3 }}>Tools</Typography>
+                  <List className='gap-2'>
+                    {tools.map((tool, index) => (
+                      <ListItem key={tool.id || index} disablePadding className='mbe-1'>
+                        <ListItemButton 
+                          selected={selectedTool?.id === tool.id}
+                          onClick={() => setSelectedTool(tool)}
+                          className={classnames({
+                            'bg-primaryLightOpacity': selectedTool?.id === tool.id
+                          })}
+                        >
+                          <ListItemIcon>
+                            <i className='ri-tools-line text-xl' />
+                          </ListItemIcon>
+                          <ListItemText primary={tool.name} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                  
+                  {/* Divider after tools */}
+                  {tools.length > 0 && (
+                    <Divider sx={{ my: 3 }} />
+                  )}
+                  
+                  {/* Additionally Section */}
+                  <Box>
+                    <Typography variant='h6' gutterBottom sx={{ mb: 2 }}>Additionally</Typography>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={6}
+                      placeholder='Enter additional information...'
+                      value={task.result?.additional_info || ''}
+                      onChange={async (e) => {
+                        try {
+                          // Сохраняем дополнительную информацию
+                          await api.put(`/moderator/tasks/${taskId}/report/additional`, {
+                            additional_info: e.target.value
+                          })
+                          // Обновляем локальное состояние
+                          setTask(prev => ({
+                            ...prev,
+                            result: {
+                              ...prev.result,
+                              additional_info: e.target.value
+                            }
+                          }))
+                        } catch (error) {
+                          console.error('Error saving additional info:', error)
+                        }
+                      }}
+                    />
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Right Column - Tool Content */}
+            <Grid size={{ xs: 12, md: 8, lg: 9 }}>
+              {selectedTool ? (
+                <Card>
+                  <CardContent>
+                    <Typography variant='h5' gutterBottom>{selectedTool.name}</Typography>
+                    {(() => {
+                      const toolData = getToolData(selectedTool.id)
+                      return (
+                        <Box sx={{ mt: 2 }}>
+                          <TextField
+                            fullWidth
+                            multiline
+                            rows={10}
+                            placeholder='Enter information for this tool...'
+                            value={toolData?.description || ''}
+                            onChange={async (e) => {
+                              try {
+                                // Сохраняем данные по тулзу
+                                await api.put(`/moderator/tasks/${taskId}/report/tool`, {
+                                  tool_id: selectedTool.id,
+                                  description: e.target.value
+                                })
+                                // Обновляем локальное состояние
+                                setTask(prev => {
+                                  const result = prev.result || {}
+                                  const tool_data = result.tool_data || []
+                                  const existingIndex = tool_data.findIndex(td => td.tool_id === selectedTool.id)
+                                  
+                                  let newToolData
+                                  if (existingIndex >= 0) {
+                                    newToolData = [...tool_data]
+                                    newToolData[existingIndex] = {
+                                      ...newToolData[existingIndex],
+                                      description: e.target.value
+                                    }
+                                  } else {
+                                    newToolData = [...tool_data, {
+                                      tool_id: selectedTool.id,
+                                      description: e.target.value
+                                    }]
+                                  }
+                                  
+                                  return {
+                                    ...prev,
+                                    result: {
+                                      ...result,
+                                      tool_data: newToolData
+                                    }
+                                  }
+                                })
+                              } catch (error) {
+                                console.error('Error saving tool data:', error)
+                              }
+                            }}
+                          />
+                        </Box>
+                      )
+                    })()}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent>
+                    <Typography variant='body1' sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>
+                      Select a tool from the list to add information
+                    </Typography>
+                  </CardContent>
+                </Card>
+              )}
+            </Grid>
+          </Grid>
+        </Box>
+      </TabPanel>
+      </TabContext>
 
       {/* Image Fullscreen Dialog */}
       <Dialog open={imageDialogOpen} onClose={() => setImageDialogOpen(false)} maxWidth="lg" fullWidth>

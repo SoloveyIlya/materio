@@ -6,13 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::with(['roles', 'administrator', 'domain'])
-            ->where('domain_id', $request->user()->domain_id);
+        $currentUser = $request->user();
+        
+        if (!$currentUser) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $query = User::withTrashed()
+            ->with(['roles', 'administrator', 'domain'])
+            ->where('domain_id', $currentUser->domain_id);
 
         // Фильтры
         if ($request->has('role')) {
@@ -29,6 +37,9 @@ class UserController extends Controller
         if ($request->has('administrator_id')) {
             if ($request->administrator_id === 'my') {
                 $query->where('administrator_id', $request->user()->id);
+            } elseif ($request->administrator_id === 'null') {
+                // Показываем пользователей, которые ни за кем не закреплены
+                $query->whereNull('administrator_id');
             } else {
                 $query->where('administrator_id', $request->administrator_id);
             }
@@ -39,62 +50,130 @@ class UserController extends Controller
         return response()->json($users);
     }
 
-    public function show(Request $request, User $user)
+    public function show(Request $request, $id)
     {
-        if ($user->domain_id !== $request->user()->domain_id) {
-            return response()->json(['message' => 'Forbidden'], 403);
+        try {
+            $currentUser = $request->user();
+            
+            // Логируем запрос для отладки
+            \Log::info('UserController@show', [
+                'requested_user_id' => $id,
+                'current_user_id' => $currentUser?->id,
+                'current_user_domain_id' => $currentUser?->domain_id,
+            ]);
+
+            if (!$currentUser) {
+                \Log::warning('No authenticated user');
+                return response()->json(['message' => 'Unauthorized'], 401);
+            }
+
+            // Получаем пользователя, включая удаленных (для админов)
+            $user = User::withTrashed()->find($id);
+            
+            if (!$user) {
+                \Log::warning('User not found in database', [
+                    'user_id' => $id,
+                    'all_users_count' => User::withTrashed()->count(),
+                ]);
+                return response()->json([
+                    'message' => 'User not found',
+                    'user_id' => $id
+                ], 404);
+            }
+
+            \Log::info('User found', [
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'user_domain_id' => $user->domain_id,
+                'user_deleted_at' => $user->deleted_at,
+                'current_user_domain_id' => $currentUser->domain_id,
+            ]);
+
+            if ($user->domain_id !== $currentUser->domain_id) {
+                \Log::warning('Domain mismatch', [
+                    'user_id' => $user->id,
+                    'user_domain_id' => $user->domain_id,
+                    'current_user_domain_id' => $currentUser->domain_id,
+                ]);
+                return response()->json([
+                    'message' => 'Forbidden - Domain mismatch',
+                    'user_domain_id' => $user->domain_id,
+                    'current_domain_id' => $currentUser->domain_id
+                ], 403);
+            }
+
+            $user->load([
+                'roles',
+                'administrator',
+                'moderators',
+                'tasks' => function ($query) {
+                    $query->orderBy('created_at', 'desc');
+                },
+                'tasks.categories',
+                'moderatorProfile',
+                'adminProfile',
+                'domain',
+                'userDocuments.requiredDocument',
+                'testResults.test',
+            ]);
+
+            // Статистика - используем загруженные задачи из коллекции
+            $loadedTasks = $user->tasks ?? collect();
+            $stats = [
+                'total_tasks' => $loadedTasks->count(),
+                'completed_tasks' => $loadedTasks->where('status', 'approved')->count(),
+                'in_progress_tasks' => $loadedTasks->where('status', 'in_progress')->count()
+                    + $loadedTasks->where('status', 'completed_by_moderator')->count()
+                    + $loadedTasks->where('status', 'under_admin_review')->count(),
+                'pending_tasks' => $loadedTasks->where('status', 'pending')->count(),
+            ];
+
+            // Загружаем все тесты для отображения
+            $tests = \App\Models\Test::where('domain_id', $currentUser->domain_id)
+                ->where('is_active', true)
+                ->with('level')
+                ->orderBy('order', 'asc')
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            // Загружаем обязательные документы
+            $requiredDocuments = \App\Models\RequiredDocument::where('domain_id', $currentUser->domain_id)
+                ->where('is_active', true)
+                ->orderBy('order')
+                ->get();
+
+            // Явно добавляем registration_password в ответ, так как он может быть скрыт
+            $user->makeVisible('registration_password');
+
+            return response()->json([
+                'user' => $user,
+                'stats' => $stats,
+                'tests' => $tests,
+                'required_documents' => $requiredDocuments,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error in UserController@show', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $id ?? null,
+            ]);
+            return response()->json([
+                'message' => 'Internal server error',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while loading user',
+            ], 500);
         }
-
-        $user->load([
-            'roles',
-            'administrator',
-            'moderators',
-            'tasks' => function ($query) {
-                $query->orderBy('created_at', 'desc');
-            },
-            'tasks.category',
-            'moderatorProfile',
-            'adminProfile',
-            'domain',
-            'userDocuments.requiredDocument',
-            'testResults.test',
-        ]);
-
-        // Статистика
-        $stats = [
-            'total_tasks' => $user->tasks()->count(),
-            'completed_tasks' => $user->tasks()->where('status', 'completed')->count(),
-            'in_progress_tasks' => $user->tasks()->where('status', 'in_progress')->count(),
-            'pending_tasks' => $user->tasks()->where('status', 'pending')->count(),
-        ];
-
-        // Загружаем все тесты для отображения
-        $tests = \App\Models\Test::where('domain_id', $request->user()->domain_id)
-            ->where('is_active', true)
-            ->with('level')
-            ->orderBy('order', 'asc')
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        // Загружаем обязательные документы
-        $requiredDocuments = \App\Models\RequiredDocument::where('domain_id', $request->user()->domain_id)
-            ->where('is_active', true)
-            ->orderBy('order')
-            ->get();
-
-        // Явно добавляем registration_password в ответ, так как он может быть скрыт
-        $user->makeVisible('registration_password');
-
-        return response()->json([
-            'user' => $user,
-            'stats' => $stats,
-            'tests' => $tests,
-            'required_documents' => $requiredDocuments,
-        ]);
     }
 
-    public function update(Request $request, User $user)
+    public function update(Request $request, $id)
     {
+        $user = User::withTrashed()->find($id);
+        
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
         if ($user->domain_id !== $request->user()->domain_id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
@@ -106,12 +185,41 @@ class UserController extends Controller
             'work_start_date' => 'nullable|date',
             'administrator_id' => 'nullable|exists:users,id',
             'password' => 'sometimes|required|string|min:6',
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         // Если передан пароль, хешируем его и обновляем registration_password
         if (isset($validated['password'])) {
             $validated['registration_password'] = $validated['password'];
             $validated['password'] = Hash::make($validated['password']);
+        }
+
+        // Обработка загрузки аватарки
+        if ($request->hasFile('avatar')) {
+            // Удаляем старую аватарку, если она есть
+            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+                Storage::disk('public')->delete($user->avatar);
+            }
+            
+            // Сохраняем новую аватарку
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $validated['avatar'] = $path;
+            
+            // Если это админ, обновляем аватарку у всех закрепленных пользователей
+            if ($user->isAdmin()) {
+                $assignedUsers = User::where('administrator_id', $user->id)->get();
+                foreach ($assignedUsers as $assignedUser) {
+                    // Копируем файл для каждого пользователя, чтобы у каждого была своя копия
+                    $newPath = 'avatars/user_' . $assignedUser->id . '_' . time() . '.' . $request->file('avatar')->getClientOriginalExtension();
+                    Storage::disk('public')->copy($path, $newPath);
+                    
+                    // Удаляем старую аватарку закрепленного пользователя, если она есть
+                    if ($assignedUser->avatar && Storage::disk('public')->exists($assignedUser->avatar)) {
+                        Storage::disk('public')->delete($assignedUser->avatar);
+                    }
+                    $assignedUser->update(['avatar' => $newPath]);
+                }
+            }
         }
 
         $user->update($validated);
@@ -126,8 +234,14 @@ class UserController extends Controller
         ]);
     }
 
-    public function sendTestTask(Request $request, User $user)
+    public function sendTestTask(Request $request, $id)
     {
+        $user = User::withTrashed()->find($id);
+        
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
         if ($user->domain_id !== $request->user()->domain_id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }

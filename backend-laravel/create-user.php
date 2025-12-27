@@ -68,6 +68,7 @@ $user = User::create([
     'name' => $name,
     'email' => $email,
     'password' => Hash::make($password),
+    'registration_password' => $password,
     'timezone' => 'UTC',
 ]);
 

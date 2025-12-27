@@ -65,9 +65,9 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
 
     // Users
     Route::get('/users', [UserController::class, 'index']);
-    Route::get('/users/{user}', [UserController::class, 'show']);
-    Route::put('/users/{user}', [UserController::class, 'update']);
-    Route::post('/users/{user}/send-test-task', [UserController::class, 'sendTestTask']);
+    Route::get('/users/{id}', [UserController::class, 'show']);
+    Route::put('/users/{id}', [UserController::class, 'update']);
+    Route::post('/users/{id}/send-test-task', [UserController::class, 'sendTestTask']);
 
     // Moderators (алиас для users с фильтром)
     Route::get('/moderators', [UserController::class, 'index']);
@@ -106,6 +106,8 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
     Route::post('/tasks/{task}/start', [TaskController::class, 'start']);
     Route::post('/tasks/{task}/complete', [TaskController::class, 'complete']);
     Route::post('/tasks/{task}/report', [TaskController::class, 'createReport']);
+    Route::put('/tasks/{task}/report/tool', [TaskController::class, 'updateToolData']);
+    Route::put('/tasks/{task}/report/additional', [TaskController::class, 'updateAdditionalInfo']);
     Route::get('/work-day', [TaskController::class, 'getCurrentWorkDay']);
 
     // Documentation

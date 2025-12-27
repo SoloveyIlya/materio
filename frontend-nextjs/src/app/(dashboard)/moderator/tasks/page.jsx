@@ -36,9 +36,11 @@ export default function ModeratorTasksPage() {
       }
 
       const response = await api.get(`/moderator/tasks?${params}`)
-      setTasks(response.data || [])
+      console.log('Tasks loaded:', response.data)
+      setTasks(Array.isArray(response.data) ? response.data : [])
     } catch (error) {
       console.error('Error loading tasks:', error)
+      console.error('Error response:', error.response?.data)
       setTasks([])
     }
   }

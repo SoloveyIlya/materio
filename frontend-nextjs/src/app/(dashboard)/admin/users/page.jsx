@@ -10,15 +10,31 @@ import UserListCards from '@/views/apps/user/list/UserListCards'
 
 export default function UsersPage() {
   const [users, setUsers] = useState([])
+  const [administrators, setAdministrators] = useState([])
   const [activeTab, setActiveTab] = useState(0) // Default to Moderators (0 - first tab)
   const [filterOnline, setFilterOnline] = useState(false)
   const [filterRole, setFilterRole] = useState('')
   const [filterMy, setFilterMy] = useState(false)
+  const [filterAdministrator, setFilterAdministrator] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    loadAdministrators()
+  }, [])
+
+  useEffect(() => {
     loadUsers()
-  }, [activeTab, filterOnline, filterRole, filterMy])
+  }, [activeTab, filterOnline, filterRole, filterMy, filterAdministrator])
+
+  const loadAdministrators = async () => {
+    try {
+      const response = await api.get('/admin/users?role=admin')
+      setAdministrators(response.data || [])
+    } catch (error) {
+      console.error('Error loading administrators:', error)
+      setAdministrators([])
+    }
+  }
 
   const loadUsers = async () => {
     try {
@@ -28,6 +44,13 @@ export default function UsersPage() {
       if (filterOnline) params.append('online_only', 'true')
       if (filterMy) params.append('administrator_id', 'my')
       if (filterRole) params.append('role', filterRole)
+      if (filterAdministrator) {
+        if (filterAdministrator === 'unassigned') {
+          params.append('administrator_id', 'null')
+        } else {
+          params.append('administrator_id', filterAdministrator)
+        }
+      }
 
       const endpoint = activeTab === 0 ? '/admin/moderators' : '/admin/users' // Swapped
       const response = await api.get(`${endpoint}?${params}`)
@@ -47,6 +70,18 @@ export default function UsersPage() {
       loadUsers()
     } catch (error) {
       alert('Error sending test task')
+    }
+  }
+
+  const handleAssignAdministrator = async (userId, administratorId) => {
+    try {
+      await api.put(`/admin/users/${userId}`, {
+        administrator_id: administratorId || null
+      })
+      loadUsers()
+    } catch (error) {
+      console.error('Error assigning administrator:', error)
+      alert('Error assigning administrator: ' + (error.response?.data?.message || error.message))
     }
   }
 
@@ -70,6 +105,10 @@ export default function UsersPage() {
             tableData={users}
             activeTab={activeTab}
             onSendTest={handleSendTest}
+            administrators={administrators}
+            selectedAdministrator={filterAdministrator}
+            onAdministratorChange={setFilterAdministrator}
+            onAssignAdministrator={handleAssignAdministrator}
           />
         </Grid>
       </Grid>

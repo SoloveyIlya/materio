@@ -17,11 +17,14 @@ class TaskResult extends Model
         'attachments',
         'moderator_comment',
         'admin_comment',
+        'tool_data',
+        'additional_info',
     ];
 
     protected $casts = [
         'screenshots' => 'array',
         'attachments' => 'array',
+        'tool_data' => 'array',
     ];
 
     public function task()

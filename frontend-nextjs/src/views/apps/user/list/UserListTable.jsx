@@ -16,6 +16,14 @@ import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
 import Checkbox from '@mui/material/Checkbox'
 import IconButton from '@mui/material/IconButton'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import FormControl from '@mui/material/FormControl'
+import InputLabel from '@mui/material/InputLabel'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
 import { styled } from '@mui/material/styles'
 import TablePagination from '@mui/material/TablePagination'
 
@@ -97,12 +105,15 @@ const userStatusObj = {
 // Column Definitions
 const columnHelper = createColumnHelper()
 
-const UserListTable = ({ tableData, activeTab, onSendTest }) => {
+const UserListTable = ({ tableData, activeTab, onSendTest, administrators, selectedAdministrator, onAdministratorChange, onAssignAdministrator }) => {
   // States
   const [rowSelection, setRowSelection] = useState({})
   const [data, setData] = useState(tableData || [])
   const [filteredData, setFilteredData] = useState(data)
   const [globalFilter, setGlobalFilter] = useState('')
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [selectedAdminId, setSelectedAdminId] = useState('')
 
   // Hooks
   const router = useRouter()
@@ -257,36 +268,47 @@ const UserListTable = ({ tableData, activeTab, onSendTest }) => {
         })
       ]
 
-      // Add Action column only for Moderators tab (activeTab === 0)
-      if (activeTab === 0) {
-        baseColumns.push(
-          columnHelper.accessor('action', {
-            header: 'Action',
-            cell: ({ row }) => {
-              const user = row.original
-              return (
-                <div className='flex items-center gap-1'>
-                  {onSendTest && (
-                    <IconButton
-                      onClick={() => onSendTest(user.id)}
-                      color='primary'
-                      title='Send test task'
-                    >
-                      <i className='ri-send-plane-line text-textSecondary' />
-                    </IconButton>
-                  )}
-                </div>
-              )
-            },
-            enableSorting: false
-          })
-        )
-      }
+      // Add Action column
+      baseColumns.push(
+        columnHelper.accessor('action', {
+          header: 'Action',
+          cell: ({ row }) => {
+            const user = row.original
+            return (
+              <div className='flex items-center gap-1'>
+                {onAssignAdministrator && (
+                  <IconButton
+                    onClick={() => {
+                      setSelectedUser(user)
+                      setSelectedAdminId(user.administrator_id || '')
+                      setAssignDialogOpen(true)
+                    }}
+                    color={user.administrator_id ? 'primary' : 'default'}
+                    title='Assign to administrator'
+                  >
+                    <i className='ri-pushpin-line text-textSecondary' />
+                  </IconButton>
+                )}
+                {onSendTest && activeTab === 0 && (
+                  <IconButton
+                    onClick={() => onSendTest(user.id)}
+                    color='primary'
+                    title='Send test task'
+                  >
+                    <i className='ri-send-plane-line text-textSecondary' />
+                  </IconButton>
+                )}
+              </div>
+            )
+          },
+          enableSorting: false
+        })
+      )
 
       return baseColumns
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, filteredData, activeTab, router, onSendTest]
+    [data, filteredData, activeTab, router, onSendTest, onAssignAdministrator]
   )
 
   const table = useReactTable({
@@ -321,6 +343,9 @@ const UserListTable = ({ tableData, activeTab, onSendTest }) => {
         setData={setFilteredData}
         tableData={data}
         activeTab={activeTab}
+        administrators={administrators}
+        selectedAdministrator={selectedAdministrator}
+        onAdministratorChange={onAdministratorChange}
       />
       <Divider />
       <div className='flex justify-between p-5 gap-4 flex-col items-start sm:flex-row sm:items-center'>
@@ -423,6 +448,56 @@ const UserListTable = ({ tableData, activeTab, onSendTest }) => {
         }}
         onRowsPerPageChange={e => table.setPageSize(Number(e.target.value))}
       />
+
+      {/* Assign Administrator Dialog */}
+      <Dialog open={assignDialogOpen} onClose={() => setAssignDialogOpen(false)} maxWidth='sm' fullWidth>
+        <DialogTitle>Assign to Administrator</DialogTitle>
+        <DialogContent>
+          <Typography variant='body2' sx={{ mb: 2 }}>
+            Select an administrator to assign this user to:
+          </Typography>
+          {selectedUser && (
+            <Typography variant='body2' sx={{ mb: 3, color: 'text.secondary' }}>
+              User: <strong>{selectedUser.name || selectedUser.email}</strong>
+            </Typography>
+          )}
+          <FormControl fullWidth>
+            <InputLabel id='admin-select-label'>Administrator</InputLabel>
+            <Select
+              labelId='admin-select-label'
+              id='admin-select'
+              value={selectedAdminId}
+              onChange={(e) => setSelectedAdminId(e.target.value)}
+              label='Administrator'
+            >
+              <MenuItem value=''>
+                <em>Not Assigned</em>
+              </MenuItem>
+              {administrators?.map((admin) => (
+                <MenuItem key={admin.id} value={admin.id}>
+                  {admin.name || admin.email}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              if (selectedUser && onAssignAdministrator) {
+                onAssignAdministrator(selectedUser.id, selectedAdminId || null)
+                setAssignDialogOpen(false)
+                setSelectedUser(null)
+                setSelectedAdminId('')
+              }
+            }}
+            variant='contained'
+          >
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   )
 }
