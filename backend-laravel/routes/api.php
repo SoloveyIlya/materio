@@ -18,6 +18,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\Moderator\DashboardController;
 use App\Http\Controllers\Moderator\DocumentationController;
+use App\Http\Controllers\Moderator\ProfileController;
 use App\Http\Controllers\Moderator\SupportController;
 use App\Http\Controllers\Moderator\TaskController;
 use App\Http\Controllers\Moderator\TestController as ModeratorTestController;
@@ -133,6 +134,11 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
     Route::get('/tests', [ModeratorTestController::class, 'index']);
     Route::get('/tests/{test}', [ModeratorTestController::class, 'show']);
     Route::post('/tests/submit', [ModeratorTestController::class, 'submit']);
+
+    // Profile
+    Route::get('/required-documents', [ProfileController::class, 'getRequiredDocuments']);
+    Route::post('/user-documents', [ProfileController::class, 'uploadUserDocument']);
+    Route::put('/profile/password', [ProfileController::class, 'changePassword']);
 
     // Support
     Route::get('/support', [SupportController::class, 'index']);
