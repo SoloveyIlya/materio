@@ -1,110 +1,35 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Box, Typography, Grid, Card, CardContent, Paper } from '@mui/material'
-import api from '@/lib/api'
+// MUI Imports
+import Grid from '@mui/material/Grid'
 
-export default function ModeratorDashboardPage() {
-  const [dashboardData, setDashboardData] = useState(null)
-  const [loading, setLoading] = useState(true)
+// Component Imports
+import WelcomeCard from '@/views/dashboards/moderator/WelcomeCard'
+import TopCourses from '@/views/dashboards/moderator/TopCourses'
+import AcademyCard from '@/views/dashboards/moderator/AcademyCard'
+import MyTasksCard from '@/views/dashboards/moderator/MyTasksCard'
+import TasksTable from '@/views/dashboards/moderator/TasksTable'
 
-  useEffect(() => {
-    loadDashboard()
-  }, [])
-
-  const loadDashboard = async () => {
-    try {
-      const response = await api.get('/moderator/dashboard')
-      setDashboardData(response.data)
-    } catch (error) {
-      console.error('Error loading dashboard:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
-    return <Box sx={{ p: 3 }}>Loading...</Box>
-  }
-
-  if (!dashboardData) {
-    return <Box sx={{ p: 3 }}>Error loading dashboard</Box>
-  }
-
+const ModeratorDashboardPage = () => {
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>Dashboard</Typography>
-
-      <Grid container spacing={3}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Completed Tasks
-              </Typography>
-              <Typography variant="h4">
-                {dashboardData.completed_tasks}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Total Tasks
-              </Typography>
-              <Typography variant="h4">
-                {dashboardData.total_tasks}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Success Rate
-              </Typography>
-              <Typography variant="h4">
-                {dashboardData.success_rate}%
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Work Days
-              </Typography>
-              <Typography variant="h4">
-                {dashboardData.work_days}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>Work Information</Typography>
-            <Typography><strong>Start Date:</strong> {dashboardData.work_start_date ? new Date(dashboardData.work_start_date).toLocaleDateString() : 'Not set'}</Typography>
-            <Typography><strong>Timezone:</strong> {dashboardData.timezone}</Typography>
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, bgcolor: 'success.light', color: 'success.contrastText' }}>
-            <Typography variant="h6" gutterBottom>Total Earnings</Typography>
-            <Typography variant="h3">
-              ${dashboardData.total_earnings}
-            </Typography>
-          </Paper>
-        </Grid>
+    <Grid container spacing={6}>
+      <Grid size={{ xs: 12 }}>
+        <WelcomeCard />
       </Grid>
-    </Box>
+      <Grid size={{ xs: 12, md: 8 }}>
+        <TopCourses />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+        <AcademyCard />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+        <MyTasksCard />
+      </Grid>
+      <Grid size={{ xs: 12 }}>
+        <TasksTable />
+      </Grid>
+    </Grid>
   )
 }
+
+export default ModeratorDashboardPage
