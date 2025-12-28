@@ -93,9 +93,9 @@ const verticalMenuData = (user = null) => {
         href: '/moderator/tasks'
       },
       {
-        label: 'Training Center',
+        label: 'Academy',
         icon: 'ri-graduation-cap-line',
-        href: '/moderator/training'
+        href: '/moderator/academy'
       },
       {
         label: 'Documentation',

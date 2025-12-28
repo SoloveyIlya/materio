@@ -54,7 +54,7 @@ const AcademyCard = () => {
   }
 
   const handleStartClick = () => {
-    router.push('/moderator/training')
+    router.push('/moderator/academy')
   }
 
   const data = [

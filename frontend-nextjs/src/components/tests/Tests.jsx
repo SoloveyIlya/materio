@@ -13,7 +13,7 @@ import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
 import Box from '@mui/material/Box'
 
-const Tests = ({ testData, onEditTest }) => {
+const Tests = ({ testData, onEditTest, onStartTest, readOnly = false }) => {
   // States
   const [data, setData] = useState([])
   const [activePage, setActivePage] = useState(0)
@@ -66,14 +66,33 @@ const Tests = ({ testData, onEditTest }) => {
                       {item.level && (
                         <Chip label={item.level.name} variant='tonal' size='small' color='primary' />
                       )}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <Typography variant='body2'>{item.duration_minutes} min</Typography>
-                        <IconButton
-                          size='small'
-                          onClick={() => onEditTest(item)}
-                        >
-                          <i className='ri-edit-box-line' />
-                        </IconButton>
+                        {readOnly && onStartTest ? (
+                          <Button
+                            variant='contained'
+                            size='small'
+                            startIcon={<i className='ri-play-line' />}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onStartTest(item)
+                            }}
+                          >
+                            Start
+                          </Button>
+                        ) : (
+                          onEditTest && (
+                            <IconButton
+                              size='small'
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onEditTest(item)
+                              }}
+                            >
+                              <i className='ri-edit-box-line' />
+                            </IconButton>
+                          )
+                        )}
                       </Box>
                     </div>
                     <div className='flex flex-col gap-1'>

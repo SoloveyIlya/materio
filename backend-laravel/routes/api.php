@@ -20,6 +20,7 @@ use App\Http\Controllers\Moderator\DashboardController;
 use App\Http\Controllers\Moderator\DocumentationController;
 use App\Http\Controllers\Moderator\SupportController;
 use App\Http\Controllers\Moderator\TaskController;
+use App\Http\Controllers\Moderator\TestController as ModeratorTestController;
 use App\Http\Controllers\Moderator\ToolController as ModeratorToolController;
 use App\Http\Controllers\Moderator\TrainingController;
 use Illuminate\Support\Facades\Route;
@@ -127,6 +128,11 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
     Route::get('/training', [TrainingController::class, 'index']);
     Route::get('/training/questions', [TrainingController::class, 'questions']);
     Route::post('/training/questions', [TrainingController::class, 'storeQuestion']);
+
+    // Tests
+    Route::get('/tests', [ModeratorTestController::class, 'index']);
+    Route::get('/tests/{test}', [ModeratorTestController::class, 'show']);
+    Route::post('/tests/submit', [ModeratorTestController::class, 'submit']);
 
     // Support
     Route::get('/support', [SupportController::class, 'index']);
