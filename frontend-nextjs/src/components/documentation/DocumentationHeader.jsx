@@ -16,30 +16,38 @@ const StyledCard = styled(Card)({
   backgroundRepeat: 'no-repeat'
 })
 
-const DocumentationHeader = ({ onAddDocumentation, onAddCategory }) => {
+const DocumentationHeader = ({ 
+  onAddDocumentation, 
+  onAddCategory, 
+  title = 'Admin Documentation',
+  subtitle = 'Manage your documentation pages and categories',
+  showButtons = true
+}) => {
   return (
     <StyledCard className='shadow-none bg-transparent bg-cover' elevation={0}>
       <CardContent className='flex flex-col items-center is-full text-center !pbs-[4.5625rem] !pbe-[5.9375rem] pli-5'>
         <Typography variant='h4' color='primary.main' className='mbe-2.5'>
-          Admin Documentation
+          {title}
         </Typography>
-        <Typography className='mbe-6'>Manage your documentation pages and categories</Typography>
-        <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-          <Button
-            variant='contained'
-            startIcon={<i className='ri-folder-add-line' />}
-            onClick={onAddCategory}
-          >
-            Add Category
-          </Button>
-          <Button
-            variant='contained'
-            startIcon={<i className='ri-add-line' />}
-            onClick={onAddDocumentation}
-          >
-            Add documentation
-          </Button>
-        </Box>
+        <Typography className='mbe-6'>{subtitle}</Typography>
+        {showButtons && onAddCategory && onAddDocumentation && (
+          <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+            <Button
+              variant='contained'
+              startIcon={<i className='ri-folder-add-line' />}
+              onClick={onAddCategory}
+            >
+              Add Category
+            </Button>
+            <Button
+              variant='contained'
+              startIcon={<i className='ri-add-line' />}
+              onClick={onAddDocumentation}
+            >
+              Add documentation
+            </Button>
+          </Box>
+        )}
       </CardContent>
     </StyledCard>
   )

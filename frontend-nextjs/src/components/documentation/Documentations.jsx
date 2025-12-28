@@ -22,7 +22,7 @@ import classnames from 'classnames'
 // Component Imports
 import CustomAvatar from '@/@core/components/mui/Avatar'
 
-const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDeleteCategory }) => {
+const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDeleteCategory, readOnly = false }) => {
   // States
   const [activeTab, setActiveTab] = useState('')
   const [categoryMenuAnchor, setCategoryMenuAnchor] = useState(null)
@@ -124,19 +124,21 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
               >
                 {category.name}
               </Button>
-              <IconButton
-                size='small'
-                onClick={(e) => handleCategoryMenuOpen(e, category)}
-                sx={{
-                  position: 'absolute',
-                  right: 8,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  zIndex: 1
-                }}
-              >
-                <i className='ri-more-2-line' />
-              </IconButton>
+              {!readOnly && (
+                <IconButton
+                  size='small'
+                  onClick={(e) => handleCategoryMenuOpen(e, category)}
+                  sx={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 1
+                  }}
+                >
+                  <i className='ri-more-2-line' />
+                </IconButton>
+              )}
             </Box>
           ))}
         </Box>
@@ -187,16 +189,18 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
                             color={page.is_published ? 'success' : 'default'}
                             size='small'
                           />
-                          <IconButton
-                            size='small'
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onEditPage(page)
-                            }}
-                            sx={{ ml: 'auto' }}
-                          >
-                            <i className='ri-edit-box-line' />
-                          </IconButton>
+                          {!readOnly && onEditPage && (
+                            <IconButton
+                              size='small'
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onEditPage(page)
+                              }}
+                              sx={{ ml: 'auto' }}
+                            >
+                              <i className='ri-edit-box-line' />
+                            </IconButton>
+                          )}
                         </Box>
                       </AccordionSummary>
                       <AccordionDetails>

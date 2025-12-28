@@ -1,36 +1,63 @@
 'use client'
 
-// React Imports
 import { useState, useEffect } from 'react'
+import { Box, Grid } from '@mui/material'
+import api from '@/lib/api'
+import DocumentationHeader from '@/components/documentation/DocumentationHeader'
+import Documentations from '@/components/documentation/Documentations'
 
-// Component Imports
-import HelpCenterHeader from '@/views/apps/documentation/HelpCenterHeader'
-import Articles from '@/views/apps/documentation/Articles'
-import KnowledgeBase from '@/views/apps/documentation/KnowledgeBase'
-import { useSettings } from '@core/hooks/useSettings'
+export default function ModeratorDocumentationPage() {
+  const [categories, setCategories] = useState([])
+  const [pages, setPages] = useState([])
 
-const ModeratorDocumentationPage = () => {
-  // States
-  const [searchValue, setSearchValue] = useState('')
-
-  // Hooks
-  const { updatePageSettings } = useSettings()
-
-  // For Page specific settings
   useEffect(() => {
-    return updatePageSettings({
-      skin: 'default'
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadCategories()
+    loadPages()
   }, [])
 
+  const loadCategories = async () => {
+    try {
+      const response = await api.get('/moderator/documentation/categories')
+      setCategories(response.data || [])
+    } catch (error) {
+      console.error('Error loading categories:', error)
+      setCategories([])
+    }
+  }
+
+  const loadPages = async () => {
+    try {
+      const response = await api.get('/moderator/documentation/pages')
+      setPages(response.data || [])
+    } catch (error) {
+      console.error('Error loading pages:', error)
+      setPages([])
+    }
+  }
+
   return (
-    <>
-      <HelpCenterHeader searchValue={searchValue} setSearchValue={setSearchValue} />
-      <Articles />
-      <KnowledgeBase />
-    </>
+    <Box sx={{ p: 3 }}>
+      <Grid container spacing={6}>
+        <Grid size={{ xs: 12 }}>
+          <DocumentationHeader
+            onAddDocumentation={null}
+            onAddCategory={null}
+            title="Documentation"
+            subtitle="Browse documentation pages and categories"
+            showButtons={false}
+          />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <Documentations
+            categories={categories}
+            pages={pages}
+            onEditPage={null}
+            onEditCategory={null}
+            onDeleteCategory={null}
+            readOnly={true}
+          />
+        </Grid>
+      </Grid>
+    </Box>
   )
 }
-
-export default ModeratorDocumentationPage
