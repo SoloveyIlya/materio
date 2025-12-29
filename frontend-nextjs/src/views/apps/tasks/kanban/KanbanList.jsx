@@ -49,7 +49,7 @@ const KanbanList = props => {
   }
 
   return (
-    <div className='flex flex-col is-[16.5rem]'>
+    <div className='flex flex-col' style={{ flex: '1 1 0', minWidth: '200px', maxWidth: '320px', width: '100%' }}>
       {editDisplay ? (
         <form
           className='flex items-center mbe-4'
@@ -71,7 +71,7 @@ const KanbanList = props => {
       ) : (
         <div
           className={classnames(
-            'flex items-center justify-between is-[16.5rem] bs-[2.125rem] mbe-4',
+            'flex items-center justify-between bs-[2.125rem] mbe-4',
             styles.kanbanColumn
           )}
         >

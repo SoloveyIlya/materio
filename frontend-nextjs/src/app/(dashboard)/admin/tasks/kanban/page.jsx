@@ -122,8 +122,9 @@ const KanbanPage = () => {
         styles.scroll,
         'is-full overflow-auto pis-2 -mis-2'
       )}
+      style={{ overflowX: 'hidden' }}
     >
-      <Box sx={{ p: 6 }}>
+      <Box sx={{ p: { xs: 3, sm: 4, lg: 5 }, maxWidth: '100%', overflowX: 'hidden', width: '100%' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
           <Typography variant='h4'>Task Manager</Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
@@ -138,7 +139,7 @@ const KanbanPage = () => {
         </Box>
 
         {/* Default Columns (5 days) - in a row */}
-        <div className='flex items-start gap-6 mbe-6'>
+        <Box sx={{ display: 'flex', gap: { xs: 2, md: 2.5, lg: 3 }, mb: 6, width: '100%', maxWidth: '100%', overflowX: 'hidden', boxSizing: 'border-box' }}>
           {defaultColumns.map(column => (
             <KanbanList
               key={column.id}
@@ -151,11 +152,11 @@ const KanbanPage = () => {
               onCreateTask={() => handleCreateTask(column)}
             />
           ))}
-        </div>
+        </Box>
 
         {/* Custom Columns - below default columns, in a row */}
         {customColumns.length > 0 && (
-          <div className='flex items-start gap-6'>
+          <Box sx={{ display: 'flex', gap: { xs: 2, md: 2.5, lg: 3 }, width: '100%', maxWidth: '100%', overflowX: 'hidden', flexWrap: 'wrap', boxSizing: 'border-box' }}>
             {customColumns.map(column => (
               <KanbanList
                 key={column.id}
@@ -169,14 +170,14 @@ const KanbanPage = () => {
               />
             ))}
             <NewColumn addNewColumn={handleAddColumn} />
-          </div>
+          </Box>
         )}
 
         {/* Show "Add New" button only if no custom columns yet - below default columns */}
         {customColumns.length === 0 && (
-          <div className='flex items-start gap-6'>
+          <Box sx={{ display: 'flex', gap: { xs: 2, md: 2.5, lg: 3 }, width: '100%', maxWidth: '100%', overflowX: 'hidden', boxSizing: 'border-box' }}>
             <NewColumn addNewColumn={handleAddColumn} />
-          </div>
+          </Box>
         )}
       </Box>
 
