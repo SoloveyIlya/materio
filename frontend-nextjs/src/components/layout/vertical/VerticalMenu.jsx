@@ -17,6 +17,7 @@ import verticalMenuData from '@/data/navigation/verticalMenuData'
 import { useAuthStore } from '@/store/authStore'
 // Hook Imports
 import useVerticalNav from '@menu/hooks/useVerticalNav'
+import { useMenuCounts } from '@/hooks/useMenuCounts'
 
 // Styled Component Imports
 import StyledVerticalNavExpandIcon from '@menu/styles/vertical/StyledVerticalNavExpandIcon'
@@ -36,10 +37,11 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
   const theme = useTheme()
   const verticalNavOptions = useVerticalNav()
   const { user } = useAuthStore()
+  const { counts } = useMenuCounts()
 
   // Vars
   const { isBreakpointReached, transitionDuration } = verticalNavOptions
-  const menuData = verticalMenuData(user)
+  const menuData = verticalMenuData(user, counts)
   const ScrollWrapper = isBreakpointReached ? 'div' : PerfectScrollbar
 
   return (

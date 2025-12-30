@@ -63,6 +63,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
 
     // Dashboard
     Route::get('/dashboard', [AdminDashboardController::class, 'index']);
+    Route::get('/dashboard/counts', [AdminDashboardController::class, 'getCounts']);
     Route::post('/users/{user}/hide-from-dashboard', [AdminDashboardController::class, 'hideDeletedUser']);
 
     // Users
@@ -124,6 +125,7 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/dashboard/counts', [DashboardController::class, 'getCounts']);
 
     // Training Center
     Route::get('/training', [TrainingController::class, 'index']);

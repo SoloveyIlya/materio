@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Models\Task;
 use App\Models\TaskAssignment;
 use App\Models\TaskResult;
+use App\Models\Message;
+use App\Models\Ticket;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -299,5 +301,106 @@ class DashboardController extends Controller
             'message' => 'User hidden from dashboard',
             'user' => $user,
         ]);
+    }
+
+    public function getCounts(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            
+            if (!$user->domain_id) {
+                return response()->json(['message' => 'User domain not set'], 400);
+            }
+
+            $counts = [];
+
+            // Для админов
+            if ($user->isAdmin()) {
+                // Непрочитанные сообщения в чате (type='message')
+                // Сообщения от модераторов, закрепленных за этим админом, которые не прочитаны
+                // Получаем ID всех модераторов, закрепленных за текущим админом
+                $moderatorIds = User::where('domain_id', $user->domain_id)
+                    ->where('administrator_id', $user->id)
+                    ->whereHas('roles', function ($q) {
+                        $q->where('name', 'moderator');
+                    })
+                    ->pluck('id')
+                    ->toArray();
+
+                $unreadChatMessages = 0;
+                if (count($moderatorIds) > 0) {
+                    $unreadChatMessages = Message::where('domain_id', $user->domain_id)
+                        ->where('type', 'message')
+                        ->whereIn('from_user_id', $moderatorIds)
+                        ->where('to_user_id', $user->id)
+                        ->where('is_read', false)
+                        ->where('is_deleted', false)
+                        ->count();
+                }
+                $counts['chat'] = $unreadChatMessages;
+
+                // Непрочитанные тикеты в support
+                // Тикеты, где есть непрочитанные сообщения от пользователей к админу
+                $unreadSupportTickets = Ticket::where('domain_id', $user->domain_id)
+                    ->whereHas('messages', function ($q) use ($user) {
+                        $q->where('to_user_id', $user->id)
+                          ->where('is_read', false)
+                          ->where('type', 'support');
+                    })
+                    ->count();
+                $counts['support'] = $unreadSupportTickets;
+
+                // Задачи на проверке (under_admin_review)
+                $tasksUnderReview = Task::where('domain_id', $user->domain_id)
+                    ->where('status', 'under_admin_review')
+                    ->count();
+                $counts['tasks'] = $tasksUnderReview;
+            }
+            // Для модераторов
+            else if ($user->isModerator()) {
+                // Непрочитанные сообщения в чате от админа
+                $administratorId = $user->administrator_id;
+                if ($administratorId) {
+                    $unreadChatMessages = Message::where('domain_id', $user->domain_id)
+                        ->where('type', 'message')
+                        ->where('from_user_id', $administratorId)
+                        ->where('to_user_id', $user->id)
+                        ->where('is_read', false)
+                        ->where('is_deleted', false)
+                        ->count();
+                    $counts['chat'] = $unreadChatMessages;
+                } else {
+                    $counts['chat'] = 0;
+                }
+
+                // Непрочитанные тикеты в support (тикеты модератора с непрочитанными ответами)
+                $unreadSupportTickets = Ticket::where('domain_id', $user->domain_id)
+                    ->where('user_id', $user->id)
+                    ->whereHas('messages', function ($q) use ($user) {
+                        $q->where('from_user_id', '!=', $user->id)
+                          ->where('to_user_id', $user->id)
+                          ->where('is_read', false)
+                          ->where('type', 'support');
+                    })
+                    ->count();
+                $counts['support'] = $unreadSupportTickets;
+
+                // Задачи на проверке для модератора нет
+                $counts['tasks'] = 0;
+            }
+
+            return response()->json($counts);
+        } catch (\Exception $e) {
+            \Log::error('Get counts error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $request->user()?->id,
+            ]);
+            
+            return response()->json([
+                'chat' => 0,
+                'support' => 0,
+                'tasks' => 0,
+            ]);
+        }
     }
 }

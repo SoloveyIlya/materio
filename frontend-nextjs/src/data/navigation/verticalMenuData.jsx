@@ -1,4 +1,4 @@
-const verticalMenuData = (user = null) => {
+const verticalMenuData = (user = null, counts = { chat: 0, support: 0, tasks: 0 }) => {
   // Check user role
   const isAdmin = user?.roles?.some((role) => role.name === 'admin')
   const isModerator = user?.roles?.some((role) => role.name === 'moderator')
@@ -30,7 +30,14 @@ const verticalMenuData = (user = null) => {
       {
         label: 'Dashboard',
         icon: 'ri-dashboard-3-line',
-        href: '/dashboard'
+        href: '/dashboard',
+        ...(counts.tasks > 0 && {
+          suffix: {
+            label: counts.tasks.toString(),
+            color: 'error',
+            size: 'small',
+          }
+        })
       },
       {
         label: 'Tasks',
@@ -40,7 +47,14 @@ const verticalMenuData = (user = null) => {
       {
         label: 'Chat',
         icon: 'ri-message-3-line',
-        href: '/chat'
+        href: '/chat',
+        ...(counts.chat > 0 && {
+          suffix: {
+            label: counts.chat.toString(),
+            color: 'error',
+            size: 'small',
+          }
+        })
       },
       {
         label: 'Users',
@@ -50,7 +64,14 @@ const verticalMenuData = (user = null) => {
       {
         label: 'Support',
         icon: 'ri-customer-service-2-line',
-        href: '/admin/support'
+        href: '/admin/support',
+        ...(counts.support > 0 && {
+          suffix: {
+            label: counts.support.toString(),
+            color: 'error',
+            size: 'small',
+          }
+        })
       },
       {
         label: 'Task Manager',
@@ -115,12 +136,26 @@ const verticalMenuData = (user = null) => {
       {
         label: 'Messages',
         icon: 'ri-message-3-line',
-        href: '/chat'
+        href: '/chat',
+        ...(counts.chat > 0 && {
+          suffix: {
+            label: counts.chat.toString(),
+            color: 'error',
+            size: 'small',
+          }
+        })
       },
       {
         label: 'Support',
         icon: 'ri-customer-service-2-line',
-        href: '/moderator/support'
+        href: '/moderator/support',
+        ...(counts.support > 0 && {
+          suffix: {
+            label: counts.support.toString(),
+            color: 'error',
+            size: 'small',
+          }
+        })
       }
     ]
   }

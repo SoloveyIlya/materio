@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Moderator;
 use App\Http\Controllers\Controller;
 use App\Models\Task;
 use App\Models\ModeratorEarning;
+use App\Models\Message;
+use App\Models\Ticket;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -58,5 +60,57 @@ class DashboardController extends Controller
             'timezone' => $user->timezone ?? 'UTC',
             'total_earnings' => number_format($totalEarnings, 2, '.', ''),
         ]);
+    }
+
+    public function getCounts(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            
+            $counts = [];
+
+            // Непрочитанные сообщения в чате от админа
+            $administratorId = $user->administrator_id;
+            if ($administratorId) {
+                $unreadChatMessages = Message::where('domain_id', $user->domain_id)
+                    ->where('type', 'message')
+                    ->where('from_user_id', $administratorId)
+                    ->where('to_user_id', $user->id)
+                    ->where('is_read', false)
+                    ->where('is_deleted', false)
+                    ->count();
+                $counts['chat'] = $unreadChatMessages;
+            } else {
+                $counts['chat'] = 0;
+            }
+
+            // Непрочитанные тикеты в support (тикеты модератора с непрочитанными ответами)
+            $unreadSupportTickets = Ticket::where('domain_id', $user->domain_id)
+                ->where('user_id', $user->id)
+                ->whereHas('messages', function ($q) use ($user) {
+                    $q->where('from_user_id', '!=', $user->id)
+                      ->where('to_user_id', $user->id)
+                      ->where('is_read', false)
+                      ->where('type', 'support');
+                })
+                ->count();
+            $counts['support'] = $unreadSupportTickets;
+
+            // Задачи на проверке для модератора нет
+            $counts['tasks'] = 0;
+
+            return response()->json($counts);
+        } catch (\Exception $e) {
+            \Log::error('Get counts error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $request->user()?->id,
+            ]);
+            
+            return response()->json([
+                'chat' => 0,
+                'support' => 0,
+                'tasks' => 0,
+            ]);
+        }
     }
 }
