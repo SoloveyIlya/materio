@@ -28,24 +28,34 @@ const verticalMenuData = (user = null) => {
   if (isAdmin) {
     menu = [
       {
-        label: 'Task Manager',
-        icon: 'ri-home-smile-line',
-        href: '/admin/tasks/kanban'
-      },
-      {
         label: 'Dashboard',
         icon: 'ri-dashboard-3-line',
         href: '/dashboard'
       },
       {
-        label: 'Chats',
+        label: 'Tasks',
+        icon: 'ri-task-line',
+        href: '/admin/tasks'
+      },
+      {
+        label: 'Chat',
         icon: 'ri-message-3-line',
         href: '/chat'
       },
       {
-        label: 'Tasks',
-        icon: 'ri-task-line',
-        href: '/admin/tasks'
+        label: 'Users',
+        icon: 'ri-user-line',
+        href: '/admin/users'
+      },
+      {
+        label: 'Support',
+        icon: 'ri-customer-service-2-line',
+        href: '/admin/support'
+      },
+      {
+        label: 'Task Manager',
+        icon: 'ri-home-smile-line',
+        href: '/admin/tasks/kanban'
       },
       {
         label: 'Documentation',
@@ -63,19 +73,14 @@ const verticalMenuData = (user = null) => {
         href: '/admin/tools'
       },
       {
-        label: 'Users',
-        icon: 'ri-user-line',
-        href: '/admin/users'
-      },
-      {
         label: 'Activity Logs',
         icon: 'ri-file-list-3-line',
         href: '/admin/activity-logs'
       },
       {
-        label: 'Support',
-        icon: 'ri-customer-service-2-line',
-        href: '/admin/support'
+        label: 'Settings',
+        icon: 'ri-settings-3-line',
+        href: '/admin/settings'
       }
     ]
   }
