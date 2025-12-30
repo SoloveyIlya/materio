@@ -196,28 +196,45 @@ class UserController extends Controller
 
         // Обработка загрузки аватарки
         if ($request->hasFile('avatar')) {
+            $avatarFile = $request->file('avatar');
+            
             // Удаляем старую аватарку, если она есть
-            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
-                Storage::disk('public')->delete($user->avatar);
+            if ($user->avatar) {
+                // Если аватарка содержит URL, извлекаем относительный путь
+                $oldAvatarPath = $user->avatar;
+                if (strpos($oldAvatarPath, '/storage/') !== false) {
+                    $oldAvatarPath = str_replace('/storage/', '', parse_url($oldAvatarPath, PHP_URL_PATH));
+                }
+                
+                if (Storage::disk('public')->exists($oldAvatarPath)) {
+                    Storage::disk('public')->delete($oldAvatarPath);
+                }
             }
             
             // Сохраняем новую аватарку
-            $path = $request->file('avatar')->store('avatars', 'public');
-            $validated['avatar'] = $path;
+            $path = $avatarFile->store('avatars', 'public');
+            $validated['avatar'] = Storage::disk('public')->url($path);
             
             // Если это админ, обновляем аватарку у всех закрепленных пользователей
             if ($user->isAdmin()) {
                 $assignedUsers = User::where('administrator_id', $user->id)->get();
                 foreach ($assignedUsers as $assignedUser) {
-                    // Копируем файл для каждого пользователя, чтобы у каждого была своя копия
-                    $newPath = 'avatars/user_' . $assignedUser->id . '_' . time() . '.' . $request->file('avatar')->getClientOriginalExtension();
-                    Storage::disk('public')->copy($path, $newPath);
-                    
                     // Удаляем старую аватарку закрепленного пользователя, если она есть
-                    if ($assignedUser->avatar && Storage::disk('public')->exists($assignedUser->avatar)) {
-                        Storage::disk('public')->delete($assignedUser->avatar);
+                    if ($assignedUser->avatar) {
+                        $oldUserAvatarPath = $assignedUser->avatar;
+                        if (strpos($oldUserAvatarPath, '/storage/') !== false) {
+                            $oldUserAvatarPath = str_replace('/storage/', '', parse_url($oldUserAvatarPath, PHP_URL_PATH));
+                        }
+                        
+                        if (Storage::disk('public')->exists($oldUserAvatarPath)) {
+                            Storage::disk('public')->delete($oldUserAvatarPath);
+                        }
                     }
-                    $assignedUser->update(['avatar' => $newPath]);
+                    
+                    // Копируем файл для каждого пользователя, чтобы у каждого была своя копия
+                    $newPath = 'avatars/user_' . $assignedUser->id . '_' . time() . '.' . $avatarFile->getClientOriginalExtension();
+                    Storage::disk('public')->copy($path, $newPath);
+                    $assignedUser->update(['avatar' => Storage::disk('public')->url($newPath)]);
                 }
             }
         }
