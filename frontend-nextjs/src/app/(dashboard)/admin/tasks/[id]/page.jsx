@@ -660,7 +660,34 @@ export default function AdminTaskViewPage() {
                             {tools.map((tool, index) => (
                               <Box key={tool.id || index} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                                 <i className='ri-tools-line' style={{ fontSize: '20px', color: '#2196F3' }} />
-                                <Typography variant='body1'>{tool.name}</Typography>
+                                <Typography variant='body1' component='div' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  {tool.url ? (
+                                    <a 
+                                      href={tool.url} 
+                                      target='_blank' 
+                                      rel='noopener noreferrer'
+                                      style={{ 
+                                        color: '#1a1a1a', 
+                                        fontWeight: 600,
+                                        textDecoration: 'none',
+                                        cursor: 'pointer'
+                                      }}
+                                      onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                                      onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                                    >
+                                      {tool.name}
+                                    </a>
+                                  ) : (
+                                    <span style={{ color: '#1a1a1a', fontWeight: 600 }}>
+                                      {tool.name}
+                                    </span>
+                                  )}
+                                  {tool.description && (
+                                    <Typography component='span' sx={{ color: 'text.secondary', fontWeight: 'normal' }}>
+                                      ({tool.description})
+                                    </Typography>
+                                  )}
+                                </Typography>
                               </Box>
                             ))}
                           </Box>
