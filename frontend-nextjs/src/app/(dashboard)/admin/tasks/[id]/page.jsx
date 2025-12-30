@@ -196,13 +196,6 @@ export default function AdminTaskViewPage() {
     return <Box sx={{ p: 6 }}>Task not found</Box>
   }
 
-  const images = []
-  if (task.document_image) {
-    images.push(task.document_image.startsWith('http') ? task.document_image : `${API_URL}/storage/${task.document_image}`)
-  }
-  if (task.selfie_image) {
-    images.push(task.selfie_image.startsWith('http') ? task.selfie_image : `${API_URL}/storage/${task.selfie_image}`)
-  }
 
   // Получаем список инструментов (может быть task.tools или task.tool)
   const tools = task.tools || (task.tool ? [task.tool] : [])
@@ -925,9 +918,9 @@ export default function AdminTaskViewPage() {
                   >
                     {task.id_number || 'N/A'}
                   </Typography>
-                  {task.document_image && (
+                  {task.selfie_image && (
                     <Box
-                      onClick={() => handleImageClick(getImageUrl(task.document_image))}
+                      onClick={() => handleImageClick(getImageUrl(task.selfie_image))}
                       sx={{
                         width: '100%',
                         maxHeight: '400px',
@@ -948,7 +941,7 @@ export default function AdminTaskViewPage() {
                       }}
                     >
                       <img
-                        src={getImageUrl(task.document_image)}
+                        src={getImageUrl(task.selfie_image)}
                         alt='ID number photo'
                         style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
                       />
@@ -957,37 +950,41 @@ export default function AdminTaskViewPage() {
                 </Box>
               </Grid>
 
-              {/* Images */}
-              {images.length > 0 && (
+              {/* Video */}
+              {task.video && (
                 <Grid size={{ xs: 12 }}>
                   <Card>
                     <CardContent>
-                      <Typography variant='h6' gutterBottom>Images</Typography>
-                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
-                        {images.map((imageUrl, index) => (
+                      <Typography variant='h6' gutterBottom>Video</Typography>
+                      <Box sx={{ mt: 2 }}>
                           <Box
-                            key={index}
-                            onClick={() => handleImageClick(imageUrl)}
                             sx={{
-                              width: 150,
-                              height: 150,
-                              cursor: 'pointer',
-                              border: '1px solid',
-                              borderColor: 'divider',
+                            width: '100%',
+                            maxWidth: '800px',
+                            position: 'relative',
+                            paddingTop: '56.25%', // 16:9 aspect ratio
+                            backgroundColor: 'action.hover',
                               borderRadius: 1,
                               overflow: 'hidden',
-                              '&:hover': {
-                                opacity: 0.8,
-                              },
+                            border: '1px solid',
+                            borderColor: 'divider',
                             }}
                           >
-                            <img
-                              src={imageUrl}
-                              alt={`Image ${index + 1}`}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
+                          <video
+                            controls
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                            }}
+                            src={getImageUrl(task.video)}
+                          >
+                            Your browser does not support the video tag.
+                          </video>
                           </Box>
-                        ))}
                       </Box>
                     </CardContent>
                   </Card>
@@ -1138,3 +1135,4 @@ export default function AdminTaskViewPage() {
     </Box>
   )
 }
+

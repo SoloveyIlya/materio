@@ -55,6 +55,7 @@ const TaskDrawer = props => {
     is_main_task: false,
     document_image: null,
     selfie_image: null,
+    video: null,
   })
   const [categories, setCategories] = useState([])
   const [documentations, setDocumentations] = useState([])
@@ -62,6 +63,7 @@ const TaskDrawer = props => {
   const [documentPreview, setDocumentPreview] = useState(null)
   const [documentFileName, setDocumentFileName] = useState(null)
   const [selfiePreview, setSelfiePreview] = useState(null)
+  const [videoPreview, setVideoPreview] = useState(null)
   const [categoriesAnchorEl, setCategoriesAnchorEl] = useState(null)
   const [documentationsAnchorEl, setDocumentationsAnchorEl] = useState(null)
   const [toolsAnchorEl, setToolsAnchorEl] = useState(null)
@@ -102,6 +104,7 @@ const TaskDrawer = props => {
           is_main_task: Boolean(task.is_main_task || false),
           document_image: null,
           selfie_image: null,
+          video: null,
         })
         if (task.document_image) {
           let docUrl
@@ -148,6 +151,19 @@ const TaskDrawer = props => {
         } else {
           setSelfiePreview(null)
         }
+        if (task.video) {
+          let videoUrl
+          if (task.video.startsWith('http')) {
+            videoUrl = task.video
+          } else if (task.video.startsWith('/storage/')) {
+            videoUrl = `${API_URL}${task.video}`
+          } else {
+            videoUrl = `${API_URL}/storage/${task.video}`
+          }
+          setVideoPreview(videoUrl)
+        } else {
+          setVideoPreview(null)
+        }
       } else {
         setFormData({
           title: '',
@@ -173,10 +189,12 @@ const TaskDrawer = props => {
           is_main_task: false,
           document_image: null,
           selfie_image: null,
+          video: null,
         })
         setDocumentPreview(null)
         setDocumentFileName(null)
         setSelfiePreview(null)
+        setVideoPreview(null)
       }
     }
   }, [drawerOpen, task])
@@ -265,6 +283,12 @@ const TaskDrawer = props => {
         const reader = new FileReader()
         reader.onloadend = () => {
           setSelfiePreview(reader.result)
+        }
+        reader.readAsDataURL(file)
+      } else if (field === 'video') {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setVideoPreview(reader.result)
         }
         reader.readAsDataURL(file)
       }
@@ -386,6 +410,9 @@ const TaskDrawer = props => {
       }
       if (formData.selfie_image) {
         formDataToSend.append('selfie_image', formData.selfie_image)
+      }
+      if (formData.video) {
+        formDataToSend.append('video', formData.video)
       }
 
       if (task && task.id) {
@@ -775,6 +802,29 @@ const TaskDrawer = props => {
             {selfiePreview && (
               <Box sx={{ mt: 1 }}>
                 <img src={selfiePreview} alt='Selfie preview' style={{ maxWidth: '100%', maxHeight: 100 }} />
+              </Box>
+            )}
+          </Box>
+
+          <Box>
+            <Button variant='outlined' component='label' fullWidth>
+              Upload Video
+              <input
+                hidden
+                type='file'
+                accept='video/*'
+                onChange={(e) => handleFileChange(e, 'video')}
+              />
+            </Button>
+            {videoPreview && (
+              <Box sx={{ mt: 1 }}>
+                <video
+                  src={videoPreview}
+                  controls
+                  style={{ maxWidth: '100%', maxHeight: 200 }}
+                >
+                  Your browser does not support the video tag.
+                </video>
               </Box>
             )}
           </Box>
