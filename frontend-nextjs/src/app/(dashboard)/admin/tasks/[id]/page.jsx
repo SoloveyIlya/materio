@@ -56,6 +56,7 @@ export default function AdminTaskViewPage() {
   const [selectedImage, setSelectedImage] = useState(null)
   const [activeTab, setActiveTab] = useState(0) // 0 = Task, 1 = Report
   const [selectedTool, setSelectedTool] = useState(null) // Для выбранного инструмента
+  const [selectedAdditionally, setSelectedAdditionally] = useState(false) // Для выбранного Additionally
   const [revisionDialogOpen, setRevisionDialogOpen] = useState(false)
   const [revisionComment, setRevisionComment] = useState('')
   const [currentTime, setCurrentTime] = useState(Date.now())
@@ -70,8 +71,9 @@ export default function AdminTaskViewPage() {
   useEffect(() => {
     if (task && activeTab === 1) {
       const taskTools = task.tools || (task.tool ? [task.tool] : [])
-      if (taskTools.length > 0 && !selectedTool) {
+      if (taskTools.length > 0 && !selectedTool && !selectedAdditionally) {
         setSelectedTool(taskTools[0])
+        setSelectedAdditionally(false)
       }
     }
   }, [task, activeTab])
@@ -219,6 +221,22 @@ export default function AdminTaskViewPage() {
 
   // Рендер контента для Report
   const renderReportContent = () => {
+    if (selectedAdditionally) {
+      // Показываем additional_info
+      return (
+        <Card>
+          <CardContent>
+            <Typography variant='h5' gutterBottom>Additionally</Typography>
+            <Box sx={{ mt: 2 }}>
+              <Typography variant='body1' sx={{ whiteSpace: 'pre-wrap' }}>
+                {task.result?.additional_info || ''}
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      )
+    }
+
     if (selectedTool) {
       // Показываем данные по выбранному инструменту
       const toolData = getToolData(selectedTool.id)
@@ -227,23 +245,23 @@ export default function AdminTaskViewPage() {
           <CardContent>
             <Typography variant='h5' gutterBottom>{selectedTool.name}</Typography>
             <Box sx={{ mt: 2 }}>
-                    <Typography variant='body1' sx={{ whiteSpace: 'pre-wrap' }}>
+              <Typography variant='body1' sx={{ whiteSpace: 'pre-wrap' }}>
                 {toolData?.description || ''}
-                    </Typography>
-                  </Box>
+              </Typography>
+            </Box>
           </CardContent>
         </Card>
       )
     }
 
-        return (
-              <Card>
-                <CardContent>
+    return (
+      <Card>
+        <CardContent>
           <Typography variant='body1' sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>
-            Select a tool from the list to view information
-                  </Typography>
-                </CardContent>
-              </Card>
+            Select a tool or additionally from the list to view information
+          </Typography>
+        </CardContent>
+      </Card>
     )
   }
 
@@ -1080,7 +1098,10 @@ export default function AdminTaskViewPage() {
                           <ListItem key={tool.id} disablePadding className='mbe-1'>
                             <ListItemButton 
                               selected={selectedTool?.id === tool.id}
-                          onClick={() => setSelectedTool(tool)}
+                              onClick={() => {
+                                setSelectedTool(tool)
+                                setSelectedAdditionally(false)
+                              }}
                               className={classnames({
                                 'bg-primaryLightOpacity': selectedTool?.id === tool.id
                               })}
@@ -1102,20 +1123,25 @@ export default function AdminTaskViewPage() {
                   {/* Additionally Section */}
                   <Box>
                     <Typography variant='h6' gutterBottom sx={{ mb: 2 }}>Additionally</Typography>
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={6}
-                      placeholder='Enter additional information...'
-                      value={task.result?.additional_info || ''}
-                      disabled
-                      sx={{ 
-                        '& .MuiInputBase-input': { 
-                          color: 'text.secondary',
-                          cursor: 'not-allowed'
-                        } 
-                      }}
-                    />
+                    <List>
+                      <ListItem disablePadding>
+                        <ListItemButton 
+                          selected={selectedAdditionally}
+                          onClick={() => {
+                            setSelectedAdditionally(true)
+                            setSelectedTool(null)
+                          }}
+                          className={classnames({
+                            'bg-primaryLightOpacity': selectedAdditionally
+                          })}
+                        >
+                          <ListItemIcon>
+                            <i className='ri-file-add-line text-xl' />
+                          </ListItemIcon>
+                          <ListItemText primary='Additional Information' />
+                        </ListItemButton>
+                      </ListItem>
+                    </List>
                   </Box>
                 </CardContent>
               </Card>
