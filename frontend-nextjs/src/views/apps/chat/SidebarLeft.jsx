@@ -52,6 +52,8 @@ const SidebarLeft = props => {
     messagesData,
     user,
     selectedChat,
+    selectedAdminTab,
+    activeTab,
     onSelectChat,
     loading,
     backdropOpen,
@@ -68,18 +70,17 @@ const SidebarLeft = props => {
   const [userSidebar, setUserSidebar] = useState(false)
   const [searchValue, setSearchValue] = useState('')
 
-  // For admin: render tabs with chats
+  // For admin: render chats for selected admin tab
   const renderAdminChats = () => {
     if (!messagesData?.tabs) return null
 
+    // Показываем чаты только для выбранной вкладки админа
+    const currentTab = messagesData.tabs[activeTab]
+    if (!currentTab) return null
+
     return (
-      <>
-        {messagesData.tabs.map((tab) => (
-          <Box key={tab.admin.id} sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ px: 2, py: 1, fontWeight: 'bold', color: 'text.secondary' }}>
-              {tab.admin.name}
-            </Typography>
-            {tab.chats.map((chat) => {
+      <List>
+        {currentTab.chats.map((chat) => {
               const isChatActive = selectedChat?.user?.id === chat.user.id
               const contact = chat.user
 
@@ -123,61 +124,7 @@ const SidebarLeft = props => {
                 </ListItem>
               )
             })}
-          </Box>
-        ))}
-        
-        {messagesData.unassigned?.chats && messagesData.unassigned.chats.length > 0 && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ px: 2, py: 1, fontWeight: 'bold', color: 'text.secondary' }}>
-              Unassigned
-            </Typography>
-            {messagesData.unassigned.chats.map((chat) => {
-              const isChatActive = selectedChat?.user?.id === chat.user.id
-              const contact = chat.user
-
-              return (
-                <ListItem
-                  key={chat.user.id}
-                  button
-                  selected={isChatActive}
-                  onClick={() => onSelectChat(chat)}
-                  sx={{
-                    bgcolor: isChatActive ? 'primary.light' : 'transparent',
-                    color: isChatActive ? 'primary.contrastText' : 'inherit',
-                    '&:hover': {
-                      bgcolor: isChatActive ? 'primary.light' : 'action.hover'
-                    }
-                  }}
-                >
-                  <ListItemAvatar>
-                    <Badge
-                      badgeContent={chat.unread_count > 0 ? chat.unread_count : 0}
-                      color="error"
-                      invisible={chat.unread_count === 0}
-                    >
-                      {contact.avatar ? (
-                        <Avatar src={contact.avatar} alt={contact.name} />
-                      ) : (
-                        <CustomAvatar color={contact.avatarColor || 'primary'} skin='light'>
-                          {getInitials(contact.name || contact.email)}
-                        </CustomAvatar>
-                      )}
-                    </Badge>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={contact.name || contact.email}
-                    secondary={
-                      chat.messages && chat.messages.length > 0
-                        ? chat.messages[chat.messages.length - 1].body?.substring(0, 30) + '...'
-                        : 'No messages yet'
-                    }
-                  />
-                </ListItem>
-              )
-            })}
-          </Box>
-        )}
-      </>
+      </List>
     )
   }
 
@@ -238,13 +185,10 @@ const SidebarLeft = props => {
   const getAllContacts = () => {
     if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs) {
       const contacts = []
-      messagesData.tabs.forEach(tab => {
-        tab.chats.forEach(chat => {
-          contacts.push(chat.user)
-        })
-      })
-      if (messagesData.unassigned?.chats) {
-        messagesData.unassigned.chats.forEach(chat => {
+      // Только для текущей вкладки
+      const currentTab = messagesData.tabs[activeTab]
+      if (currentTab) {
+        currentTab.chats.forEach(chat => {
           contacts.push(chat.user)
         })
       }
@@ -265,13 +209,7 @@ const SidebarLeft = props => {
         // Find chat for this contact
         let foundChat = null
         if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs) {
-          for (const tab of messagesData.tabs) {
-            foundChat = tab.chats.find(c => c.user.id === contact.id)
-            if (foundChat) break
-          }
-          if (!foundChat && messagesData.unassigned?.chats) {
-            foundChat = messagesData.unassigned.chats.find(c => c.user.id === contact.id)
-          }
+          foundChat = findChatInCurrentTab(contact.id)
         } else if (Array.isArray(messagesData)) {
           foundChat = messagesData.find(c => c.user.id === contact.id)
         }
@@ -284,6 +222,13 @@ const SidebarLeft = props => {
       }
       setSearchValue('')
     }
+  }
+
+  // For admin: find chat in current tab
+  const findChatInCurrentTab = (contactId) => {
+    if (!messagesData?.tabs || activeTab < 0 || activeTab >= messagesData.tabs.length) return null
+    const currentTab = messagesData.tabs[activeTab]
+    return currentTab.chats.find(c => c.user.id === contactId)
   }
 
   return (

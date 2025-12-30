@@ -63,6 +63,8 @@ const ChatContent = props => {
   const {
     selectedChat,
     user,
+    selectedAdminTab,
+    messagesData,
     onSendMessage,
     onEditMessage,
     onDeleteMessage,
@@ -83,6 +85,10 @@ const ChatContent = props => {
   const [editText, setEditText] = useState('')
   const [attachments, setAttachments] = useState([])
   const [messageText, setMessageText] = useState('')
+  const [voiceFile, setVoiceFile] = useState(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [mediaRecorder, setMediaRecorder] = useState(null)
+  const [audioChunks, setAudioChunks] = useState([])
 
   // Refs
   const scrollRef = useRef(null)
@@ -116,7 +122,12 @@ const ChatContent = props => {
   useEffect(() => {
     setMessageText('')
     setAttachments([])
+    setVoiceFile(null)
     setEditingMessage(null)
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop()
+      setIsRecording(false)
+    }
   }, [selectedChat?.user?.id])
 
   const handleFileSelect = (e) => {
@@ -137,14 +148,67 @@ const ChatContent = props => {
   }
 
   const handleSend = async () => {
-    if (!messageText.trim() && attachments.length === 0) return
+    if (!messageText.trim() && attachments.length === 0 && !voiceFile) return
 
     try {
-      await onSendMessage(messageText, attachments)
+      await onSendMessage(messageText, attachments, voiceFile)
       setMessageText('')
       setAttachments([])
+      setVoiceFile(null)
     } catch (error) {
       console.error('Error sending message:', error)
+    }
+  }
+
+  // Voice recording functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      const chunks = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data)
+        }
+      }
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' })
+        const file = new File([audioBlob], `voice-${Date.now()}.webm`, { type: 'audio/webm' })
+        setVoiceFile(file)
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      recorder.start()
+      setMediaRecorder(recorder)
+      setIsRecording(true)
+      setAudioChunks(chunks)
+    } catch (error) {
+      console.error('Error starting recording:', error)
+      alert('Error accessing microphone. Please allow microphone access.')
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop()
+      setIsRecording(false)
+    }
+  }
+
+  const handleVoiceFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (file && file.type.startsWith('audio/')) {
+      setVoiceFile(file)
+    }
+  }
+
+  const removeVoiceFile = () => {
+    setVoiceFile(null)
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop()
+      setIsRecording(false)
     }
   }
 
@@ -291,7 +355,22 @@ const ChatContent = props => {
                 selectedChat.messages
                   .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
                   .map((msg) => {
-                    const isSender = msg.from_user_id === user?.id
+                    // Для админов: сообщение считается отправленным от нас, если оно от текущего пользователя или от выбранного админа во вкладке
+                    let isSender = false
+                    let senderUser = user // По умолчанию отправитель - текущий пользователь
+                    
+                    if (user?.roles?.some(r => r.name === 'admin') && selectedAdminTab) {
+                      isSender = msg.from_user_id === user.id || msg.from_user_id === selectedAdminTab
+                      // Если сообщение от выбранного админа, используем его данные для аватара
+                      if (msg.from_user_id === selectedAdminTab && messagesData?.tabs) {
+                        const tab = messagesData.tabs.find(t => t.admin.id === selectedAdminTab)
+                        if (tab && tab.admin) {
+                          senderUser = tab.admin
+                        }
+                      }
+                    } else {
+                      isSender = msg.from_user_id === user?.id
+                    }
 
                     return (
                       <div
@@ -314,13 +393,17 @@ const ChatContent = props => {
                               {getInitials(activeUser?.name || activeUser?.email)}
                             </CustomAvatar>
                           )
-                        ) : user?.avatar ? (
-                          <Avatar alt={user?.name || user?.email} src={user?.avatar} className='is-8 bs-8' />
-                        ) : (
-                          <CustomAvatar size={32}>
-                            {getInitials(user?.name || user?.email)}
-                          </CustomAvatar>
-                        )}
+                        ) : (() => {
+                          // Определяем аватар отправителя
+                          const displayUser = senderUser || user
+                          return displayUser?.avatar ? (
+                            <Avatar alt={displayUser?.name || displayUser?.email} src={displayUser?.avatar} className='is-8 bs-8' />
+                          ) : (
+                            <CustomAvatar size={32}>
+                              {getInitials(displayUser?.name || displayUser?.email || 'User')}
+                            </CustomAvatar>
+                          )
+                        })()}
                         <div
                           className={classnames('flex flex-col gap-2', {
                             'items-end': isSender,
@@ -353,15 +436,17 @@ const ChatContent = props => {
                             </Box>
                           ) : (
                             <>
-                              <Typography
-                                className={classnames('whitespace-pre-wrap pli-4 plb-2 shadow-xs', {
-                                  'bg-backgroundPaper rounded-e rounded-b': !isSender,
-                                  'bg-primary text-[var(--mui-palette-primary-contrastText)] rounded-s rounded-b': isSender
-                                })}
-                                style={{ wordBreak: 'break-word' }}
-                              >
-                                {msg.body}
-                              </Typography>
+                              {msg.body && (
+                                <Typography
+                                  className={classnames('whitespace-pre-wrap pli-4 plb-2 shadow-xs', {
+                                    'bg-backgroundPaper rounded-e rounded-b': !isSender,
+                                    'bg-primary text-[var(--mui-palette-primary-contrastText)] rounded-s rounded-b': isSender
+                                  })}
+                                  style={{ wordBreak: 'break-word' }}
+                                >
+                                  {msg.body}
+                                </Typography>
+                              )}
                               {msg.task_id && (
                                 <Chip
                                   label={`Task #${msg.task_id}`}
@@ -385,10 +470,21 @@ const ChatContent = props => {
                               {msg.attachments && msg.attachments.length > 0 && (
                                 <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                                   {msg.attachments.map((att, idx) => {
-                                    const isImage = typeof att === 'string' && /\.(jpg|jpeg|png|gif|webp)$/i.test(att)
-                                    const url = typeof att === 'string' 
-                                      ? (att.startsWith('http') ? att : `${API_URL}${att}`)
+                                    // Обработка разных типов attachments
+                                    const attachment = typeof att === 'string' ? { url: att, type: 'file' } : att
+                                    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(attachment.url || '')
+                                    const isVoice = attachment.type === 'voice'
+                                    const url = attachment.url 
+                                      ? (attachment.url.startsWith('http') ? attachment.url : `${API_URL}${attachment.url}`)
                                       : null
+                                    
+                                    if (isVoice && url) {
+                                      return (
+                                        <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                          <audio controls src={url} style={{ maxWidth: 250 }} />
+                                        </Box>
+                                      )
+                                    }
                                     
                                     return isImage && url ? (
                                       <Box
@@ -410,7 +506,7 @@ const ChatContent = props => {
                                     ) : (
                                       <Chip
                                         key={idx}
-                                        label={typeof att === 'string' ? att.split('/').pop() : `Attachment ${idx + 1}`}
+                                        label={attachment.name || (typeof attachment.url === 'string' ? attachment.url.split('/').pop() : `Attachment ${idx + 1}`)}
                                         size="small"
                                         icon={<i className="ri-file-line" />}
                                         onClick={() => url && window.open(url, '_blank')}
@@ -424,6 +520,12 @@ const ChatContent = props => {
                                 <Typography variant='caption' className='text-textSecondary'>
                                   {formatDate(msg.created_at_formatted || msg.created_at)}
                                 </Typography>
+                                {/* Статус прочтения: админы видят для своих сообщений, модераторы не видят */}
+                                {user?.roles?.some(r => r.name === 'admin') && isSender && msg.is_read !== null && msg.is_read !== undefined && (
+                                  <Tooltip title={msg.is_read ? `Read at ${msg.read_at_formatted ? formatDate(msg.read_at_formatted) : ''}` : 'Unread'}>
+                                    <i className={msg.is_read ? 'ri-check-double-line text-primary' : 'ri-check-line text-textSecondary'} style={{ fontSize: 14 }} />
+                                  </Tooltip>
+                                )}
                                 {user?.roles?.some(r => r.name === 'admin') && isSender && (
                                   <Box sx={{ display: 'flex', gap: 0.5 }}>
                                     <Tooltip title="Edit message">
@@ -480,9 +582,16 @@ const ChatContent = props => {
             setMessageText={setMessageText}
             attachments={attachments}
             setAttachments={setAttachments}
+            voiceFile={voiceFile}
+            setVoiceFile={setVoiceFile}
+            isRecording={isRecording}
             onSend={handleSend}
             onFileSelect={handleFileSelect}
+            onVoiceFileSelect={handleVoiceFileSelect}
             onPaste={handlePaste}
+            onStartRecording={startRecording}
+            onStopRecording={stopRecording}
+            onRemoveVoiceFile={removeVoiceFile}
             isBelowSmScreen={isBelowSmScreen}
             messageInputRef={messageInputRef}
           />

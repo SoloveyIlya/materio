@@ -29,7 +29,8 @@ const ChatWrapper = () => {
   // States
   const [backdropOpen, setBackdropOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState(0) // 0 = Messages, 1 = Support
+  const [activeTab, setActiveTab] = useState(0) // Для админов: индекс выбранной вкладки с админом, для модераторов: 0 = Messages
+  const [selectedAdminTab, setSelectedAdminTab] = useState(null) // Для админов: ID выбранного админа во вкладке
   const [messagesData, setMessagesData] = useState(null)
   const [selectedChat, setSelectedChat] = useState(null)
   const [user, setUser] = useState(null)
@@ -54,7 +55,16 @@ const ChatWrapper = () => {
     if (user) {
       loadMessages()
     }
-  }, [activeTab, user])
+  }, [user])
+
+  // For admins: when tab changes, update selectedAdminTab
+  useEffect(() => {
+    if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs && messagesData.tabs.length > 0) {
+      if (activeTab >= 0 && activeTab < messagesData.tabs.length) {
+        setSelectedAdminTab(messagesData.tabs[activeTab].admin.id)
+      }
+    }
+  }, [activeTab, messagesData, user])
 
   // Auto-refresh messages every 3 seconds
   useEffect(() => {
@@ -74,18 +84,12 @@ const ChatWrapper = () => {
     if (selectedChat && selectedChat.user && messagesData) {
       const selectedUserId = selectedChat.user.id
       
-      // For admin
-      if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs) {
-        for (const tab of messagesData.tabs) {
-          const chat = tab.chats.find(c => c.user.id === selectedUserId)
-          if (chat) {
-            setSelectedChat(chat)
-            return
-          }
-        }
-        const unassignedChat = messagesData.unassigned?.chats?.find(c => c.user.id === selectedUserId)
-        if (unassignedChat) {
-          setSelectedChat(unassignedChat)
+      // For admin - ищем чат только в текущей вкладке
+      if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs && activeTab >= 0 && activeTab < messagesData.tabs.length) {
+        const currentTab = messagesData.tabs[activeTab]
+        const chat = currentTab.chats.find(c => c.user.id === selectedUserId)
+        if (chat) {
+          setSelectedChat(chat)
         }
       } else if (messagesData && Array.isArray(messagesData) && selectedChat.user) {
         // For moderator
@@ -95,7 +99,7 @@ const ChatWrapper = () => {
         }
       }
     }
-  }, [messagesData])
+  }, [messagesData, activeTab])
 
   // Check URL parameters for task_id
   useEffect(() => {
@@ -109,19 +113,13 @@ const ChatWrapper = () => {
         setTimeout(() => {
           if (messagesData) {
             if (moderatorId && user?.roles?.some(r => r.name === 'admin')) {
-              // Find moderator in tabs or unassigned
-              if (messagesData.tabs) {
-                for (const tab of messagesData.tabs) {
-                  const chat = tab.chats.find(c => c.user.id === parseInt(moderatorId))
-                  if (chat) {
-                    setSelectedChat(chat)
-                    return
-                  }
+              // Find moderator in current tab only
+              if (messagesData.tabs && activeTab >= 0 && activeTab < messagesData.tabs.length) {
+                const currentTab = messagesData.tabs[activeTab]
+                const chat = currentTab.chats.find(c => c.user.id === parseInt(moderatorId))
+                if (chat) {
+                  setSelectedChat(chat)
                 }
-              }
-              const unassignedChat = messagesData.unassigned?.chats?.find(c => c.user.id === parseInt(moderatorId))
-              if (unassignedChat) {
-                setSelectedChat(unassignedChat)
               }
             }
           }
@@ -144,9 +142,23 @@ const ChatWrapper = () => {
       if (!silent) {
         setLoading(true)
       }
-      const type = activeTab === 0 ? 'message' : 'support'
+      // Для админов всегда используем type='message', для модераторов тоже
+      const type = 'message'
       const response = await api.get(`/messages?type=${type}`)
       setMessagesData(response.data)
+      
+      // Для админов: устанавливаем вкладку текущего админа по умолчанию
+      if (user?.roles?.some(r => r.name === 'admin') && response.data?.tabs && response.data.tabs.length > 0) {
+        // Находим индекс вкладки с текущим админом
+        const currentAdminTabIndex = response.data.tabs.findIndex(tab => tab.admin.id === user.id)
+        if (currentAdminTabIndex >= 0) {
+          setActiveTab(currentAdminTabIndex)
+          setSelectedAdminTab(response.data.tabs[currentAdminTabIndex].admin.id)
+        } else if (activeTab === 0 && !selectedAdminTab) {
+          // Если текущий админ не найден, используем первую вкладку
+          setSelectedAdminTab(response.data.tabs[0].admin.id)
+        }
+      }
     } catch (error) {
       console.error('Error loading messages:', error)
     } finally {
@@ -156,33 +168,51 @@ const ChatWrapper = () => {
     }
   }
 
-  const handleSendMessage = async (messageText, attachments = []) => {
-    if (!messageText.trim() && attachments.length === 0) return
+  const handleSendMessage = async (messageText, attachments = [], voiceFile = null) => {
+    if (!messageText.trim() && attachments.length === 0 && !voiceFile) return
     if (!selectedChat || !selectedChat.user) return
 
     try {
       const urlParams = new URLSearchParams(window.location.search)
       const taskId = urlParams.get('task_id')
 
+      // Для админов: определяем from_user_id на основе выбранной вкладки
+      let fromUserId = null
+      if (user?.roles?.some(r => r.name === 'admin') && selectedAdminTab && selectedAdminTab !== user.id) {
+        fromUserId = selectedAdminTab
+      }
+
       const messageData = {
         to_user_id: selectedChat.user.id,
-        type: activeTab === 0 ? 'message' : 'support',
-        body: messageText,
+        type: 'message',
+        body: messageText || null,
         attachments: attachments.map(f => f.name || f),
         task_id: taskId || null,
       }
 
-      // If there are files, use FormData
-      if (attachments.some(f => f instanceof File)) {
+      if (fromUserId) {
+        messageData.from_user_id = fromUserId
+      }
+
+      // If there are files or voice, use FormData
+      if (attachments.some(f => f instanceof File) || voiceFile) {
         const formData = new FormData()
         formData.append('to_user_id', selectedChat.user.id.toString())
-        formData.append('type', activeTab === 0 ? 'message' : 'support')
+        formData.append('type', 'message')
         if (messageText) {
           formData.append('body', messageText)
         }
         
+        if (fromUserId) {
+          formData.append('from_user_id', fromUserId.toString())
+        }
+        
         if (taskId) {
           formData.append('task_id', taskId)
+        }
+        
+        if (voiceFile) {
+          formData.append('voice', voiceFile)
         }
         
         attachments.forEach((file, index) => {
@@ -245,27 +275,61 @@ const ChatWrapper = () => {
         'shadow-md': settings.skin !== 'bordered'
       })}
     >
-      {/* Tabs for Messages/Support */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3, pt: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-          <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
-            <Tab label="Messages" />
-            <Tab label="Support" />
-          </Tabs>
-          <Chip 
-            label="🟢 Real-time" 
-            size="small" 
-            color="success" 
-            sx={{ fontSize: '0.75rem' }}
-          />
+      {/* Tabs: для админов - вкладки с админами, для модераторов - только Messages */}
+      {user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs ? (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3, pt: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={(e, newValue) => {
+                setActiveTab(newValue)
+                if (messagesData.tabs[newValue]) {
+                  setSelectedAdminTab(messagesData.tabs[newValue].admin.id)
+                  setSelectedChat(null) // Сбрасываем выбранный чат при смене вкладки
+                }
+              }}
+              variant="scrollable"
+              scrollButtons="auto"
+            >
+              {messagesData.tabs.map((tab, index) => (
+                <Tab 
+                  key={tab.admin.id} 
+                  label={tab.admin.name} 
+                  value={index}
+                />
+              ))}
+            </Tabs>
+            <Chip 
+              label="🟢 Real-time" 
+              size="small" 
+              color="success" 
+              sx={{ fontSize: '0.75rem' }}
+            />
+          </Box>
         </Box>
-      </Box>
+      ) : (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3, pt: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+            <Tabs value={0}>
+              <Tab label="Messages" />
+            </Tabs>
+            <Chip 
+              label="🟢 Real-time" 
+              size="small" 
+              color="success" 
+              sx={{ fontSize: '0.75rem' }}
+            />
+          </Box>
+        </Box>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         <SidebarLeft
           messagesData={messagesData}
           user={user}
           selectedChat={selectedChat}
+          selectedAdminTab={selectedAdminTab}
+          activeTab={activeTab}
           onSelectChat={handleSelectChat}
           loading={loading}
           backdropOpen={backdropOpen}
@@ -281,6 +345,8 @@ const ChatWrapper = () => {
         <ChatContent
           selectedChat={selectedChat}
           user={user}
+          selectedAdminTab={selectedAdminTab}
+          messagesData={messagesData}
           onSendMessage={handleSendMessage}
           onEditMessage={handleEditMessage}
           onDeleteMessage={handleDeleteMessage}

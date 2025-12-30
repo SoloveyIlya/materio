@@ -16,255 +16,132 @@ class MessageController extends Controller
         $user = $request->user();
         $type = $request->get('type', 'message'); // message или support
 
-        // Для админа: получаем чаты с модераторами, группированные по администраторам
+        // Для админа: получаем чаты, группированные по администраторам (вкладки с админами)
         if ($user->isAdmin()) {
-            $query = Message::where('domain_id', $user->domain_id)
-                ->where('type', $type)
-                ->where('is_deleted', false)
-                ->where(function ($q) use ($user) {
-                    $q->where('from_user_id', $user->id)
-                      ->orWhere('to_user_id', $user->id);
-                })
-                ->with(['fromUser', 'toUser', 'task']);
-
-            if ($request->has('moderator_id')) {
-                $query->where(function ($q) use ($request) {
-                    $q->where('from_user_id', $request->moderator_id)
-                      ->orWhere('to_user_id', $request->moderator_id);
-                });
-            }
-
-            $messages = $query->orderBy('created_at', 'desc')->get();
-
-            // Получаем всех администраторов домена
+            // Получаем всех администраторов домена (все будут вкладками)
             $admins = \App\Models\User::where('domain_id', $user->domain_id)
                 ->whereHas('roles', function ($q) {
                     $q->where('name', 'admin');
                 })
-                ->get();
+                ->get(['id', 'name', 'email', 'is_online', 'last_seen_at', 'avatar']);
 
-            // Группируем чаты по администраторам
-            $tabs = [];
-            $unassignedChats = [];
-
-            foreach ($admins as $admin) {
-                // Получаем модераторов, закреплённых за этого администратора
-                $assignedModerators = \App\Models\User::where('domain_id', $user->domain_id)
-                    ->where('administrator_id', $admin->id)
-                    ->whereHas('roles', function ($q) {
-                        $q->where('name', 'moderator');
-                    })
-                    ->pluck('id')
-                    ->toArray();
-
-                $adminChats = [];
-                
-                // Находим сообщения с модераторами этого администратора
-                foreach ($messages as $message) {
-                    $otherUserId = $message->from_user_id === $user->id 
-                        ? $message->to_user_id 
-                        : $message->from_user_id;
-                    
-                    // Если это модератор, закреплённый за этого админа
-                    if (in_array($otherUserId, $assignedModerators)) {
-                        if (!isset($adminChats[$otherUserId])) {
-                            $adminChats[$otherUserId] = [
-                                'user' => $message->from_user_id === $user->id 
-                                    ? $message->toUser 
-                                    : $message->fromUser,
-                                'messages' => [],
-                                'unread_count' => 0,
-                            ];
-                        }
-                        
-                        $adminChats[$otherUserId]['messages'][] = $message;
-                        
-                        // Считаем непрочитанные сообщения
-                        if (!$message->is_read && $message->to_user_id === $user->id) {
-                            $adminChats[$otherUserId]['unread_count']++;
-                        }
-                    }
-                }
-
-                if (count($adminChats) > 0 || $admin->id === $user->id) {
-                    $tabs[] = [
-                        'admin' => [
-                            'id' => $admin->id,
-                            'name' => $admin->name,
-                            'email' => $admin->email,
-                        ],
-                        'chats' => array_values($adminChats),
-                    ];
-                }
-            }
-
-            // Незакреплённые модераторы
-            $unassignedModerators = \App\Models\User::where('domain_id', $user->domain_id)
-                ->whereHas('roles', function ($q) {
-                    $q->where('name', 'moderator');
-                })
-                ->whereNull('administrator_id')
-                ->pluck('id')
-                ->toArray();
-
-            foreach ($messages as $message) {
-                $otherUserId = $message->from_user_id === $user->id 
-                    ? $message->to_user_id 
-                    : $message->from_user_id;
-                
-                // Если это незакреплённый модератор
-                if (in_array($otherUserId, $unassignedModerators)) {
-                    if (!isset($unassignedChats[$otherUserId])) {
-                        $unassignedChats[$otherUserId] = [
-                            'user' => $message->from_user_id === $user->id 
-                                ? $message->toUser 
-                                : $message->fromUser,
-                            'messages' => [],
-                            'unread_count' => 0,
-                        ];
-                    }
-                    
-                    $unassignedChats[$otherUserId]['messages'][] = $message;
-                    
-                    // Считаем непрочитанные сообщения
-                    if (!$message->is_read && $message->to_user_id === $user->id) {
-                        $unassignedChats[$otherUserId]['unread_count']++;
-                    }
-                }
-            }
-
-            // Получаем всех модераторов для отображения, даже если нет сообщений
+            // Получаем всех модераторов для отображения
             $allModerators = \App\Models\User::where('domain_id', $user->domain_id)
                 ->whereHas('roles', function ($q) {
                     $q->where('name', 'moderator');
                 })
-                ->get(['id', 'name', 'email', 'is_online', 'last_seen_at']);
+                ->get(['id', 'name', 'email', 'is_online', 'last_seen_at', 'avatar', 'administrator_id']);
 
-            // Добавляем модераторов без сообщений в соответствующие табы
-            foreach ($admins as $adminIndex => $admin) {
-                $assignedModerators = \App\Models\User::where('domain_id', $user->domain_id)
-                    ->where('administrator_id', $admin->id)
-                    ->whereHas('roles', function ($q) {
-                        $q->where('name', 'moderator');
-                    })
-                    ->pluck('id')
-                    ->toArray();
+            $tabs = [];
 
-                // Находим таб для этого админа
-                $tabIndex = null;
-                foreach ($tabs as $idx => $tab) {
-                    if ($tab['admin']['id'] === $admin->id) {
-                        $tabIndex = $idx;
-                        break;
-                    }
-                }
+            foreach ($admins as $admin) {
+                // Получаем модераторов, закреплённых за этого администратора
+                $assignedModerators = $allModerators->where('administrator_id', $admin->id)->values();
+
+                // Получаем все сообщения между этим админом и его модераторами
+                $moderatorIds = $assignedModerators->pluck('id')->toArray();
                 
-                if ($tabIndex !== null) {
-                    // Добавляем модераторов без сообщений
-                    foreach ($allModerators as $moderator) {
-                        if (in_array($moderator->id, $assignedModerators)) {
-                            // Проверяем, есть ли уже чат с этим модератором
-                            $existingChat = null;
-                            foreach ($tabs[$tabIndex]['chats'] as $chat) {
-                                if ($chat['user']['id'] === $moderator->id) {
-                                    $existingChat = $chat;
-                                    break;
-                                }
-                            }
-                            
-                            if (!$existingChat) {
-                                $tabs[$tabIndex]['chats'][] = [
-                                    'user' => $moderator,
-                                    'messages' => [],
-                                    'unread_count' => 0
-                                ];
-                            }
-                        }
-                    }
-                } else {
-                    // Создаём новый таб, если его нет, но есть закреплённые модераторы
-                    if (count($assignedModerators) > 0) {
-                        $newTabChats = [];
-                        foreach ($allModerators as $moderator) {
-                            if (in_array($moderator->id, $assignedModerators)) {
-                                $newTabChats[] = [
-                                    'user' => $moderator,
-                                    'messages' => [],
-                                    'unread_count' => 0
-                                ];
-                            }
-                        }
-                        
-                        if (count($newTabChats) > 0) {
-                            $tabs[] = [
-                                'admin' => [
-                                    'id' => $admin->id,
-                                    'name' => $admin->name,
-                                    'email' => $admin->email,
-                                ],
-                                'chats' => $newTabChats,
-                            ];
-                        }
-                    }
-                }
-            }
+                if (count($moderatorIds) > 0) {
+                    $messages = Message::where('domain_id', $user->domain_id)
+                        ->where('type', $type)
+                        ->where('is_deleted', false)
+                        ->where(function ($q) use ($admin, $moderatorIds) {
+                            // Сообщения от админа к модераторам
+                            $q->where(function ($subQ) use ($admin, $moderatorIds) {
+                                $subQ->where('from_user_id', $admin->id)
+                                     ->whereIn('to_user_id', $moderatorIds);
+                            })
+                            // Сообщения от модераторов к админу
+                            ->orWhere(function ($subQ) use ($admin, $moderatorIds) {
+                                $subQ->whereIn('from_user_id', $moderatorIds)
+                                     ->where('to_user_id', $admin->id);
+                            });
+                        })
+                        ->with(['fromUser', 'toUser', 'task'])
+                        ->orderBy('created_at', 'asc')
+                        ->get();
 
-            // Незакреплённые модераторы - добавляем тех, у кого нет сообщений
-            $unassignedModeratorIds = \App\Models\User::where('domain_id', $user->domain_id)
-                ->whereHas('roles', function ($q) {
-                    $q->where('name', 'moderator');
-                })
-                ->whereNull('administrator_id')
-                ->pluck('id')
-                ->toArray();
-
-            $unassignedModeratorsList = [];
-            foreach ($allModerators as $moderator) {
-                if (in_array($moderator->id, $unassignedModeratorIds)) {
-                    // Проверяем, есть ли уже чат
-                    $existingChat = null;
-                    foreach (array_values($unassignedChats) as $chat) {
-                        if ($chat['user']['id'] === $moderator->id) {
-                            $existingChat = $chat;
-                            break;
-                        }
-                    }
+                    // Группируем сообщения по модераторам
+                    $adminChats = [];
                     
-                    if (!$existingChat) {
-                        $unassignedModeratorsList[] = [
+                    foreach ($assignedModerators as $moderator) {
+                        $moderatorMessages = $messages->filter(function ($msg) use ($admin, $moderator) {
+                            return ($msg->from_user_id === $admin->id && $msg->to_user_id === $moderator->id) ||
+                                   ($msg->from_user_id === $moderator->id && $msg->to_user_id === $admin->id);
+                        })->values();
+
+                        // Форматируем сообщения (админ видит статус прочтения для сообщений от модераторов)
+                        $formattedMessages = $moderatorMessages->map(function ($message) use ($user, $admin) {
+                            if ($message->created_at) {
+                                $message->created_at_formatted = $message->created_at
+                                    ->setTimezone($user->timezone ?? 'UTC')
+                                    ->format('Y-m-d H:i:s');
+                            }
+                            // Админ видит статус прочтения для сообщений, которые он отправил модератору
+                            if ($message->from_user_id === $admin->id && $message->read_at) {
+                                $message->read_at_formatted = $message->read_at
+                                    ->setTimezone($user->timezone ?? 'UTC')
+                                    ->format('Y-m-d H:i:s');
+                            }
+                            return $message;
+                        })->toArray();
+
+                        // Считаем непрочитанные сообщения от модераторов для этого админа
+                        $unreadCount = $moderatorMessages->filter(function ($msg) use ($admin) {
+                            return $msg->from_user_id !== $admin->id && 
+                                   $msg->to_user_id === $admin->id && 
+                                   !$msg->is_read;
+                        })->count();
+
+                        $adminChats[] = [
                             'user' => $moderator,
-                            'messages' => [],
-                            'unread_count' => 0
+                            'messages' => $formattedMessages,
+                            'unread_count' => $unreadCount,
                         ];
                     }
+                } else {
+                    $adminChats = [];
                 }
+
+                // Добавляем таб для каждого админа, даже если нет чатов
+                $tabs[] = [
+                    'admin' => [
+                        'id' => $admin->id,
+                        'name' => $admin->name,
+                        'email' => $admin->email,
+                        'avatar' => $admin->avatar,
+                    ],
+                    'chats' => $adminChats,
+                ];
             }
 
             return response()->json([
                 'tabs' => $tabs,
-                'unassigned' => [
-                    'chats' => array_merge(array_values($unassignedChats), $unassignedModeratorsList),
-                    'moderators' => $allModerators,
-                ],
             ]);
         }
 
-        // Для модератора: получаем чаты с админами
+        // Для модератора: получаем чаты только с его админом (administrator_id)
+        $administratorId = $user->administrator_id;
+        
+        if (!$administratorId) {
+            // Если модератор не закреплен за админом, возвращаем пустой список
+            return response()->json([]);
+        }
+
         $query = Message::where('domain_id', $user->domain_id)
             ->where('type', $type)
-            ->where(function ($q) use ($user) {
-                $q->where('from_user_id', $user->id)
-                  ->orWhere('to_user_id', $user->id);
+            ->where(function ($q) use ($user, $administratorId) {
+                // Сообщения между модератором и его админом
+                $q->where(function ($subQ) use ($user, $administratorId) {
+                    $subQ->where('from_user_id', $user->id)
+                         ->where('to_user_id', $administratorId);
+                })->orWhere(function ($subQ) use ($user, $administratorId) {
+                    $subQ->where('from_user_id', $administratorId)
+                         ->where('to_user_id', $user->id);
+                });
             })
             ->where('is_deleted', false)
             ->with(['fromUser', 'toUser', 'task']);
-
-        if ($request->has('admin_id')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('from_user_id', $request->admin_id)
-                  ->orWhere('to_user_id', $request->admin_id);
-            });
-        }
 
         if ($request->has('task_id')) {
             $query->where('task_id', $request->task_id);
@@ -272,72 +149,50 @@ class MessageController extends Controller
 
         $messages = $query->orderBy('created_at', 'asc')->get();
 
-        // Получаем всех админов для отображения, даже если нет сообщений
-        $allAdmins = \App\Models\User::where('domain_id', $user->domain_id)
-            ->whereHas('roles', function ($q) {
-                $q->where('name', 'admin');
-            })
-            ->get(['id', 'name', 'email', 'is_online', 'last_seen_at']);
-
-        // Группируем сообщения по админам
-        $adminChats = [];
-        $adminIdsWithMessages = [];
+        // Получаем админа модератора
+        $admin = \App\Models\User::find($administratorId);
         
-        foreach ($messages as $message) {
-            $adminId = $message->from_user_id === $user->id 
-                ? $message->to_user_id 
-                : $message->from_user_id;
-            
-            // Проверяем, что это админ
-            $isAdmin = $allAdmins->contains('id', $adminId);
-            if ($isAdmin) {
-                if (!isset($adminChats[$adminId])) {
-                    $adminChats[$adminId] = [
-                        'user' => $message->from_user_id === $user->id 
-                            ? $message->toUser 
-                            : $message->fromUser,
-                        'messages' => [],
-                    ];
-                }
-                $adminChats[$adminId]['messages'][] = $message;
-                $adminIdsWithMessages[] = $adminId;
-            }
+        if (!$admin) {
+            return response()->json([]);
         }
 
-        // Добавляем админов без сообщений
-        foreach ($allAdmins as $admin) {
-            if (!in_array($admin->id, $adminIdsWithMessages)) {
-                $adminChats[$admin->id] = [
-                    'user' => $admin,
-                    'messages' => [],
-                ];
+        // Форматируем даты по таймзоне модератора и скрываем статус прочтения для модератора
+        $formattedMessages = collect($messages)->map(function ($message) use ($user) {
+            if ($message->created_at) {
+                $message->created_at_formatted = $message->created_at
+                    ->setTimezone($user->timezone ?? 'UTC')
+                    ->format('Y-m-d H:i:s');
             }
-        }
-
-        // Форматируем даты по таймзоне модератора
-        $formattedChats = [];
-        foreach ($adminChats as $chat) {
-            $formattedMessages = collect($chat['messages'])->map(function ($message) use ($user) {
-                if ($message->created_at) {
-                    $message->created_at_formatted = $message->created_at
-                        ->setTimezone($user->timezone ?? 'UTC')
-                        ->format('Y-m-d H:i:s');
-                }
+            // Модератор не видит статус прочтения админом
+            if ($message->from_user_id === $user->id) {
+                // Сообщения от модератора - скрываем статус прочтения
+                $message->is_read = null;
+                $message->read_at = null;
+                $message->read_at_formatted = null;
+            } else {
+                // Сообщения от админа - форматируем read_at если есть
                 if ($message->read_at) {
                     $message->read_at_formatted = $message->read_at
                         ->setTimezone($user->timezone ?? 'UTC')
                         ->format('Y-m-d H:i:s');
                 }
-                return $message;
-            })->toArray();
-            
-            $formattedChats[] = [
-                'user' => $chat['user'],
+            }
+            return $message;
+        })->toArray();
+        
+        return response()->json([
+            [
+                'user' => [
+                    'id' => $admin->id,
+                    'name' => $admin->name,
+                    'email' => $admin->email,
+                    'is_online' => $admin->is_online,
+                    'last_seen_at' => $admin->last_seen_at,
+                    'avatar' => $admin->avatar,
+                ],
                 'messages' => $formattedMessages,
-            ];
-        }
-
-        return response()->json($formattedChats);
+            ]
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -347,14 +202,26 @@ class MessageController extends Controller
         // Валидация для обычных данных
         $validated = $request->validate([
             'to_user_id' => 'required|exists:users,id',
+            'from_user_id' => 'nullable|exists:users,id', // Для отправки от имени другого админа
             'task_id' => 'nullable|exists:tasks,id',
             'type' => 'required|in:message,support',
             'body' => 'nullable|string',
         ]);
         
         // Проверяем, что есть либо body, либо файлы
-        if (empty($validated['body']) && !$request->hasFile('attachments')) {
-            return response()->json(['message' => 'Message body or attachments required'], 422);
+        if (empty($validated['body']) && !$request->hasFile('attachments') && !$request->hasFile('voice')) {
+            return response()->json(['message' => 'Message body, attachments or voice required'], 422);
+        }
+
+        // Определяем от имени кого отправлять сообщение
+        $fromUserId = $user->id;
+        if ($user->isAdmin() && isset($validated['from_user_id']) && $validated['from_user_id'] !== $user->id) {
+            // Проверяем, что указанный пользователь - админ из того же домена
+            $fromUser = \App\Models\User::find($validated['from_user_id']);
+            if (!$fromUser || !$fromUser->isAdmin() || $fromUser->domain_id !== $user->domain_id) {
+                return response()->json(['message' => 'Invalid from_user_id'], 403);
+            }
+            $fromUserId = $validated['from_user_id'];
         }
 
         // Проверяем права доступа
@@ -384,21 +251,42 @@ class MessageController extends Controller
                 foreach ($attachments as $attachment) {
                     if ($attachment && $attachment->isValid()) {
                         $path = $attachment->store('messages/attachments', 'public');
-                        $attachmentPaths[] = Storage::url($path);
+                        $attachmentPaths[] = [
+                            'url' => Storage::url($path),
+                            'type' => 'file',
+                            'name' => $attachment->getClientOriginalName(),
+                        ];
                     }
                 }
             } else {
                 // Если одно вложение
                 if ($attachments->isValid()) {
                     $path = $attachments->store('messages/attachments', 'public');
-                    $attachmentPaths[] = Storage::url($path);
+                    $attachmentPaths[] = [
+                        'url' => Storage::url($path),
+                        'type' => 'file',
+                        'name' => $attachments->getClientOriginalName(),
+                    ];
                 }
+            }
+        }
+
+        // Обработка голосовых сообщений (кружков)
+        if ($request->hasFile('voice')) {
+            $voiceFile = $request->file('voice');
+            if ($voiceFile->isValid()) {
+                $path = $voiceFile->store('messages/voice', 'public');
+                $attachmentPaths[] = [
+                    'url' => Storage::url($path),
+                    'type' => 'voice',
+                    'name' => $voiceFile->getClientOriginalName(),
+                ];
             }
         }
 
         $message = Message::create([
             'domain_id' => $user->domain_id,
-            'from_user_id' => $user->id,
+            'from_user_id' => $fromUserId, // Используем fromUserId (может быть другой админ)
             'to_user_id' => $validated['to_user_id'],
             'task_id' => $validated['task_id'] ?? null,
             'type' => $validated['type'],

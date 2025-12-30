@@ -63,10 +63,17 @@ const SendMsgForm = ({
   messageText, 
   setMessageText, 
   attachments, 
-  setAttachments, 
+  setAttachments,
+  voiceFile,
+  setVoiceFile,
+  isRecording,
   onSend, 
-  onFileSelect, 
+  onFileSelect,
+  onVoiceFileSelect,
   onPaste,
+  onStartRecording,
+  onStopRecording,
+  onRemoveVoiceFile,
   isBelowSmScreen, 
   messageInputRef 
 }) => {
@@ -93,7 +100,7 @@ const SendMsgForm = ({
   const handleSendMsg = (event) => {
     event.preventDefault()
 
-    if (messageText.trim() !== '' || attachments.length > 0) {
+    if (messageText.trim() !== '' || attachments.length > 0 || voiceFile) {
       onSend()
     }
   }
@@ -135,6 +142,28 @@ const SendMsgForm = ({
                   />
                 </label>
               </MenuItem>
+              <MenuItem onClick={handleClose} className='p-0'>
+                <label htmlFor='upload-voice-sm' className='plb-2 pli-5'>
+                  <i className='ri-mic-line text-textPrimary' />
+                  <input 
+                    hidden 
+                    type='file' 
+                    id='upload-voice-sm'
+                    accept='audio/*'
+                    onChange={onVoiceFileSelect}
+                  />
+                </label>
+              </MenuItem>
+              {isRecording && onStopRecording && (
+                <MenuItem onClick={() => { onStopRecording(); handleClose(); }}>
+                  <i className='ri-stop-circle-line text-textPrimary' />
+                </MenuItem>
+              )}
+              {!isRecording && onStartRecording && (
+                <MenuItem onClick={() => { onStartRecording(); handleClose(); }}>
+                  <i className='ri-mic-fill text-textPrimary' />
+                </MenuItem>
+              )}
             </Menu>
             <EmojiPicker
               anchorRef={anchorRef}
@@ -178,6 +207,38 @@ const SendMsgForm = ({
                 onChange={onFileSelect}
               />
             </IconButton>
+            <IconButton 
+              size='small' 
+              component='label' 
+              htmlFor='upload-voice'
+              color={isRecording ? 'error' : 'default'}
+            >
+              <i className={isRecording ? 'ri-stop-circle-line text-textPrimary' : 'ri-mic-line text-textPrimary'} />
+              <input 
+                hidden 
+                type='file' 
+                id='upload-voice'
+                accept='audio/*'
+                onChange={onVoiceFileSelect}
+              />
+            </IconButton>
+            {isRecording && onStopRecording && (
+              <IconButton 
+                size='small' 
+                onClick={onStopRecording}
+                color='error'
+              >
+                <i className='ri-stop-circle-fill text-textPrimary' />
+              </IconButton>
+            )}
+            {!isRecording && onStartRecording && (
+              <IconButton 
+                size='small' 
+                onClick={onStartRecording}
+              >
+                <i className='ri-mic-fill text-textPrimary' />
+              </IconButton>
+            )}
           </>
         )}
         {isBelowSmScreen ? (
@@ -199,8 +260,8 @@ const SendMsgForm = ({
       onSubmit={handleSendMsg}
       className='bg-[var(--mui-palette-customColors-chatBg)]'
     >
-      {attachments.length > 0 && (
-        <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider' }}>
+      {(attachments.length > 0 || voiceFile) && (
+        <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider', display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           {attachments.map((file, idx) => (
             <Chip
               key={idx}
@@ -210,6 +271,16 @@ const SendMsgForm = ({
               sx={{ mr: 0.5, mb: 0.5 }}
             />
           ))}
+          {voiceFile && (
+            <Chip
+              label={voiceFile.name || 'Voice message'}
+              onDelete={onRemoveVoiceFile}
+              size="small"
+              icon={<i className='ri-mic-line' />}
+              color="primary"
+              sx={{ mr: 0.5, mb: 0.5 }}
+            />
+          )}
         </Box>
       )}
       <TextField
