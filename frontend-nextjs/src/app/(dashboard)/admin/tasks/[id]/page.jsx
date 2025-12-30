@@ -546,8 +546,8 @@ export default function AdminTaskViewPage() {
                     <Typography variant='h6' gutterBottom sx={{ mb: 4 }}>Additional Materials</Typography>
                     
                     <Box sx={{ position: 'relative', pl: 2 }}>
-                      {/* Documentation Section */}
-                      {documentations.length > 0 && (
+                      {/* Answers Section - новейший (сверху) */}
+                      {task.result?.answers && (
                         <Box sx={{ mb: 4, position: 'relative' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                             <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -556,23 +556,23 @@ export default function AdminTaskViewPage() {
                                   width: 12,
                                   height: 12,
                                   borderRadius: '50%',
-                                  bgcolor: '#4CAF50',
+                                  bgcolor: '#3F51B5',
                                   flexShrink: 0,
                                   zIndex: 2
                                 }}
                               />
                               {(() => {
-                                const hasNextSections = tools.length > 0 || 
+                                const hasNextSections = task.result?.moderator_comment || 
                                                        (task.result?.admin_comment && task.status === 'sent_for_revision') || 
-                                                       task.result?.moderator_comment || 
-                                                       task.result?.answers;
+                                                       tools.length > 0 || 
+                                                       documentations.length > 0;
                                 if (!hasNextSections) return null;
                                 
                                 let height = 60; // Base height
-                                if (tools.length > 0) height += 40;
-                                if (task.result?.admin_comment && task.status === 'sent_for_revision') height += 40;
                                 if (task.result?.moderator_comment) height += 40;
-                                if (task.result?.answers) height += 40;
+                                if (task.result?.admin_comment && task.status === 'sent_for_revision') height += 40;
+                                if (tools.length > 0) height += 40;
+                                if (documentations.length > 0) height += 40;
                                 
                                 return (
                                   <Box
@@ -597,34 +597,149 @@ export default function AdminTaskViewPage() {
                                 fontSize: '1.1rem'
                               }}
                             >
-                              Documentation
+                              Answers
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                            {documentations.map((doc, index) => (
-                              <Box key={doc.id || index} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                <i className='ri-file-text-line' style={{ fontSize: '20px', color: '#4CAF50' }} />
-                                <Typography variant='body1' component='div'>
-                                  <a 
-                                    href={`/admin/documentation`}
-                                    onClick={(e) => {
-                                      e.preventDefault()
-                                      router.push(`/admin/documentation`)
+                          <Box sx={{ pl: 4, mt: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                              <i className='ri-question-answer-line' style={{ fontSize: '20px', color: '#3F51B5', marginTop: '2px' }} />
+                              <Typography 
+                                variant='body2' 
+                                sx={{ 
+                                  whiteSpace: 'pre-wrap', 
+                                  bgcolor: 'action.hover', 
+                                  p: 2, 
+                                  borderRadius: 1,
+                                  color: 'text.secondary',
+                                  lineHeight: 1.7,
+                                  flex: 1
+                                }}
+                              >
+                                {typeof task.result.answers === 'object' 
+                                  ? JSON.stringify(task.result.answers, null, 2)
+                                  : task.result.answers}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Moderator Comment Section */}
+                      {task.result?.moderator_comment && (
+                        <Box sx={{ mb: 4, position: 'relative' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  bgcolor: '#9C27B0',
+                                  flexShrink: 0,
+                                  zIndex: 2
+                                }}
+                              />
+                              {(() => {
+                                const hasNextSections = (task.result?.admin_comment && task.status === 'sent_for_revision') || 
+                                                       tools.length > 0 || 
+                                                       documentations.length > 0;
+                                if (!hasNextSections) return null;
+                                
+                                let height = 60; // Base height
+                                if (task.result?.admin_comment && task.status === 'sent_for_revision') height += 40;
+                                if (tools.length > 0) height += 40;
+                                if (documentations.length > 0) height += 40;
+                                
+                                return (
+                                  <Box
+                                    sx={{
+                                      position: 'absolute',
+                                      left: 5,
+                                      top: 12,
+                                      width: 2,
+                                      height: height,
+                                      bgcolor: '#E0E0E0',
+                                      zIndex: 1
                                     }}
-                                    style={{ 
-                                      color: '#1a1a1a', 
-                                      fontWeight: 600,
-                                      textDecoration: 'none',
-                                      cursor: 'pointer'
+                                  />
+                                );
+                              })()}
+                            </Box>
+                            <Typography 
+                              variant='h6' 
+                              sx={{ 
+                                fontWeight: 700, 
+                                color: '#000',
+                                fontSize: '1.1rem'
+                              }}
+                            >
+                              Moderator Comment
+                            </Typography>
+                          </Box>
+                          <Box sx={{ pl: 4, mt: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                              <i className='ri-message-3-line' style={{ fontSize: '20px', color: '#9C27B0', marginTop: '2px' }} />
+                              <Typography variant='body2' sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
+                                {task.result.moderator_comment}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Revision Section */}
+                      {task.result?.admin_comment && task.status === 'sent_for_revision' && (
+                        <Box sx={{ mb: 4, position: 'relative' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  bgcolor: '#FF9800',
+                                  flexShrink: 0,
+                                  zIndex: 2
+                                }}
+                              />
+                              {(() => {
+                                const hasNextSections = tools.length > 0 || documentations.length > 0;
+                                if (!hasNextSections) return null;
+                                
+                                let height = 60; // Base height
+                                if (tools.length > 0) height += 40;
+                                if (documentations.length > 0) height += 40;
+                                
+                                return (
+                                  <Box
+                                    sx={{
+                                      position: 'absolute',
+                                      left: 5,
+                                      top: 12,
+                                      width: 2,
+                                      height: height,
+                                      bgcolor: '#E0E0E0',
+                                      zIndex: 1
                                     }}
-                                    onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
-                                    onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
-                                  >
-                                    {doc.title}
-                                  </a>
-                                </Typography>
-                              </Box>
-                            ))}
+                                  />
+                                );
+                              })()}
+                            </Box>
+                            <Typography 
+                              variant='h6' 
+                              sx={{ 
+                                fontWeight: 700, 
+                                color: '#000',
+                                fontSize: '1.1rem'
+                              }}
+                            >
+                              Sent for Revision
+                            </Typography>
+                          </Box>
+                          <Box sx={{ pl: 4, mt: 1 }}>
+                            <Typography variant='body2' sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
+                              {task.result.admin_comment}
+                            </Typography>
                           </Box>
                         </Box>
                       )}
@@ -645,15 +760,8 @@ export default function AdminTaskViewPage() {
                                 }}
                               />
                               {(() => {
-                                const hasNextSections = (task.result?.admin_comment && task.status === 'sent_for_revision') || 
-                                                       task.result?.moderator_comment || 
-                                                       task.result?.answers;
+                                const hasNextSections = documentations.length > 0;
                                 if (!hasNextSections) return null;
-                                
-                                let height = 60; // Base height
-                                if (task.result?.admin_comment && task.status === 'sent_for_revision') height += 40;
-                                if (task.result?.moderator_comment) height += 40;
-                                if (task.result?.answers) height += 40;
                                 
                                 return (
                                   <Box
@@ -662,7 +770,7 @@ export default function AdminTaskViewPage() {
                                       left: 5,
                                       top: 12,
                                       width: 2,
-                                      height: height,
+                                      height: 60,
                                       bgcolor: '#E0E0E0',
                                       zIndex: 1
                                     }}
@@ -719,8 +827,8 @@ export default function AdminTaskViewPage() {
                         </Box>
                       )}
 
-                      {/* Revision Section */}
-                      {task.result?.admin_comment && task.status === 'sent_for_revision' && (
+                      {/* Documentation Section - старейший (снизу) */}
+                      {documentations.length > 0 && (
                         <Box sx={{ mb: 4, position: 'relative' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                             <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -729,24 +837,11 @@ export default function AdminTaskViewPage() {
                                   width: 12,
                                   height: 12,
                                   borderRadius: '50%',
-                                  bgcolor: '#FF9800',
+                                  bgcolor: '#4CAF50',
                                   flexShrink: 0,
                                   zIndex: 2
                                 }}
                               />
-                              {(task.result?.moderator_comment || task.result?.answers) && (
-                                <Box
-                                  sx={{
-                                    position: 'absolute',
-                                    left: 5,
-                                    top: 12,
-                                    width: 2,
-                                    height: task.result?.moderator_comment && task.result?.answers ? 100 : 60,
-                                    bgcolor: '#E0E0E0',
-                                    zIndex: 1
-                                  }}
-                                />
-                              )}
                             </Box>
                             <Typography 
                               variant='h6' 
@@ -756,112 +851,34 @@ export default function AdminTaskViewPage() {
                                 fontSize: '1.1rem'
                               }}
                             >
-                              Отправка на исправление
+                              Documentation
                             </Typography>
                           </Box>
-                          <Box sx={{ pl: 4, mt: 1 }}>
-                            <Typography variant='body2' sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
-                              {task.result.admin_comment}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      )}
-
-                      {/* Moderator Comment Section */}
-                      {task.result?.moderator_comment && (
-                        <Box sx={{ mb: 4, position: 'relative' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                              <Box
-                                sx={{
-                                  width: 12,
-                                  height: 12,
-                                  borderRadius: '50%',
-                                  bgcolor: '#9C27B0',
-                                  flexShrink: 0,
-                                  zIndex: 2
-                                }}
-                              />
-                              {task.result?.answers && (
-                                <Box
-                                  sx={{
-                                    position: 'absolute',
-                                    left: 5,
-                                    top: 12,
-                                    width: 2,
-                                    height: 60,
-                                    bgcolor: '#E0E0E0',
-                                    zIndex: 1
-                                  }}
-                                />
-                              )}
-                            </Box>
-                            <Typography 
-                              variant='h6' 
-                              sx={{ 
-                                fontWeight: 700, 
-                                color: '#000',
-                                fontSize: '1.1rem'
-                              }}
-                            >
-                              Moderator Comment
-                            </Typography>
-                          </Box>
-                          <Box sx={{ pl: 4, mt: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-                              <i className='ri-message-3-line' style={{ fontSize: '20px', color: '#9C27B0', marginTop: '2px' }} />
-                              <Typography variant='body2' sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
-                                {task.result.moderator_comment}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </Box>
-                      )}
-
-                      {/* Answers Section */}
-                      {task.result?.answers && (
-                        <Box sx={{ position: 'relative' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                            <Box
-                              sx={{
-                                width: 12,
-                                height: 12,
-                                borderRadius: '50%',
-                                bgcolor: '#3F51B5',
-                                flexShrink: 0
-                              }}
-                            />
-                            <Typography 
-                              variant='h6' 
-                              sx={{ 
-                                fontWeight: 700, 
-                                color: '#000',
-                                fontSize: '1.1rem'
-                              }}
-                            >
-                              Answers
-                            </Typography>
-                          </Box>
-                          <Box sx={{ pl: 4, mt: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-                              <i className='ri-question-answer-line' style={{ fontSize: '20px', color: '#3F51B5', marginTop: '2px' }} />
-                              <Typography 
-                                variant='body2' 
-                                sx={{ 
-                                  whiteSpace: 'pre-wrap', 
-                                  bgcolor: 'action.hover', 
-                                  p: 2, 
-                                  borderRadius: 1,
-                                  color: 'text.secondary',
-                                  lineHeight: 1.7,
-                                  flex: 1
-                                }}
-                              >
-                                {typeof task.result.answers === 'object' 
-                                  ? JSON.stringify(task.result.answers, null, 2)
-                                  : task.result.answers}
-                              </Typography>
-                            </Box>
+                          <Box sx={{ pl: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            {documentations.map((doc, index) => (
+                              <Box key={doc.id || index} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <i className='ri-file-text-line' style={{ fontSize: '20px', color: '#4CAF50' }} />
+                                <Typography variant='body1' component='div'>
+                                  <a 
+                                    href={`/admin/documentation`}
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      router.push(`/admin/documentation`)
+                                    }}
+                                    style={{ 
+                                      color: '#1a1a1a', 
+                                      fontWeight: 600,
+                                      textDecoration: 'none',
+                                      cursor: 'pointer'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                                    onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                                  >
+                                    {doc.title}
+                                  </a>
+                                </Typography>
+                              </Box>
+                            ))}
                           </Box>
                         </Box>
                       )}
