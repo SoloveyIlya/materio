@@ -199,6 +199,9 @@ export default function AdminTaskViewPage() {
 
   // Получаем список инструментов (может быть task.tools или task.tool)
   const tools = task.tools || (task.tool ? [task.tool] : [])
+  
+  // Получаем список документаций (может быть task.documentations или task.documentation)
+  const documentations = task.documentations || (task.documentation ? [task.documentation] : [])
 
   // Получаем данные для выбранного инструмента из результата
   const getToolData = (toolId) => {
@@ -544,7 +547,7 @@ export default function AdminTaskViewPage() {
                     
                     <Box sx={{ position: 'relative', pl: 2 }}>
                       {/* Documentation Section */}
-                      {task.documentation && (
+                      {documentations.length > 0 && (
                         <Box sx={{ mb: 4, position: 'relative' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                             <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -559,12 +562,14 @@ export default function AdminTaskViewPage() {
                                 }}
                               />
                               {(() => {
-                                const hasNextSections = (task.result?.admin_comment && task.status === 'sent_for_revision') || 
+                                const hasNextSections = tools.length > 0 || 
+                                                       (task.result?.admin_comment && task.status === 'sent_for_revision') || 
                                                        task.result?.moderator_comment || 
                                                        task.result?.answers;
                                 if (!hasNextSections) return null;
                                 
                                 let height = 60; // Base height
+                                if (tools.length > 0) height += 40;
                                 if (task.result?.admin_comment && task.status === 'sent_for_revision') height += 40;
                                 if (task.result?.moderator_comment) height += 40;
                                 if (task.result?.answers) height += 40;
@@ -592,14 +597,34 @@ export default function AdminTaskViewPage() {
                                 fontSize: '1.1rem'
                               }}
                             >
-                              Документация
+                              Documentation
                             </Typography>
                           </Box>
                           <Box sx={{ pl: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                              <i className='ri-file-text-line' style={{ fontSize: '20px', color: '#4CAF50' }} />
-                              <Typography variant='body1'>{task.documentation.title}</Typography>
-                            </Box>
+                            {documentations.map((doc, index) => (
+                              <Box key={doc.id || index} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <i className='ri-file-text-line' style={{ fontSize: '20px', color: '#4CAF50' }} />
+                                <Typography variant='body1' component='div'>
+                                  <a 
+                                    href={`/admin/documentation`}
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      router.push(`/admin/documentation`)
+                                    }}
+                                    style={{ 
+                                      color: '#1a1a1a', 
+                                      fontWeight: 600,
+                                      textDecoration: 'none',
+                                      cursor: 'pointer'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                                    onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                                  >
+                                    {doc.title}
+                                  </a>
+                                </Typography>
+                              </Box>
+                            ))}
                           </Box>
                         </Box>
                       )}
