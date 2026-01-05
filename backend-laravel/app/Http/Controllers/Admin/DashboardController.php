@@ -138,6 +138,13 @@ class DashboardController extends Controller
                 ->count()
             : 0;
 
+        $underReviewTasks = $moderatorIds->isNotEmpty()
+            ? Task::where('domain_id', $admin->domain_id)
+                ->whereIn('assigned_to', $moderatorIds)
+                ->where('status', 'under_admin_review')
+                ->count()
+            : 0;
+
         // Main Task statistics
         $mainTask = Task::where('domain_id', $admin->domain_id)
             ->where('is_main_task', true)
@@ -268,6 +275,7 @@ class DashboardController extends Controller
                     'completed' => $completedTasks,
                     'in_progress' => $inProgressTasks,
                     'pending' => $pendingTasks,
+                    'under_review' => $underReviewTasks,
                 ],
                 'main_task' => $mainTaskStats,
             ]);

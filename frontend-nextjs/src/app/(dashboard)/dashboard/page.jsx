@@ -7,7 +7,8 @@ import {
   Typography, 
   Grid, 
   Card, 
-  CardContent, 
+  CardContent,
+  CardHeader,
   Paper,
   Table as MuiTable,
   TableBody,
@@ -16,7 +17,9 @@ import {
   TableHead,
   TableRow,
   Checkbox,
-  Button
+  Button,
+  Avatar,
+  Chip
 } from '@mui/material'
 import api from '@/lib/api'
 
@@ -32,6 +35,10 @@ import DepositWithdraw from '@/views/dashboards/analytics/DepositWithdraw'
 import SalesByCountries from '@/views/dashboards/analytics/SalesByCountries'
 import CardStatVertical from '@/components/card-statistics/Vertical'
 import Table from '@/views/dashboards/analytics/Table'
+import CardStatWithImage from '@/components/card-statistics/Character'
+import TransactionsCRM from '@/views/dashboards/crm/Transactions'
+import MainTaskList from '@/views/dashboards/crm/MainTaskList'
+import CustomAvatar from '@core/components/mui/Avatar'
 
 const DashboardPage = () => {
   const [user, setUser] = useState(null)
@@ -108,280 +115,113 @@ const DashboardPage = () => {
       return <Box sx={{ p: 3 }}>Error loading dashboard</Box>
     }
 
+    const formatDate = (dateString) => {
+      if (!dateString) return '-'
+      const date = new Date(dateString)
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = date.toLocaleString('en-US', { month: 'short' })
+      return `${day} ${month}`
+    }
+
     return (
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom>Dashboard</Typography>
+      <Box sx={{ p: 6 }}>
+        <Grid container spacing={6}>
+          {/* Working Moderators Card */}
+          <Grid size={{ xs: 12, sm: 6, md: 3 }} className='self-end'>
+            <CardStatWithImage
+              stats={String(dashboardData.working_moderators?.length || 0)}
+              title='Working'
+              chipColor='primary'
+              src='/images/illustrations/characters/9.png'
+              chipText='Active moderators'
+            />
+          </Grid>
 
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          {/* Tasks Statistics */}
-          <Grid item xs={12} md={6} lg={3}>
+          {/* Deleted Moderators Card */}
+          <Grid size={{ xs: 12, sm: 6, md: 3 }} className='self-end'>
+            <CardStatWithImage
+              stats={String(dashboardData.deleted_moderators?.length || 0)}
+              title='Deleted'
+              chipColor='error'
+              src='/images/illustrations/characters/10.png'
+              chipText='Removed moderators'
+            />
+          </Grid>
+
+          {/* Tasks Card */}
+          <Grid size={{ xs: 12, md: 6 }} className='self-end'>
             <Card>
+              <CardHeader
+                title='Tasks'
+              />
               <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Total Tasks
-                </Typography>
-                <Typography variant="h4">
-                  {dashboardData.tasks?.total || 0}
-                </Typography>
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <div className='flex items-center gap-3'>
+                      <CustomAvatar variant='rounded' color='primary' className='shadow-xs'>
+                        <i className='ri-time-line'></i>
+                      </CustomAvatar>
+                      <div>
+                        <Typography>Under Review</Typography>
+                        <Typography variant='h5'>{dashboardData.tasks?.under_review || 0}</Typography>
+                      </div>
+                    </div>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <div className='flex items-center gap-3'>
+                      <CustomAvatar variant='rounded' color='success' className='shadow-xs'>
+                        <i className='ri-group-line'></i>
+                      </CustomAvatar>
+                      <div>
+                        <Typography>Pending</Typography>
+                        <Typography variant='h5'>{dashboardData.tasks?.pending || 0}</Typography>
+                      </div>
+                    </div>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <div className='flex items-center gap-3'>
+                      <CustomAvatar variant='rounded' color='warning' className='shadow-xs'>
+                        <i className='ri-checkbox-circle-line'></i>
+                      </CustomAvatar>
+                      <div>
+                        <Typography>Completed</Typography>
+                        <Typography variant='h5'>{dashboardData.tasks?.completed || 0}</Typography>
+                      </div>
+                    </div>
+                  </Grid>
+                </Grid>
               </CardContent>
             </Card>
           </Grid>
 
-          <Grid item xs={12} md={6} lg={3}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Completed Tasks
-                </Typography>
-                <Typography variant="h4">
-                  {dashboardData.tasks?.completed || 0}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={6} lg={3}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  In Progress
-                </Typography>
-                <Typography variant="h4">
-                  {dashboardData.tasks?.in_progress || 0}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={6} lg={3}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Pending Tasks
-                </Typography>
-                <Typography variant="h4">
-                  {dashboardData.tasks?.pending || 0}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        <Grid container spacing={3}>
-          {/* Working Moderators */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Working Moderators</Typography>
-                <TableContainer>
-                  <MuiTable size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Name</TableCell>
-                        <TableCell>Email</TableCell>
-                        <TableCell>Start Date</TableCell>
-                        <TableCell>Days</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {dashboardData.working_moderators?.map((mod) => (
-                        <TableRow key={mod.id}>
-                          <TableCell>{mod.name}</TableCell>
-                          <TableCell>{mod.email}</TableCell>
-                          <TableCell>{mod.work_start_date || '-'}</TableCell>
-                          <TableCell>
-                            {mod.days_since_start !== null ? `${mod.days_since_start} days` : '-'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {(!dashboardData.working_moderators || dashboardData.working_moderators.length === 0) && (
-                        <TableRow>
-                          <TableCell colSpan={4} align="center">No working moderators</TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </MuiTable>
-                </TableContainer>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Deleted Moderators */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Deleted Moderators</Typography>
-                <TableContainer>
-                  <MuiTable size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Name</TableCell>
-                        <TableCell>Email</TableCell>
-                        <TableCell>Deleted Date</TableCell>
-                        <TableCell>Days</TableCell>
-                        <TableCell>Hide</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {dashboardData.deleted_moderators?.map((mod) => (
-                        <TableRow key={mod.id}>
-                          <TableCell>{mod.name}</TableCell>
-                          <TableCell>{mod.email}</TableCell>
-                          <TableCell>{mod.deleted_at || '-'}</TableCell>
-                          <TableCell>
-                            {mod.days_since_deleted !== null ? `${mod.days_since_deleted} days` : '-'}
-                          </TableCell>
-                          <TableCell>
-                            <Checkbox
-                              checked={false}
-                              onChange={() => handleHideDeletedUser(mod.id)}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {(!dashboardData.deleted_moderators || dashboardData.deleted_moderators.length === 0) && (
-                        <TableRow>
-                          <TableCell colSpan={5} align="center">No deleted moderators</TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </MuiTable>
-                </TableContainer>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Main Task Statistics */}
+          {/* Main Task Lists */}
           {dashboardData.main_task && (
             <>
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Main Task: {dashboardData.main_task.task.title}
-                    </Typography>
-                    {dashboardData.main_task.task.description && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        {dashboardData.main_task.task.description}
-                      </Typography>
-                    )}
-                  </CardContent>
-                </Card>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <MainTaskList
+                  title='Main task sent'
+                  users={dashboardData.main_task.received_users}
+                  dotColor='primary'
+                  formatDate={formatDate}
+                />
               </Grid>
-
-              {/* Users who received main task */}
-              <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>Received Task</Typography>
-                    <TableContainer>
-                      <MuiTable size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Name</TableCell>
-                            <TableCell>Date</TableCell>
-                            <TableCell>Days</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {dashboardData.main_task.received_users?.map((user) => (
-                            <TableRow key={user.id}>
-                              <TableCell>{user.name}</TableCell>
-                              <TableCell>{user.received_at || '-'}</TableCell>
-                              <TableCell>
-                                {user.days_since_received !== null ? `${user.days_since_received} days` : '-'}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {(!dashboardData.main_task.received_users || dashboardData.main_task.received_users.length === 0) && (
-                            <TableRow>
-                              <TableCell colSpan={3} align="center">No users received this task</TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </MuiTable>
-                    </TableContainer>
-                  </CardContent>
-                </Card>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <MainTaskList
+                  title='Main task completed'
+                  users={dashboardData.main_task.completed_users}
+                  dotColor='success'
+                  formatDate={formatDate}
+                />
               </Grid>
-
-              {/* Users who completed main task */}
-              <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>Completed Task</Typography>
-                    <TableContainer>
-                      <MuiTable size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Name</TableCell>
-                            <TableCell>Date</TableCell>
-                            <TableCell>Days</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {dashboardData.main_task.completed_users?.map((user) => (
-                            <TableRow key={user.id}>
-                              <TableCell>{user.name}</TableCell>
-                              <TableCell>{user.completed_at || '-'}</TableCell>
-                              <TableCell>
-                                {user.days_since_completed !== null ? `${user.days_since_completed} days` : '-'}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {(!dashboardData.main_task.completed_users || dashboardData.main_task.completed_users.length === 0) && (
-                            <TableRow>
-                              <TableCell colSpan={3} align="center">No users completed this task</TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </MuiTable>
-                    </TableContainer>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Deleted users who completed main task */}
-              <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>Deleted - Completed Task</Typography>
-                    <TableContainer>
-                      <MuiTable size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Name</TableCell>
-                            <TableCell>Date</TableCell>
-                            <TableCell>Days</TableCell>
-                            <TableCell>Hide</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {dashboardData.main_task.deleted_completed_users?.map((user) => (
-                            <TableRow key={user.id}>
-                              <TableCell>{user.name}</TableCell>
-                              <TableCell>{user.completed_at || '-'}</TableCell>
-                              <TableCell>
-                                {user.days_since_completed !== null ? `${user.days_since_completed} days` : '-'}
-                              </TableCell>
-                              <TableCell>
-                                <Checkbox
-                                  checked={false}
-                                  onChange={() => handleHideDeletedUser(user.id)}
-                                />
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {(!dashboardData.main_task.deleted_completed_users || dashboardData.main_task.deleted_completed_users.length === 0) && (
-                            <TableRow>
-                              <TableCell colSpan={4} align="center">No deleted users completed this task</TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </MuiTable>
-                    </TableContainer>
-                  </CardContent>
-                </Card>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <MainTaskList
+                  title='Deleted users'
+                  users={dashboardData.main_task.deleted_completed_users}
+                  dotColor='error'
+                  showCheckbox={true}
+                  onCheckboxChange={handleHideDeletedUser}
+                  formatDate={formatDate}
+                />
               </Grid>
             </>
           )}
