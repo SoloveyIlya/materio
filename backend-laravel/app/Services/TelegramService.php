@@ -34,19 +34,22 @@ class TelegramService
                 'chat_id' => $user->telegram_id,
                 'text' => $text,
                 'parse_mode' => 'HTML',
-                'reply_markup' => [
-                    'inline_keyboard' => [
-                        [
-                            [
-                                'text' => 'Ответить',
-                                'callback_data' => "reply_{$message->id}",
-                            ],
-                        ],
-                    ],
-                ],
             ]);
 
-            return $response->successful();
+            if ($response->successful()) {
+                $responseData = $response->json();
+                $telegramMessageId = $responseData['result']['message_id'] ?? null;
+                
+                // Сохраняем telegram_message_id для последующего reply
+                if ($telegramMessageId) {
+                    $message->telegram_message_id = $telegramMessageId;
+                    $message->save();
+                }
+                
+                return true;
+            }
+
+            return false;
         } catch (\Exception $e) {
             Log::error('Telegram notification error: ' . $e->getMessage());
             return false;
@@ -126,26 +129,31 @@ class TelegramService
             return false;
         }
 
-        // Ищем последнее сообщение от модератора, на которое может быть ответ
-        // В реальности нужно хранить mapping между Telegram message_id и нашим message_id
-        // Пока используем упрощённый подход: ищем последнее непрочитанное сообщение для этого админа
-        $lastMessage = Message::where('to_user_id', $user->id)
-            ->where('is_read', false)
-            ->orderBy('created_at', 'desc')
+        // Ищем сообщение по telegram_message_id
+        $originalMessage = Message::where('telegram_message_id', $replyToMessageId)
+            ->where('to_user_id', $user->id)
             ->first();
 
-        if (!$lastMessage) {
+        // Если не нашли по telegram_message_id, ищем последнее непрочитанное сообщение
+        if (!$originalMessage) {
+            $originalMessage = Message::where('to_user_id', $user->id)
+                ->where('is_read', false)
+                ->orderBy('created_at', 'desc')
+                ->first();
+        }
+
+        if (!$originalMessage) {
             $this->sendConfirmation($chatId, '❌ Не найдено сообщение для ответа');
             return false;
         }
 
         // Создаем ответное сообщение
         $replyMessage = Message::create([
-            'domain_id' => $lastMessage->domain_id,
+            'domain_id' => $originalMessage->domain_id,
             'from_user_id' => $user->id,
-            'to_user_id' => $lastMessage->from_user_id,
-            'task_id' => $lastMessage->task_id,
-            'type' => $lastMessage->type,
+            'to_user_id' => $originalMessage->from_user_id,
+            'task_id' => $originalMessage->task_id,
+            'type' => $originalMessage->type,
             'body' => $messageText,
         ]);
 

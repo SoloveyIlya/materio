@@ -69,6 +69,7 @@ class TelegramController extends Controller
                 
                 if ($text && $replyToMessageId) {
                     $this->telegramService->handleReply($chatId, $replyToMessageId, $text);
+                    return response()->json(['ok' => true]);
                 }
             }
         }

@@ -115,8 +115,75 @@ class MessageController extends Controller
                 ];
             }
 
+            // Добавляем группу незакрепленных модераторов
+            $unassignedModerators = $allModerators->whereNull('administrator_id')->values();
+            $unassignedChats = [];
+            
+            if ($unassignedModerators->count() > 0) {
+                $unassignedModeratorIds = $unassignedModerators->pluck('id')->toArray();
+                
+                // Получаем все сообщения с незакрепленными модераторами
+                // Для незакрепленных модераторов используем первый доступный админ (или всех админов)
+                $unassignedMessages = Message::where('domain_id', $user->domain_id)
+                    ->where('type', $type)
+                    ->where('is_deleted', false)
+                    ->where(function ($q) use ($unassignedModeratorIds, $admins) {
+                        $adminIds = $admins->pluck('id')->toArray();
+                        // Сообщения от админов к незакрепленным модераторам
+                        $q->where(function ($subQ) use ($adminIds, $unassignedModeratorIds) {
+                            $subQ->whereIn('from_user_id', $adminIds)
+                                 ->whereIn('to_user_id', $unassignedModeratorIds);
+                        })
+                        // Сообщения от незакрепленных модераторов к админам
+                        ->orWhere(function ($subQ) use ($adminIds, $unassignedModeratorIds) {
+                            $subQ->whereIn('from_user_id', $unassignedModeratorIds)
+                                 ->whereIn('to_user_id', $adminIds);
+                        });
+                    })
+                    ->with(['fromUser', 'toUser', 'task'])
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+                
+                foreach ($unassignedModerators as $moderator) {
+                    $moderatorMessages = $unassignedMessages->filter(function ($msg) use ($moderator, $admins) {
+                        $adminIds = $admins->pluck('id')->toArray();
+                        return ($msg->from_user_id === $moderator->id && in_array($msg->to_user_id, $adminIds)) ||
+                               ($msg->to_user_id === $moderator->id && in_array($msg->from_user_id, $adminIds));
+                    })->values();
+                    
+                    $formattedMessages = $moderatorMessages->map(function ($message) use ($user) {
+                        if ($message->created_at) {
+                            $message->created_at_formatted = $message->created_at
+                                ->setTimezone($user->timezone ?? 'UTC')
+                                ->format('Y-m-d H:i:s');
+                        }
+                        if ($message->read_at) {
+                            $message->read_at_formatted = $message->read_at
+                                ->setTimezone($user->timezone ?? 'UTC')
+                                ->format('Y-m-d H:i:s');
+                        }
+                        return $message;
+                    })->toArray();
+                    
+                    // Считаем непрочитанные сообщения от незакрепленных модераторов
+                    $unreadCount = $moderatorMessages->filter(function ($msg) use ($admins) {
+                        $adminIds = $admins->pluck('id')->toArray();
+                        return in_array($msg->to_user_id, $adminIds) && !$msg->is_read;
+                    })->count();
+                    
+                    $unassignedChats[] = [
+                        'user' => $moderator,
+                        'messages' => $formattedMessages,
+                        'unread_count' => $unreadCount,
+                    ];
+                }
+            }
+            
             return response()->json([
                 'tabs' => $tabs,
+                'unassigned' => [
+                    'chats' => $unassignedChats,
+                ],
             ]);
         }
 
@@ -294,10 +361,17 @@ class MessageController extends Controller
             'attachments' => !empty($attachmentPaths) ? $attachmentPaths : null,
         ]);
 
-        // Отправляем уведомление в Telegram, если у получателя есть telegram_id
-        if ($toUser->telegram_id) {
-            $telegramService = app(\App\Services\TelegramService::class);
-            $telegramService->sendNotification($toUser, $message);
+        // Отправляем уведомление в Telegram через очередь
+        // Для Messages: отправляем админу, к которому закреплен модератор
+        // Для Support: отправляем админу, к которому закреплен модератор
+        if ($user->isModerator() && $toUser->isAdmin()) {
+            // Модератор отправляет админу - отправляем уведомление админу через очередь
+            if ($toUser->telegram_id) {
+                \App\Jobs\SendTelegramNotification::dispatch($toUser, $message);
+            }
+        } elseif ($user->isAdmin() && $toUser->isModerator()) {
+            // Админ отправляет модератору - уведомление не нужно
+            // Но если модератор должен получать уведомления, можно добавить здесь
         }
 
         $message->load(['fromUser', 'toUser', 'task']);

@@ -25,6 +25,7 @@ class Message extends Model
         'edited_at',
         'is_deleted',
         'deleted_at',
+        'telegram_message_id',
     ];
 
     protected $casts = [
