@@ -16,6 +16,11 @@ class ModeratorProfile extends Model
         'has_w4',
         'has_i9',
         'has_direct',
+        'task_timezone',
+        'task_start_time',
+        'task_end_time',
+        'task_min_interval',
+        'task_max_interval',
     ];
 
     protected $casts = [
@@ -24,6 +29,8 @@ class ModeratorProfile extends Model
         'has_w4' => 'boolean',
         'has_i9' => 'boolean',
         'has_direct' => 'boolean',
+        'task_min_interval' => 'integer',
+        'task_max_interval' => 'integer',
     ];
 
     public function user()

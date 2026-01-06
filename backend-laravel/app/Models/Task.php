@@ -84,6 +84,11 @@ class Task extends Model
         return $this->hasOne(TaskResult::class);
     }
 
+    public function schedules()
+    {
+        return $this->hasMany(TaskSchedule::class);
+    }
+
     public function documentations()
     {
         return $this->belongsToMany(DocumentationPage::class, 'task_documentation', 'task_id', 'documentation_id');

@@ -99,14 +99,33 @@ class TaskController extends Controller
     {
         $user = $request->user();
         
-        // Автогенерация первичных тасков или выдача для текущего дня
-        $tasks = $this->taskService->autoAssignTasksForCurrentDay($user);
+        // Проверяем, есть ли настройки для планирования тасков
+        $profile = $user->moderatorProfile;
+        
+        if ($profile && $profile->task_timezone && $profile->task_start_time && $profile->task_end_time) {
+            // Если есть настройки, планируем таски первого дня
+            $scheduledTasks = $this->taskService->scheduleFirstDayTasks($user);
+            
+            return response()->json([
+                'message' => 'Tasks scheduled successfully',
+                'scheduled_tasks' => array_map(function ($item) {
+                    return [
+                        'task' => $item['task'],
+                        'scheduled_at' => $item['scheduled_at']->toDateTimeString(),
+                    ];
+                }, $scheduledTasks),
+                'current_work_day' => $user->fresh()->getCurrentWorkDay(),
+            ]);
+        } else {
+            // Если нет настроек, используем старую логику (немедленная выдача)
+            $tasks = $this->taskService->autoAssignTasksForCurrentDay($user);
 
-        return response()->json([
-            'message' => 'Tasks assigned successfully',
-            'tasks' => $tasks,
-            'current_work_day' => $user->fresh()->getCurrentWorkDay(),
-        ]);
+            return response()->json([
+                'message' => 'Tasks assigned successfully',
+                'tasks' => $tasks,
+                'current_work_day' => $user->fresh()->getCurrentWorkDay(),
+            ]);
+        }
     }
 
     public function show(Task $task, Request $request): JsonResponse
