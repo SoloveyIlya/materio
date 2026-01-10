@@ -45,6 +45,7 @@ import { API_URL } from '@/lib/api'
 import CustomAvatar from '@core/components/mui/Avatar'
 import CustomTabList from '@/@core/components/mui/TabList'
 import classnames from 'classnames'
+import { showToast } from '@/utils/toast'
 
 export default function AdminTaskViewPage() {
   const params = useParams()
@@ -107,9 +108,12 @@ export default function AdminTaskViewPage() {
       await api.post(`/admin/tasks/${taskId}/moderate`, {
         action: 'approve'
       })
+      showToast.success('Task approved successfully')
       await loadTask()
     } catch (error) {
       console.error('Error approving task:', error)
+      const errorMessage = error.response?.data?.message || error.message || 'Error approving task'
+      showToast.error(errorMessage)
     }
   }
 
@@ -118,23 +122,41 @@ export default function AdminTaskViewPage() {
       await api.post(`/admin/tasks/${taskId}/moderate`, {
         action: 'reject'
       })
+      showToast.success('Task rejected successfully')
       await loadTask()
     } catch (error) {
       console.error('Error rejecting task:', error)
+      const errorMessage = error.response?.data?.message || error.message || 'Error rejecting task'
+      showToast.error(errorMessage)
     }
   }
 
   const handleSendForRevision = async () => {
+    if (!revisionComment.trim()) {
+      showToast.error('Please enter a revision comment')
+      return
+    }
+
+    // Validate that task has a result before sending for revision
+    if (!task?.result) {
+      showToast.error('Task result not found. Cannot send task for revision.')
+      return
+    }
+
     try {
       await api.post(`/admin/tasks/${taskId}/moderate`, {
         action: 'revision',
-        comment: revisionComment
+        comment: revisionComment.trim()
       })
+      showToast.success('Task sent for revision successfully')
       setRevisionDialogOpen(false)
       setRevisionComment('')
       await loadTask()
     } catch (error) {
       console.error('Error sending task for revision:', error)
+      const errorMessage = error.response?.data?.message || error.message || 'Error sending task for revision'
+      showToast.error(errorMessage)
+      // Don't close dialog on error so user can see the issue and try again
     }
   }
 
@@ -395,7 +417,7 @@ export default function AdminTaskViewPage() {
                         variant='contained' 
                         color='warning'
                         onClick={handleOpenRevisionDialog}
-                        disabled={task.status === 'approved' || task.status === 'rejected'}
+                        disabled={task.status === 'approved' || task.status === 'rejected' || !task.result}
                         startIcon={<i className='ri-send-plane-line' />}
                       >
                         Send for Revision
