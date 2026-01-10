@@ -60,14 +60,19 @@ export default function ModeratorTestPage() {
   }
 
   const handleStart = () => {
-    if (!test || !test.duration_minutes) {
-      showToast.error('Test duration not set')
+    if (!test) {
+      showToast.error('Test not found')
       return
     }
     
+    // Use default duration of 30 minutes if not set or is 0
+    const durationMinutes = test.duration_minutes && test.duration_minutes > 0 
+      ? test.duration_minutes 
+      : 30
+    
     setStarted(true)
     setStartTime(new Date())
-    setTimeRemaining(test.duration_minutes * 60) // Convert minutes to seconds
+    setTimeRemaining(durationMinutes * 60) // Convert minutes to seconds
   }
 
   const handleTimeUp = () => {
@@ -244,7 +249,7 @@ export default function ModeratorTestPage() {
                   Ready to Start?
                 </Typography>
                 <Typography variant='body1' color='text.secondary' sx={{ mb: 4 }}>
-                  This test has {test.questions?.length || 0} questions and will take approximately {test.duration_minutes || 30} minutes.
+                  This test has {test.questions?.length || 0} questions and will take approximately {test.duration_minutes && test.duration_minutes > 0 ? test.duration_minutes : 30} minutes.
                 </Typography>
                 <Button
                   variant='contained'
