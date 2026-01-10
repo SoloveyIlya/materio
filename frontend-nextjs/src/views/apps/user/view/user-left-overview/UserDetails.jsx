@@ -61,6 +61,20 @@ const CountryFromIP = ({ ipAddress }) => {
 
 const UserDetails = ({ user, stats, onUserUpdate }) => {
   const [uploading, setUploading] = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
+  
+  useEffect(() => {
+    // Получаем текущего авторизованного пользователя
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await api.get('/auth/user')
+        setCurrentUser(response.data)
+      } catch (error) {
+        console.error('Error fetching current user:', error)
+      }
+    }
+    fetchCurrentUser()
+  }, [])
   
   if (!user) return null
 
@@ -88,18 +102,24 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
       const formData = new FormData()
       formData.append('avatar', file)
 
-      const response = await api.put(`/admin/users/${user.id}`, formData, {
+      // Если админ обновляет свой собственный профиль, используем /admin/profile
+      // Иначе используем /admin/users/{id} для обновления других пользователей
+      const isOwnProfile = currentUser && user.id === currentUser.id && isAdmin
+      const endpoint = isOwnProfile ? '/admin/profile' : `/admin/users/${user.id}`
+      
+      const response = await api.put(endpoint, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       })
 
       if (onUserUpdate) {
+        // Оба эндпоинта возвращают user в response.data.user
         onUserUpdate(response.data.user)
       }
     } catch (error) {
       console.error('Error uploading avatar:', error)
-      alert('Error uploading avatar: ' + (error.response?.data?.message || error.message))
+      alert('Ошибка загрузки аватара: ' + (error.response?.data?.message || error.message))
     } finally {
       setUploading(false)
     }

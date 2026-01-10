@@ -10,8 +10,6 @@ import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
 import Divider from '@mui/material/Divider'
 import Box from '@mui/material/Box'
-import IconButton from '@mui/material/IconButton'
-import Tooltip from '@mui/material/Tooltip'
 
 // Component Imports
 import CustomAvatar from '@core/components/mui/Avatar'
@@ -21,11 +19,8 @@ import UserPlan from '../user-left-overview/UserPlan'
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
 import { API_URL } from '@/lib/api'
-import api from '@/lib/api'
 
 const ModeratorUserLeftOverview = ({ user, stats, onUserUpdate }) => {
-  const [uploading, setUploading] = useState(false)
-  
   if (!user) return null
 
   const primaryRole = user.roles?.[0]?.name || 'moderator'
@@ -40,32 +35,6 @@ const ModeratorUserLeftOverview = ({ user, stats, onUserUpdate }) => {
     if (avatar.startsWith('http')) return avatar
     if (avatar.startsWith('/storage')) return `${API_URL}${avatar}`
     return `${API_URL}/storage/${avatar}`
-  }
-
-  const handleAvatarUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    try {
-      setUploading(true)
-      const formData = new FormData()
-      formData.append('avatar', file)
-
-      const response = await api.put('/moderator/profile', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-
-      if (onUserUpdate) {
-        onUserUpdate(response.data.user)
-      }
-    } catch (error) {
-      console.error('Error uploading avatar:', error)
-      alert('Ошибка загрузки аватара: ' + (error.response?.data?.message || error.message))
-    } finally {
-      setUploading(false)
-    }
   }
 
   return (
@@ -83,31 +52,6 @@ const ModeratorUserLeftOverview = ({ user, stats, onUserUpdate }) => {
                       {getInitials(user.name || user.email || 'User')}
                     </CustomAvatar>
                   )}
-                  <Tooltip title='Загрузить аватар'>
-                    <IconButton
-                      component='label'
-                      sx={{
-                        position: 'absolute',
-                        bottom: 0,
-                        right: 0,
-                        bgcolor: 'primary.main',
-                        color: 'primary.contrastText',
-                        '&:hover': {
-                          bgcolor: 'primary.dark',
-                        },
-                      }}
-                      size='small'
-                      disabled={uploading}
-                    >
-                      <i className='ri-camera-line' />
-                      <input
-                        type='file'
-                        hidden
-                        accept='image/*'
-                        onChange={handleAvatarUpload}
-                      />
-                    </IconButton>
-                  </Tooltip>
                 </Box>
                 <Typography variant='h5'>{user.name || user.email}</Typography>
               </div>

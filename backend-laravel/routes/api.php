@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\TaskController as AdminTaskController;
 use App\Http\Controllers\Admin\TaskTemplateController;
 use App\Http\Controllers\Admin\ToolController;
 use App\Http\Controllers\Admin\TrainingQuestionController;
+use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MessageController;
@@ -98,6 +99,11 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
     Route::get('/support/{ticket}', [AdminSupportController::class, 'show']);
     Route::put('/support/{ticket}', [AdminSupportController::class, 'update']);
     Route::post('/support/{ticket}/reply', [AdminSupportController::class, 'reply']);
+
+    // Profile
+    Route::put('/profile', [AdminProfileController::class, 'updateProfile']);
+    Route::post('/profile', [AdminProfileController::class, 'updateProfile']); // For FormData with method spoofing
+    Route::put('/profile/password', [AdminProfileController::class, 'changePassword']);
 });
 
 // Moderator routes
@@ -141,8 +147,6 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
     Route::get('/required-documents', [ProfileController::class, 'getRequiredDocuments']);
     Route::post('/user-documents', [ProfileController::class, 'uploadUserDocument']);
     Route::put('/profile/password', [ProfileController::class, 'changePassword']);
-    Route::put('/profile', [ProfileController::class, 'updateProfile']);
-    Route::post('/profile', [ProfileController::class, 'updateProfile']); // For FormData with method spoofing
 
     // Support
     Route::get('/support', [SupportController::class, 'index']);
