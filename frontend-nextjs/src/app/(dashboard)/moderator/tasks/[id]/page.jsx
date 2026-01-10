@@ -432,7 +432,7 @@ export default function ModeratorTaskViewPage() {
                             variant='h6' 
                             sx={{ 
                               fontWeight: 700, 
-                              color: '#000',
+                              color: 'text.primary',
                               fontSize: '1.1rem'
                             }}
                           >
@@ -442,7 +442,7 @@ export default function ModeratorTaskViewPage() {
                         <Box sx={{ pl: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                             <i className='ri-file-text-line' style={{ fontSize: '20px', color: '#4CAF50' }} />
-                            <Typography variant='body1'>{task.documentation.title}</Typography>
+                            <Typography variant='body1' sx={{ color: 'text.primary' }}>{task.documentation.title}</Typography>
                           </Box>
                         </Box>
                       </Box>
@@ -481,7 +481,7 @@ export default function ModeratorTaskViewPage() {
                             variant='h6' 
                             sx={{ 
                               fontWeight: 700, 
-                              color: '#000',
+                              color: 'text.primary',
                               fontSize: '1.1rem'
                             }}
                           >
@@ -492,7 +492,7 @@ export default function ModeratorTaskViewPage() {
                           {tools.map((tool, index) => (
                             <Box key={tool.id || index} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                               <i className='ri-tools-line' style={{ fontSize: '20px', color: '#2196F3' }} />
-                              <Typography variant='body1'>{tool.name}</Typography>
+                              <Typography variant='body1' sx={{ color: 'text.primary' }}>{tool.name}</Typography>
                             </Box>
                           ))}
                         </Box>
@@ -516,7 +516,7 @@ export default function ModeratorTaskViewPage() {
                             variant='h6' 
                             sx={{ 
                               fontWeight: 700, 
-                              color: '#000',
+                              color: 'text.primary',
                               fontSize: '1.1rem'
                             }}
                           >

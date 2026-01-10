@@ -611,7 +611,7 @@ export default function AdminTaskViewPage() {
                               variant='h6' 
                               sx={{ 
                                 fontWeight: 700, 
-                                color: '#000',
+                                color: 'text.primary',
                                 fontSize: '1.1rem'
                               }}
                             >
@@ -687,7 +687,7 @@ export default function AdminTaskViewPage() {
                               variant='h6' 
                               sx={{ 
                                 fontWeight: 700, 
-                                color: '#000',
+                                color: 'text.primary',
                                 fontSize: '1.1rem'
                               }}
                             >
@@ -747,7 +747,7 @@ export default function AdminTaskViewPage() {
                               variant='h6' 
                               sx={{ 
                                 fontWeight: 700, 
-                                color: '#000',
+                                color: 'text.primary',
                                 fontSize: '1.1rem'
                               }}
                             >
@@ -800,7 +800,7 @@ export default function AdminTaskViewPage() {
                               variant='h6' 
                               sx={{ 
                                 fontWeight: 700, 
-                                color: '#000',
+                                color: 'text.primary',
                                 fontSize: '1.1rem'
                               }}
                             >
@@ -811,14 +811,14 @@ export default function AdminTaskViewPage() {
                             {tools.map((tool, index) => (
                               <Box key={tool.id || index} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                                 <i className='ri-tools-line' style={{ fontSize: '20px', color: '#2196F3' }} />
-                                <Typography variant='body1' component='div' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Typography variant='body1' component='div' sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.primary' }}>
                                   {tool.url ? (
                                     <a 
                                       href={tool.url} 
                                       target='_blank' 
                                       rel='noopener noreferrer'
                                       style={{ 
-                                        color: '#1a1a1a', 
+                                        color: 'inherit', 
                                         fontWeight: 600,
                                         textDecoration: 'none',
                                         cursor: 'pointer'
@@ -829,9 +829,9 @@ export default function AdminTaskViewPage() {
                                       {tool.name}
                                     </a>
                                   ) : (
-                                    <span style={{ color: '#1a1a1a', fontWeight: 600 }}>
+                                    <Typography component='span' sx={{ color: 'text.primary', fontWeight: 600 }}>
                                       {tool.name}
-                                    </span>
+                                    </Typography>
                                   )}
                                   {tool.description && (
                                     <Typography component='span' sx={{ color: 'text.secondary', fontWeight: 'normal' }}>
@@ -865,7 +865,7 @@ export default function AdminTaskViewPage() {
                               variant='h6' 
                               sx={{ 
                                 fontWeight: 700, 
-                                color: '#000',
+                                color: 'text.primary',
                                 fontSize: '1.1rem'
                               }}
                             >
@@ -876,7 +876,7 @@ export default function AdminTaskViewPage() {
                             {documentations.map((doc, index) => (
                               <Box key={doc.id || index} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                                 <i className='ri-file-text-line' style={{ fontSize: '20px', color: '#4CAF50' }} />
-                                <Typography variant='body1' component='div'>
+                                <Typography variant='body1' component='div' sx={{ color: 'text.primary' }}>
                                   <a 
                                     href={`/admin/documentation`}
                                     onClick={(e) => {
@@ -884,7 +884,7 @@ export default function AdminTaskViewPage() {
                                       router.push(`/admin/documentation`)
                                     }}
                                     style={{ 
-                                      color: '#1a1a1a', 
+                                      color: 'inherit', 
                                       fontWeight: 600,
                                       textDecoration: 'none',
                                       cursor: 'pointer'
