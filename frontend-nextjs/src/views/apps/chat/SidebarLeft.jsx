@@ -78,9 +78,26 @@ const SidebarLeft = props => {
     const currentTab = messagesData.tabs[activeTab]
     if (!currentTab) return null
 
+    // Сортируем чаты: сначала с непрочитанными сообщениями, затем по времени последнего сообщения
+    const sortedChats = [...currentTab.chats].sort((a, b) => {
+      // Сначала сортируем по наличию непрочитанных сообщений
+      if (a.unread_count > 0 && b.unread_count === 0) return -1
+      if (a.unread_count === 0 && b.unread_count > 0) return 1
+      
+      // Если оба имеют или не имеют непрочитанные, сортируем по времени последнего сообщения
+      const aLastMessage = a.messages && a.messages.length > 0 
+        ? new Date(a.messages[a.messages.length - 1].created_at || a.messages[a.messages.length - 1].created_at_formatted)
+        : new Date(0)
+      const bLastMessage = b.messages && b.messages.length > 0
+        ? new Date(b.messages[b.messages.length - 1].created_at || b.messages[b.messages.length - 1].created_at_formatted)
+        : new Date(0)
+      
+      return bLastMessage - aLastMessage // Новые сообщения вверху
+    })
+
     return (
       <List>
-        {currentTab.chats.map((chat) => {
+        {sortedChats.map((chat) => {
               const isChatActive = selectedChat?.user?.id === chat.user.id
               const contact = chat.user
 

@@ -1,6 +1,9 @@
 // Next Imports
 import { useParams } from 'next/navigation'
 
+// React Imports
+import { Fragment } from 'react'
+
 // MUI Imports
 import Chip from '@mui/material/Chip'
 
@@ -41,7 +44,10 @@ export const GenerateVerticalMenu = ({ menuData }) => {
         const { children, icon, prefix, suffix, ...rest } = subMenuItem
         const Icon = icon ? <i className={icon} /> : null
         const subMenuPrefix = prefix && prefix.label ? <Chip size='small' {...prefix} /> : prefix
-        const subMenuSuffix = suffix && suffix.label ? <Chip size='small' {...suffix} /> : suffix
+        // Поддержка массива suffix для отображения нескольких бейджей
+        const subMenuSuffix = Array.isArray(suffix) 
+          ? <Fragment>{suffix.map((s, idx) => s && s.label ? <Chip key={s.key || idx} size='small' {...s} sx={{ ml: 0.5 }} /> : null).filter(Boolean)}</Fragment>
+          : (suffix && suffix.label ? <Chip size='small' {...suffix} /> : suffix)
 
         // If it is, return a SubMenu component and call generateMenu with the current subMenuItem's children
         return (
@@ -67,7 +73,10 @@ export const GenerateVerticalMenu = ({ menuData }) => {
 
       const Icon = icon ? <i className={icon} /> : null
       const menuItemPrefix = prefix && prefix.label ? <Chip size='small' {...prefix} /> : prefix
-      const menuItemSuffix = suffix && suffix.label ? <Chip size='small' {...suffix} /> : suffix
+      // Поддержка массива suffix для отображения нескольких бейджей
+      const menuItemSuffix = Array.isArray(suffix) 
+        ? <Fragment>{suffix.map((s, idx) => s && s.label ? <Chip key={s.key || idx} size='small' {...s} sx={{ ml: 0.5 }} /> : null).filter(Boolean)}</Fragment>
+        : (suffix && suffix.label ? <Chip size='small' {...suffix} /> : suffix)
 
       return (
         <VerticalMenuItem

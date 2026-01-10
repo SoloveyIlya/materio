@@ -161,6 +161,7 @@ Route::prefix('messages')->middleware(['auth:sanctum', 'activity'])->group(funct
     Route::put('/{message}', [MessageController::class, 'update']);
     Route::delete('/{message}', [MessageController::class, 'destroy']);
     Route::post('/{message}/read', [MessageController::class, 'markAsRead']);
+    Route::post('/mark-chat-read', [MessageController::class, 'markChatAsRead']);
 });
 
 // Telegram routes

@@ -24,6 +24,7 @@ import { useSettings } from '@core/hooks/useSettings'
 // Util Imports
 import { commonLayoutClasses } from '@layouts/utils/layoutClasses'
 import api from '@/lib/api'
+import { useMenuCounts } from '@/hooks/useMenuCounts'
 
 const ChatWrapper = () => {
   // States
@@ -41,6 +42,7 @@ const ChatWrapper = () => {
 
   // Hooks
   const { settings } = useSettings()
+  const { refreshCounts } = useMenuCounts()
   const isBelowLgScreen = useMediaQuery(theme => theme.breakpoints.down('lg'))
   const isBelowMdScreen = useMediaQuery(theme => theme.breakpoints.down('md'))
   const isBelowSmScreen = useMediaQuery(theme => theme.breakpoints.down('sm'))
@@ -100,6 +102,7 @@ const ChatWrapper = () => {
       }
     }
   }, [messagesData, activeTab])
+
 
   // Check URL parameters for task_id
   useEffect(() => {
@@ -232,6 +235,9 @@ const ChatWrapper = () => {
       }
 
       await loadMessages()
+      
+      // Обновляем счетчики в меню после отправки сообщения
+      refreshCounts()
     } catch (error) {
       console.error('Error sending message:', error)
       throw error
@@ -260,11 +266,54 @@ const ChatWrapper = () => {
     }
   }
 
-  const handleSelectChat = (chat) => {
+  const handleSelectChat = async (chat) => {
     setSelectedChat(chat)
     if (isBelowMdScreen) {
       setSidebarOpen(false)
       setBackdropOpen(false)
+    }
+
+    // Помечаем все непрочитанные сообщения в этом чате как прочитанные
+    if (chat && chat.user) {
+      try {
+        // Определяем from_user_id (от кого) и to_user_id (кому) для пометки сообщений
+        let fromUserId = chat.user.id
+        let toUserId = null
+
+        if (user?.roles?.some(r => r.name === 'admin')) {
+          // Для админов: 
+          // - fromUserId = ID модератора (chat.user.id)
+          // - toUserId = ID админа (selectedAdminTab или user.id)
+          fromUserId = chat.user.id // От модератора
+          toUserId = selectedAdminTab || user.id // К админу (выбранному во вкладке или текущему)
+        } else if (user?.roles?.some(r => r.name === 'moderator')) {
+          // Для модераторов:
+          // - fromUserId = ID админа (chat.user.id)
+          // - toUserId = текущий модератор (user.id)
+          fromUserId = chat.user.id // От админа
+          toUserId = user.id // К модератору (текущий пользователь)
+        }
+
+        const requestData = {
+          from_user_id: fromUserId,
+          type: 'message'
+        }
+
+        // Добавляем to_user_id только если это админ и выбран другой админ во вкладке
+        if (user?.roles?.some(r => r.name === 'admin') && toUserId && toUserId !== user.id) {
+          requestData.to_user_id = toUserId
+        }
+
+        await api.post('/messages/mark-chat-read', requestData)
+
+        // Обновляем сообщения и счетчики
+        await loadMessages(true) // silent = true для быстрого обновления
+        
+        // Обновляем счетчики в меню
+        refreshCounts()
+      } catch (error) {
+        console.error('Error marking chat as read:', error)
+      }
     }
   }
 
@@ -291,13 +340,38 @@ const ChatWrapper = () => {
               variant="scrollable"
               scrollButtons="auto"
             >
-              {messagesData.tabs.map((tab, index) => (
-                <Tab 
-                  key={tab.admin.id} 
-                  label={tab.admin.name} 
-                  value={index}
-                />
-              ))}
+              {messagesData.tabs.map((tab, index) => {
+                // Считаем общее количество непрочитанных сообщений для этого админа
+                const totalUnreadCount = tab.chats.reduce((sum, chat) => sum + (chat.unread_count || 0), 0)
+                
+                return (
+                  <Tab 
+                    key={tab.admin.id} 
+                    value={index}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <span>{tab.admin.name}</span>
+                        {totalUnreadCount > 0 && (
+                          <Chip
+                            label={totalUnreadCount}
+                            size="small"
+                            color="error"
+                            sx={{
+                              height: 20,
+                              minWidth: 20,
+                              fontSize: '0.7rem',
+                              fontWeight: 'bold',
+                              '& .MuiChip-label': {
+                                px: 0.5
+                              }
+                            }}
+                          />
+                        )}
+                      </Box>
+                    }
+                  />
+                )
+              })}
             </Tabs>
             <Chip 
               label="🟢 Real-time" 

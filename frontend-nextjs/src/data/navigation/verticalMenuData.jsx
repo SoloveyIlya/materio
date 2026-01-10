@@ -1,4 +1,4 @@
-const verticalMenuData = (user = null, counts = { chat: 0, support: 0, tasks: 0 }) => {
+const verticalMenuData = (user = null, counts = { chat: 0, support: 0, tasks: 0, chat_by_admin: [] }) => {
   // Check user role
   const isAdmin = user?.roles?.some((role) => role.name === 'admin')
   const isModerator = user?.roles?.some((role) => role.name === 'moderator')
@@ -48,12 +48,19 @@ const verticalMenuData = (user = null, counts = { chat: 0, support: 0, tasks: 0 
         label: 'Chat',
         icon: 'ri-message-3-line',
         href: '/chat',
-        ...(counts.chat > 0 && {
-          suffix: {
-            label: counts.chat.toString(),
-            color: 'error',
-            size: 'small',
-          }
+        ...(counts.chat_by_admin && counts.chat_by_admin.length > 0 && {
+          suffix: counts.chat_by_admin.map((adminCount, index) => {
+            // Чередуем цвета: красный для первого, фиолетовый для второго, и так далее
+            const colors = ['error', 'secondary'] // error = красный, secondary = фиолетовый
+            const color = colors[index % colors.length]
+            
+            return {
+              label: adminCount.count.toString(),
+              color: color,
+              size: 'small',
+              key: `admin-${adminCount.admin_id}`, // Добавляем ключ для идентификации
+            }
+          })
         })
       },
       {

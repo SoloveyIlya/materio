@@ -347,6 +347,44 @@ class DashboardController extends Controller
                 }
                 $counts['chat'] = $unreadChatMessages;
 
+                // Также возвращаем количество непрочитанных сообщений для каждого админа в домене
+                $allAdmins = User::where('domain_id', $user->domain_id)
+                    ->whereHas('roles', function ($q) {
+                        $q->where('name', 'admin');
+                    })
+                    ->get(['id', 'name']);
+
+                $chatCountsByAdmin = [];
+                foreach ($allAdmins as $admin) {
+                    $adminModeratorIds = User::where('domain_id', $user->domain_id)
+                        ->where('administrator_id', $admin->id)
+                        ->whereHas('roles', function ($q) {
+                            $q->where('name', 'moderator');
+                        })
+                        ->pluck('id')
+                        ->toArray();
+
+                    $adminUnreadCount = 0;
+                    if (count($adminModeratorIds) > 0) {
+                        $adminUnreadCount = Message::where('domain_id', $user->domain_id)
+                            ->where('type', 'message')
+                            ->whereIn('from_user_id', $adminModeratorIds)
+                            ->where('to_user_id', $admin->id)
+                            ->where('is_read', false)
+                            ->where('is_deleted', false)
+                            ->count();
+                    }
+                    
+                    if ($adminUnreadCount > 0) {
+                        $chatCountsByAdmin[] = [
+                            'admin_id' => $admin->id,
+                            'admin_name' => $admin->name,
+                            'count' => $adminUnreadCount
+                        ];
+                    }
+                }
+                $counts['chat_by_admin'] = $chatCountsByAdmin;
+
                 // Непрочитанные тикеты в support
                 // Тикеты, где есть непрочитанные сообщения от пользователей к админу
                 $unreadSupportTickets = Ticket::where('domain_id', $user->domain_id)

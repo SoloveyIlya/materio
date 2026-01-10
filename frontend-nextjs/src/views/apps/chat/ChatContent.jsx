@@ -12,6 +12,11 @@ import Chip from '@mui/material/Chip'
 import TextField from '@mui/material/TextField'
 import Tooltip from '@mui/material/Tooltip'
 import Avatar from '@mui/material/Avatar'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogContentText from '@mui/material/DialogContentText'
+import DialogActions from '@mui/material/DialogActions'
 
 // Third-party Imports
 import classnames from 'classnames'
@@ -89,6 +94,8 @@ const ChatContent = props => {
   const [isRecording, setIsRecording] = useState(false)
   const [mediaRecorder, setMediaRecorder] = useState(null)
   const [audioChunks, setAudioChunks] = useState([])
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [messageToDelete, setMessageToDelete] = useState(null)
 
   // Refs
   const scrollRef = useRef(null)
@@ -224,14 +231,28 @@ const ChatContent = props => {
     }
   }
 
-  const handleDelete = async (message) => {
-    if (!confirm('Are you sure you want to delete this message?')) return
+  const handleDelete = (message) => {
+    setMessageToDelete(message)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!messageToDelete) return
 
     try {
-      await onDeleteMessage(message)
+      await onDeleteMessage(messageToDelete)
+      setDeleteDialogOpen(false)
+      setMessageToDelete(null)
     } catch (error) {
       console.error('Error deleting message:', error)
+      setDeleteDialogOpen(false)
+      setMessageToDelete(null)
     }
+  }
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false)
+    setMessageToDelete(null)
   }
 
   // Renders the user avatar with badge and user information
@@ -462,7 +483,8 @@ const ChatContent = props => {
                                   sx={{ cursor: 'pointer', mt: 0.5 }}
                                 />
                               )}
-                              {msg.is_edited && (
+                              {/* Показываем метку "(edited)" только для админов, модераторы не должны видеть, что сообщение было отредактировано */}
+                              {msg.is_edited && user?.roles?.some(r => r.name === 'admin') && (
                                 <Typography variant='caption' className='text-textSecondary italic'>
                                   (edited)
                                 </Typography>
@@ -610,6 +632,65 @@ const ChatContent = props => {
           isBelowLgScreen={isBelowLgScreen}
         />
       )}
+
+      {/* Диалог подтверждения удаления сообщения */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCancelDelete}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+        sx={{
+          '& .MuiDialog-paper': {
+            borderRadius: 2,
+            minWidth: 400,
+            maxWidth: 500,
+          }
+        }}
+      >
+        <DialogTitle id="delete-dialog-title" sx={{ pb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                bgcolor: 'error.light',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <i className="ri-delete-bin-line" style={{ fontSize: 24, color: 'var(--mui-palette-error-main)' }} />
+            </Box>
+            <Typography variant="h6" component="div">
+              Delete Message
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="delete-dialog-description" sx={{ fontSize: '0.95rem', color: 'text.secondary' }}>
+            Are you sure you want to delete this message? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+          <Button
+            onClick={handleCancelDelete}
+            variant="outlined"
+            sx={{ minWidth: 100 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            variant="contained"
+            color="error"
+            sx={{ minWidth: 100 }}
+            autoFocus
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   )
 }

@@ -19,12 +19,14 @@ import Typography from '@mui/material/Typography'
 import Divider from '@mui/material/Divider'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
+import Chip from '@mui/material/Chip'
 
 // Third-party Imports
 
 // Hook Imports
 import { useSettings } from '@core/hooks/useSettings'
 import { useAuthStore } from '@/store/authStore'
+import { useMenuCounts } from '@/hooks/useMenuCounts'
 
 // Util Imports
 import { getLocalizedUrl } from '@/utils/i18n'
@@ -52,6 +54,7 @@ const UserDropdown = () => {
   const { settings } = useSettings()
   const params = useParams()
   const locale = params?.lang || 'en'
+  const { counts } = useMenuCounts()
 
   const handleDropdownOpen = () => {
     !open ? setOpen(true) : setOpen(false)
@@ -120,9 +123,27 @@ const UserDropdown = () => {
                       {user?.name?.charAt(0)?.toUpperCase() || 'U'}
                     </Avatar>
                     <div className='flex items-start flex-col'>
-                      <Typography className='font-medium' color='text.primary'>
-                        {user?.name || ''}
-                      </Typography>
+                      <div className='flex items-center gap-2'>
+                        <Typography className='font-medium' color='text.primary'>
+                          {user?.name || ''}
+                        </Typography>
+                        {user?.roles?.some(r => r.name === 'admin') && counts?.chat > 0 && (
+                          <Chip
+                            label={counts.chat}
+                            size="small"
+                            color="error"
+                            sx={{
+                              height: 20,
+                              minWidth: 20,
+                              fontSize: '0.7rem',
+                              fontWeight: 'bold',
+                              '& .MuiChip-label': {
+                                px: 0.5
+                              }
+                            }}
+                          />
+                        )}
+                      </div>
                       <Typography variant='caption'>{user?.email || ''}</Typography>
                     </div>
                   </div>

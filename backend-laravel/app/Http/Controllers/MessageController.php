@@ -86,11 +86,13 @@ class MessageController extends Controller
                             return $message;
                         })->toArray();
 
-                        // Считаем непрочитанные сообщения от модераторов для этого админа
-                        $unreadCount = $moderatorMessages->filter(function ($msg) use ($admin) {
-                            return $msg->from_user_id !== $admin->id && 
+                        // Считаем непрочитанные сообщения от модератора к админу
+                        // Важно: учитываем только сообщения, которые админ еще не прочитал
+                        $unreadCount = $moderatorMessages->filter(function ($msg) use ($admin, $moderator) {
+                            // Непрочитанные сообщения от модератора к админу
+                            return $msg->from_user_id === $moderator->id && 
                                    $msg->to_user_id === $admin->id && 
-                                   !$msg->is_read;
+                                   $msg->is_read === false;
                         })->count();
 
                         $adminChats[] = [
@@ -243,6 +245,9 @@ class MessageController extends Controller
                         ->setTimezone($user->timezone ?? 'UTC')
                         ->format('Y-m-d H:i:s');
                 }
+                // Модератор не должен видеть, что сообщение было отредактировано админом
+                $message->is_edited = false;
+                $message->edited_at = null;
             }
             return $message;
         })->toArray();
@@ -447,5 +452,68 @@ class MessageController extends Controller
         ]);
 
         return response()->json($message);
+    }
+
+    /**
+     * Пометка всех непрочитанных сообщений в чате как прочитанных
+     * Используется при открытии чата
+     */
+    public function markChatAsRead(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        $validated = $request->validate([
+            'from_user_id' => 'required|exists:users,id',
+            'type' => 'required|in:message,support',
+            'to_user_id' => 'nullable|exists:users,id', // Для админов: ID админа, которому принадлежит чат (выбранная вкладка)
+        ]);
+
+        $fromUserId = $validated['from_user_id'];
+        $type = $validated['type'];
+        $toUserId = $validated['to_user_id'] ?? $user->id; // По умолчанию - текущий пользователь
+
+        // Проверяем права доступа - пользователь должен иметь доступ к этому чату
+        $fromUser = \App\Models\User::find($fromUserId);
+        if (!$fromUser || $fromUser->domain_id !== $user->domain_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // Проверяем, что toUserId - это админ из того же домена (если указан)
+        if ($toUserId !== $user->id) {
+            $toUser = \App\Models\User::find($toUserId);
+            if (!$toUser || !$toUser->isAdmin() || $toUser->domain_id !== $user->domain_id) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+        }
+
+        // Для админов: помечаем сообщения от модератора (fromUserId) к админу (toUserId)
+        if ($user->isAdmin()) {
+            // Помечаем все непрочитанные сообщения от модератора (fromUserId) к админу (toUserId)
+            Message::where('domain_id', $user->domain_id)
+                ->where('type', $type)
+                ->where('from_user_id', $fromUserId) // От модератора
+                ->where('to_user_id', $toUserId) // К админу (может быть текущий или выбранный во вкладке)
+                ->where('is_read', false)
+                ->where('is_deleted', false)
+                ->update([
+                    'is_read' => true,
+                    'read_at' => now(),
+                ]);
+        } 
+        // Для модераторов: помечаем сообщения от админа к модератору
+        else if ($user->isModerator()) {
+            Message::where('domain_id', $user->domain_id)
+                ->where('type', $type)
+                ->where('from_user_id', $fromUserId)
+                ->where('to_user_id', $user->id)
+                ->where('is_read', false)
+                ->where('is_deleted', false)
+                ->update([
+                    'is_read' => true,
+                    'read_at' => now(),
+                ]);
+        }
+
+        return response()->json(['message' => 'Messages marked as read']);
     }
 }
