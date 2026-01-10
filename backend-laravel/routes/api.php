@@ -141,6 +141,8 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
     Route::get('/required-documents', [ProfileController::class, 'getRequiredDocuments']);
     Route::post('/user-documents', [ProfileController::class, 'uploadUserDocument']);
     Route::put('/profile/password', [ProfileController::class, 'changePassword']);
+    Route::put('/profile', [ProfileController::class, 'updateProfile']);
+    Route::post('/profile', [ProfileController::class, 'updateProfile']); // For FormData with method spoofing
 
     // Support
     Route::get('/support', [SupportController::class, 'index']);
