@@ -88,6 +88,9 @@ class DocumentationController extends Controller
         if ($request->has('popular')) {
             // Пока возвращаем все опубликованные страницы (можно добавить логику популярности позже)
             $query->orderBy('created_at', 'desc');
+        } elseif ($request->has('latest')) {
+            // Последние добавленные документы
+            $query->orderBy('created_at', 'desc');
         }
 
         $pages = $query->with('category')->get();

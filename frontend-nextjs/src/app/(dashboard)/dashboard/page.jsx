@@ -243,7 +243,7 @@ const DashboardPage = () => {
         <Grid size={{ xs: 12 }}>
           <WelcomeCard />
         </Grid>
-        <Grid size={{ xs: 12, md: 8 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <TopCourses />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>

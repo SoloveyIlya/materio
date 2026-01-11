@@ -9,11 +9,9 @@ import Card from '@mui/material/Card'
 import CardHeader from '@mui/material/CardHeader'
 import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
-import Chip from '@mui/material/Chip'
 
 // Components Imports
 import CustomAvatar from '@core/components/mui/Avatar'
-import OptionMenu from '@core/components/option-menu'
 import api from '@/lib/api'
 
 const TopCourses = () => {
@@ -26,11 +24,11 @@ const TopCourses = () => {
 
   const loadTopPages = async () => {
     try {
-      const response = await api.get('/moderator/documentation/pages?popular=true')
+      const response = await api.get('/moderator/documentation/pages?latest=true')
       const pages = response.data || []
       setTopPages(pages.slice(0, 5)) // Берем первые 5
     } catch (error) {
-      console.error('Error loading top pages:', error)
+      console.error('Error loading latest documentation:', error)
       setTopPages([])
     }
   }
@@ -56,8 +54,7 @@ const TopCourses = () => {
   return (
     <Card className='bs-full'>
       <CardHeader
-        title='Top courses'
-        action={<OptionMenu iconClassName='text-textPrimary' options={['Last 28 Days', 'Last Month', 'Last Year']} />}
+        title='Last Documentation'
       />
       <CardContent className='flex flex-col gap-[1.625rem]'>
         {topPages.map((page, i) => (
@@ -69,12 +66,9 @@ const TopCourses = () => {
             <CustomAvatar variant='rounded' skin='light' color={getColorForPage(i)}>
               <i className={getIconForPage(i)} />
             </CustomAvatar>
-            <div className='flex justify-between items-center gap-4 is-full flex-wrap'>
-              <Typography className='font-medium flex-1' color='text.primary'>
-                {page.title}
-              </Typography>
-              <Chip label={`${page.views || 0} Views`} variant='tonal' size='small' />
-            </div>
+            <Typography className='font-medium flex-1' color='text.primary'>
+              {page.title}
+            </Typography>
           </div>
         ))}
       </CardContent>
