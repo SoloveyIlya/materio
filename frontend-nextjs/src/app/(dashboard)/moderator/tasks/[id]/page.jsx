@@ -27,6 +27,7 @@ export default function ModeratorTaskViewPage() {
   const [currentTime, setCurrentTime] = useState(Date.now())
   const [activeTab, setActiveTab] = useState(0) // 0 = Task, 1 = Report
   const [selectedTool, setSelectedTool] = useState(null) // Для выбранного инструмента
+  const [selectedAdditionally, setSelectedAdditionally] = useState(false) // Для выбранного Additionally
   const [additionalInfo, setAdditionalInfo] = useState('') // Локальное состояние для дополнительной информации
   const [toolDescriptions, setToolDescriptions] = useState({}) // Локальное состояние для описаний инструментов
   const [pendingToolDescription, setPendingToolDescription] = useState(null) // Отложенное сохранение инструмента
@@ -42,8 +43,9 @@ export default function ModeratorTaskViewPage() {
   useEffect(() => {
     if (task && activeTab === 1) {
       const taskTools = task.tools || (task.tool ? [task.tool] : [])
-      if (taskTools.length > 0 && !selectedTool) {
+      if (taskTools.length > 0 && !selectedTool && !selectedAdditionally) {
         setSelectedTool(taskTools[0])
+        setSelectedAdditionally(false)
       }
       // Обновляем локальные состояния только при первой загрузке или переключении вкладки
       // Не перезаписываем, если пользователь уже редактирует
@@ -941,7 +943,10 @@ export default function ModeratorTaskViewPage() {
                       <ListItem key={tool.id || index} disablePadding className='mbe-1'>
                         <ListItemButton 
                           selected={selectedTool?.id === tool.id}
-                          onClick={() => setSelectedTool(tool)}
+                          onClick={() => {
+                            setSelectedTool(tool)
+                            setSelectedAdditionally(false)
+                          }}
                           className={classnames({
                             'bg-primaryLightOpacity': selectedTool?.id === tool.id
                           })}
@@ -963,19 +968,25 @@ export default function ModeratorTaskViewPage() {
                   {/* Additionally Section */}
                   <Box>
                     <Typography variant='h6' gutterBottom sx={{ mb: 2 }}>Additionally</Typography>
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={6}
-                      placeholder='Enter additional information...'
-                      value={additionalInfo}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        setAdditionalInfo(value)
-                        // Откладываем сохранение (debounce)
-                        setPendingAdditionalInfo(value)
-                      }}
-                    />
+                    <List>
+                      <ListItem disablePadding>
+                        <ListItemButton 
+                          selected={selectedAdditionally}
+                          onClick={() => {
+                            setSelectedAdditionally(true)
+                            setSelectedTool(null)
+                          }}
+                          className={classnames({
+                            'bg-primaryLightOpacity': selectedAdditionally
+                          })}
+                        >
+                          <ListItemIcon>
+                            <i className='ri-file-add-line text-xl' />
+                          </ListItemIcon>
+                          <ListItemText primary='Additional Information' />
+                        </ListItemButton>
+                      </ListItem>
+                    </List>
                   </Box>
                 </CardContent>
               </Card>
@@ -983,7 +994,108 @@ export default function ModeratorTaskViewPage() {
 
             {/* Right Column - Tool Content */}
             <Grid size={{ xs: 12, md: 8, lg: 9 }}>
-              {selectedTool ? (
+              {selectedAdditionally ? (
+                <Card>
+                  <CardContent>
+                    <Typography variant='h5' gutterBottom>Additionally</Typography>
+                    <Box sx={{ mt: 2 }}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={10}
+                        placeholder='Enter additional information...'
+                        value={additionalInfo}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setAdditionalInfo(value)
+                          // Откладываем сохранение (debounce)
+                          setPendingAdditionalInfo(value)
+                        }}
+                      />
+                      
+                      {/* Submit Button - под полем ввода Additionally */}
+                      {task.status === 'in_progress' && (
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
+                          <Button
+                            variant='contained'
+                            color='primary'
+                            size='large'
+                            onClick={async () => {
+                              try {
+                                // Сначала сохраняем все несохранённые изменения
+                                const tools = task.tools || (task.tool ? [task.tool] : [])
+                                
+                                // Сохраняем все описания инструментов, которые есть в toolDescriptions
+                                for (const [toolId, description] of Object.entries(toolDescriptions)) {
+                                  const tool = tools.find(t => t.id === parseInt(toolId))
+                                  if (tool) {
+                                    try {
+                                      await api.put(`/moderator/tasks/${taskId}/report/tool`, {
+                                        tool_id: parseInt(toolId),
+                                        description: description
+                                      })
+                                    } catch (err) {
+                                      console.error(`Error saving tool ${toolId}:`, err)
+                                    }
+                                  }
+                                }
+
+                                // Сохраняем дополнительную информацию, если она изменилась
+                                if (additionalInfo !== (task.result?.additional_info || '')) {
+                                  try {
+                                    await api.put(`/moderator/tasks/${taskId}/report/additional`, {
+                                      additional_info: additionalInfo
+                                    })
+                                  } catch (err) {
+                                    console.error('Error saving additional info:', err)
+                                  }
+                                }
+
+                                // Формируем ответы из данных инструментов
+                                const toolDataArray = []
+                                tools.forEach(tool => {
+                                  const savedData = task.result?.tool_data?.find(td => td.tool_id === tool.id)
+                                  const unsavedData = toolDescriptions[tool.id]
+                                  toolDataArray.push({
+                                    tool_id: tool.id,
+                                    description: unsavedData || savedData?.description || ''
+                                  })
+                                })
+
+                                const answers = {
+                                  tools: toolDataArray,
+                                  additional_info: additionalInfo || task.result?.additional_info || ''
+                                }
+
+                                // Отправляем задачу на проверку
+                                const formData = new FormData()
+                                formData.append('answers', JSON.stringify(answers))
+                                formData.append('comment', additionalInfo || task.result?.additional_info || '')
+
+                                await api.post(`/moderator/tasks/${taskId}/complete`, formData, {
+                                  headers: {
+                                    'Content-Type': 'multipart/form-data',
+                                  },
+                                })
+
+                                alert('Report submitted successfully for review!')
+                                // Перезагружаем задачу
+                                loadTask()
+                              } catch (error) {
+                                console.error('Error submitting report:', error)
+                                alert('Error submitting report: ' + (error.response?.data?.message || error.message))
+                              }
+                            }}
+                            disabled={loading}
+                          >
+                            Submit for Review
+                          </Button>
+                        </Box>
+                      )}
+                    </Box>
+                  </CardContent>
+                </Card>
+              ) : selectedTool ? (
                 <Card>
                   <CardContent>
                     <Typography variant='h5' gutterBottom>{selectedTool.name}</Typography>
@@ -1101,7 +1213,7 @@ export default function ModeratorTaskViewPage() {
                 <Card>
                   <CardContent>
                     <Typography variant='body1' sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>
-                      Select a tool from the list to add information
+                      Select a tool or additionally from the list to add information
                     </Typography>
                   </CardContent>
                 </Card>
