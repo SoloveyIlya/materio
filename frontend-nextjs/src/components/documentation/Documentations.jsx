@@ -184,11 +184,13 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
                           <Typography color='text.primary'>{page.title}</Typography>
-                          <Chip
-                            label={page.is_published ? 'Published' : 'Draft'}
-                            color={page.is_published ? 'success' : 'default'}
-                            size='small'
-                          />
+                          {!readOnly && (
+                            <Chip
+                              label={page.is_published ? 'Published' : 'Draft'}
+                              color={page.is_published ? 'success' : 'default'}
+                              size='small'
+                            />
+                          )}
                           {!readOnly && onEditPage && (
                             <IconButton
                               size='small'
