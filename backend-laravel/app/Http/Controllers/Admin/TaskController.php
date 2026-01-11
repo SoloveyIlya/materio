@@ -24,6 +24,24 @@ class TaskController extends Controller
         $query = Task::where('domain_id', $user->domain_id)
             ->with(['categories', 'template', 'assignedUser', 'documentations', 'tools', 'result']);
 
+        // Фильтр по админу - показываем таски модераторов выбранного админа
+        if ($request->has('administrator_id')) {
+            $administratorId = $request->administrator_id;
+            if ($administratorId === 'all') {
+                // Показываем все таски (без фильтра)
+            } else {
+                // Фильтруем таски модераторов выбранного админа
+                $query->whereHas('assignedUser', function ($q) use ($administratorId) {
+                    $q->where('administrator_id', $administratorId);
+                });
+            }
+        } else {
+            // По умолчанию показываем таски модераторов текущего админа
+            $query->whereHas('assignedUser', function ($q) use ($user) {
+                $q->where('administrator_id', $user->id);
+            });
+        }
+
         if ($request->has('status')) {
             $status = $request->status;
             // Если статус содержит запятую, это множественный статус

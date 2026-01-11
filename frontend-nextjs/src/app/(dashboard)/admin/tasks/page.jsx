@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, Typography, Tabs, Tab, Grid, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Card, CardContent } from '@mui/material'
+import { Box, Typography, Tabs, Tab, Grid, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Card, CardContent, FormControl, InputLabel, Select, MenuItem } from '@mui/material'
 import api from '@/lib/api'
 import { API_URL } from '@/lib/api'
 
@@ -15,13 +15,49 @@ export default function AdminTasksPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [moderationComment, setModerationComment] = useState('')
   const [activeTab, setActiveTab] = useState(0) // По умолчанию "Under Review"
+  const [selectedAdminId, setSelectedAdminId] = useState(null) // null = текущий админ (по умолчанию)
+  const [admins, setAdmins] = useState([])
+  const [currentUser, setCurrentUser] = useState(null)
+
+  useEffect(() => {
+    loadCurrentUser()
+    loadAdmins()
+  }, [])
 
   useEffect(() => {
     loadTasks()
-  }, [activeTab])
+  }, [activeTab, selectedAdminId])
+
+  const loadCurrentUser = async () => {
+    try {
+      const response = await api.get('/auth/user')
+      const user = response.data
+      setCurrentUser(user)
+      // По умолчанию выбираем текущего админа, если еще не выбран
+      if (user && selectedAdminId === null) {
+        setSelectedAdminId(user.id)
+      }
+    } catch (error) {
+      console.error('Error loading current user:', error)
+    }
+  }
+
+  const loadAdmins = async () => {
+    try {
+      const response = await api.get('/admin/users?role=admin')
+      setAdmins(response.data || [])
+    } catch (error) {
+      console.error('Error loading admins:', error)
+    }
+  }
 
   const loadTasks = async () => {
     try {
+      // Не загружаем таски, если еще не загружен текущий пользователь
+      if (!currentUser && selectedAdminId === null) {
+        return
+      }
+
       const statusMap = {
         0: 'under_admin_review', // Under Review (первый таб, по умолчанию)
         1: 'pending,in_progress', // Pending - включает pending и in_progress
@@ -32,6 +68,12 @@ export default function AdminTasksPage() {
       const params = new URLSearchParams()
       if (statusMap[activeTab]) {
         params.append('status', statusMap[activeTab])
+      }
+
+      // Добавляем фильтр по админу
+      // Если selectedAdminId установлен, передаем его, иначе backend применит фильтр по умолчанию (текущий админ)
+      if (selectedAdminId) {
+        params.append('administrator_id', selectedAdminId)
       }
 
       const response = await api.get(`/admin/tasks?${params}`)
@@ -78,7 +120,30 @@ export default function AdminTasksPage() {
 
   return (
     <Box sx={{ p: 6 }}>
-      <Typography variant='h4' gutterBottom>Tasks</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant='h4'>Tasks</Typography>
+        <FormControl sx={{ minWidth: 200 }}>
+          <InputLabel id="admin-select-label">Filter by Admin</InputLabel>
+          <Select
+            labelId="admin-select-label"
+            id="admin-select"
+            value={selectedAdminId || ''}
+            label="Filter by Admin"
+            onChange={(e) => setSelectedAdminId(e.target.value)}
+          >
+            <MenuItem value={currentUser?.id || ''}>
+              My Moderators
+            </MenuItem>
+            {admins
+              .filter((admin) => admin.id !== currentUser?.id)
+              .map((admin) => (
+                <MenuItem key={admin.id} value={admin.id}>
+                  {admin.name || admin.email}
+                </MenuItem>
+              ))}
+          </Select>
+        </FormControl>
+      </Box>
 
       <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 6 }}>
         <Tab label='Under Review' />
