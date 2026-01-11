@@ -335,9 +335,38 @@ class TaskController extends Controller
     {
         $user = $request->user();
         
-        // Проверяем, что задача в том же домене и назначена этому модератору
-        if ($task->domain_id !== $user->domain_id || $task->assigned_to !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        // Проверяем, что задача в том же домене
+        if ($task->domain_id !== $user->domain_id) {
+            return response()->json(['message' => 'Unauthorized: wrong domain'], 403);
+        }
+
+        // Проверяем доступ:
+        // 1. Для pending задач - любой модератор может редактировать
+        // 2. Для in_progress и sent_for_revision задач - только назначенный модератор может редактировать
+        // 3. Для других статусов - только назначенный модератор (если задача была назначена ему)
+        if ($task->status === 'pending') {
+            // Любой модератор может редактировать pending задачи
+        } elseif (in_array($task->status, ['in_progress', 'sent_for_revision'])) {
+            // Для in_progress и sent_for_revision задач нужна проверка назначения
+            // Используем сравнение с приведением типов для надежности
+            if ((int)$task->assigned_to !== (int)$user->id) {
+                return response()->json([
+                    'message' => 'Unauthorized: task is assigned to another moderator',
+                    'task_status' => $task->status,
+                    'task_assigned_to' => $task->assigned_to,
+                    'user_id' => $user->id
+                ], 403);
+            }
+        } else {
+            // Для других статусов - только если назначена этому модератору
+            if ((int)$task->assigned_to !== (int)$user->id) {
+                return response()->json([
+                    'message' => 'Unauthorized: task status does not allow editing',
+                    'task_status' => $task->status,
+                    'task_assigned_to' => $task->assigned_to,
+                    'user_id' => $user->id
+                ], 403);
+            }
         }
 
         $validated = $request->validate([
@@ -397,9 +426,38 @@ class TaskController extends Controller
     {
         $user = $request->user();
         
-        // Проверяем, что задача в том же домене и назначена этому модератору
-        if ($task->domain_id !== $user->domain_id || $task->assigned_to !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        // Проверяем, что задача в том же домене
+        if ($task->domain_id !== $user->domain_id) {
+            return response()->json(['message' => 'Unauthorized: wrong domain'], 403);
+        }
+
+        // Проверяем доступ:
+        // 1. Для pending задач - любой модератор может редактировать
+        // 2. Для in_progress и sent_for_revision задач - только назначенный модератор может редактировать
+        // 3. Для других статусов - только назначенный модератор (если задача была назначена ему)
+        if ($task->status === 'pending') {
+            // Любой модератор может редактировать pending задачи
+        } elseif (in_array($task->status, ['in_progress', 'sent_for_revision'])) {
+            // Для in_progress и sent_for_revision задач нужна проверка назначения
+            // Используем сравнение с приведением типов для надежности
+            if ((int)$task->assigned_to !== (int)$user->id) {
+                return response()->json([
+                    'message' => 'Unauthorized: task is assigned to another moderator',
+                    'task_status' => $task->status,
+                    'task_assigned_to' => $task->assigned_to,
+                    'user_id' => $user->id
+                ], 403);
+            }
+        } else {
+            // Для других статусов - только если назначена этому модератору
+            if ((int)$task->assigned_to !== (int)$user->id) {
+                return response()->json([
+                    'message' => 'Unauthorized: task status does not allow editing',
+                    'task_status' => $task->status,
+                    'task_assigned_to' => $task->assigned_to,
+                    'user_id' => $user->id
+                ], 403);
+            }
         }
 
         $validated = $request->validate([

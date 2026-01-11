@@ -27,6 +27,10 @@ export default function ModeratorTaskViewPage() {
   const [currentTime, setCurrentTime] = useState(Date.now())
   const [activeTab, setActiveTab] = useState(0) // 0 = Task, 1 = Report
   const [selectedTool, setSelectedTool] = useState(null) // Для выбранного инструмента
+  const [additionalInfo, setAdditionalInfo] = useState('') // Локальное состояние для дополнительной информации
+  const [toolDescriptions, setToolDescriptions] = useState({}) // Локальное состояние для описаний инструментов
+  const [pendingToolDescription, setPendingToolDescription] = useState(null) // Отложенное сохранение инструмента
+  const [pendingAdditionalInfo, setPendingAdditionalInfo] = useState(null) // Отложенное сохранение дополнительной информации
 
   useEffect(() => {
     if (taskId) {
@@ -41,6 +45,35 @@ export default function ModeratorTaskViewPage() {
       if (taskTools.length > 0 && !selectedTool) {
         setSelectedTool(taskTools[0])
       }
+      // Обновляем локальные состояния только при первой загрузке или переключении вкладки
+      // Не перезаписываем, если пользователь уже редактирует
+      if (task.result) {
+        // Обновляем additionalInfo только если он пустой или совпадает с сохраненным
+        const savedAdditionalInfo = task.result.additional_info || ''
+        if (additionalInfo === '' || additionalInfo === savedAdditionalInfo) {
+          setAdditionalInfo(savedAdditionalInfo)
+        }
+        
+        if (task.result.tool_data && Array.isArray(task.result.tool_data)) {
+          const toolDescs = {}
+          task.result.tool_data.forEach(td => {
+            if (td.tool_id) {
+              toolDescs[td.tool_id] = td.description || ''
+            }
+          })
+          // Обновляем только те инструменты, которые не были изменены пользователем
+          setToolDescriptions(prev => {
+            const updated = { ...prev }
+            Object.keys(toolDescs).forEach(toolId => {
+              // Обновляем только если значение не было изменено пользователем
+              if (!prev[toolId] || prev[toolId] === toolDescs[toolId]) {
+                updated[toolId] = toolDescs[toolId]
+              }
+            })
+            return updated
+          })
+        }
+      }
     }
   }, [task, activeTab])
 
@@ -52,10 +85,114 @@ export default function ModeratorTaskViewPage() {
     return () => clearInterval(interval)
   }, [])
 
+  // Debounce сохранение данных инструмента
+  useEffect(() => {
+    if (pendingToolDescription === null) return
+
+    const timer = setTimeout(async () => {
+      try {
+        await api.put(`/moderator/tasks/${taskId}/report/tool`, {
+          tool_id: pendingToolDescription.toolId,
+          description: pendingToolDescription.description
+        })
+        // Обновляем локальное состояние задачи БЕЗ перезаписи локальных состояний
+        // Это предотвратит сброс того, что пользователь вводит
+        setTask(prev => {
+          const result = prev.result || {}
+          const tool_data = result.tool_data || []
+          const existingIndex = tool_data.findIndex(td => td.tool_id === pendingToolDescription.toolId)
+          
+          let newToolData
+          if (existingIndex >= 0) {
+            newToolData = [...tool_data]
+            newToolData[existingIndex] = {
+              ...newToolData[existingIndex],
+              description: pendingToolDescription.description
+            }
+          } else {
+            newToolData = [...tool_data, {
+              tool_id: pendingToolDescription.toolId,
+              description: pendingToolDescription.description
+            }]
+          }
+          
+          return {
+            ...prev,
+            result: {
+              ...result,
+              tool_data: newToolData
+            }
+          }
+        })
+        // НЕ обновляем toolDescriptions здесь - они уже актуальны
+      } catch (error) {
+        console.error('Error saving tool data:', error)
+        // При ошибке откатываем к сохраненному значению
+        const toolData = task?.result?.tool_data?.find(td => td.tool_id === pendingToolDescription.toolId)
+        setToolDescriptions(prev => ({
+          ...prev,
+          [pendingToolDescription.toolId]: toolData?.description || ''
+        }))
+      } finally {
+        setPendingToolDescription(null)
+      }
+    }, 1000) // Задержка 1 секунда
+
+    return () => clearTimeout(timer)
+  }, [pendingToolDescription, taskId, task])
+
+  // Debounce сохранение дополнительной информации
+  useEffect(() => {
+    if (pendingAdditionalInfo === null) return
+
+    const timer = setTimeout(async () => {
+      try {
+        await api.put(`/moderator/tasks/${taskId}/report/additional`, {
+          additional_info: pendingAdditionalInfo
+        })
+        // Обновляем локальное состояние задачи БЕЗ перезаписи локального состояния
+        // Это предотвратит сброс того, что пользователь вводит
+        setTask(prev => ({
+          ...prev,
+          result: {
+            ...(prev.result || {}),
+            additional_info: pendingAdditionalInfo
+          }
+        }))
+        // НЕ обновляем additionalInfo здесь - оно уже актуально
+      } catch (error) {
+        console.error('Error saving additional info:', error)
+        // При ошибке откатываем к сохраненному значению
+        setAdditionalInfo(task?.result?.additional_info || '')
+      } finally {
+        setPendingAdditionalInfo(null)
+      }
+    }, 1000) // Задержка 1 секунда
+
+    return () => clearTimeout(timer)
+  }, [pendingAdditionalInfo, taskId, task])
+
   const loadTask = async () => {
     try {
       const response = await api.get(`/moderator/tasks/${taskId}`)
       setTask(response.data)
+      // Инициализируем локальное состояние из результата задачи
+      if (response.data?.result) {
+        setAdditionalInfo(response.data.result.additional_info || '')
+        // Инициализируем описания инструментов
+        if (response.data.result.tool_data && Array.isArray(response.data.result.tool_data)) {
+          const toolDescs = {}
+          response.data.result.tool_data.forEach(td => {
+            if (td.tool_id) {
+              toolDescs[td.tool_id] = td.description || ''
+            }
+          })
+          setToolDescriptions(toolDescs)
+        }
+      } else {
+        setAdditionalInfo('')
+        setToolDescriptions({})
+      }
     } catch (error) {
       console.error('Error loading task:', error)
     } finally {
@@ -831,24 +968,12 @@ export default function ModeratorTaskViewPage() {
                       multiline
                       rows={6}
                       placeholder='Enter additional information...'
-                      value={task.result?.additional_info || ''}
-                      onChange={async (e) => {
-                        try {
-                          // Сохраняем дополнительную информацию
-                          await api.put(`/moderator/tasks/${taskId}/report/additional`, {
-                            additional_info: e.target.value
-                          })
-                          // Обновляем локальное состояние
-                          setTask(prev => ({
-                            ...prev,
-                            result: {
-                              ...prev.result,
-                              additional_info: e.target.value
-                            }
-                          }))
-                        } catch (error) {
-                          console.error('Error saving additional info:', error)
-                        }
+                      value={additionalInfo}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setAdditionalInfo(value)
+                        // Откладываем сохранение (debounce)
+                        setPendingAdditionalInfo(value)
                       }}
                     />
                   </Box>
@@ -864,6 +989,7 @@ export default function ModeratorTaskViewPage() {
                     <Typography variant='h5' gutterBottom>{selectedTool.name}</Typography>
                     {(() => {
                       const toolData = getToolData(selectedTool.id)
+                      const currentDescription = toolDescriptions[selectedTool.id] || toolData?.description || ''
                       return (
                         <Box sx={{ mt: 2 }}>
                           <TextField
@@ -871,47 +997,101 @@ export default function ModeratorTaskViewPage() {
                             multiline
                             rows={10}
                             placeholder='Enter information for this tool...'
-                            value={toolData?.description || ''}
-                            onChange={async (e) => {
-                              try {
-                                // Сохраняем данные по тулзу
-                                await api.put(`/moderator/tasks/${taskId}/report/tool`, {
-                                  tool_id: selectedTool.id,
-                                  description: e.target.value
-                                })
-                                // Обновляем локальное состояние
-                                setTask(prev => {
-                                  const result = prev.result || {}
-                                  const tool_data = result.tool_data || []
-                                  const existingIndex = tool_data.findIndex(td => td.tool_id === selectedTool.id)
-                                  
-                                  let newToolData
-                                  if (existingIndex >= 0) {
-                                    newToolData = [...tool_data]
-                                    newToolData[existingIndex] = {
-                                      ...newToolData[existingIndex],
-                                      description: e.target.value
-                                    }
-                                  } else {
-                                    newToolData = [...tool_data, {
-                                      tool_id: selectedTool.id,
-                                      description: e.target.value
-                                    }]
-                                  }
-                                  
-                                  return {
-                                    ...prev,
-                                    result: {
-                                      ...result,
-                                      tool_data: newToolData
-                                    }
-                                  }
-                                })
-                              } catch (error) {
-                                console.error('Error saving tool data:', error)
-                              }
+                            value={currentDescription}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              // Обновляем локальное состояние немедленно для отображения
+                              setToolDescriptions(prev => ({
+                                ...prev,
+                                [selectedTool.id]: value
+                              }))
+                              // Откладываем сохранение на сервер (debounce)
+                              setPendingToolDescription({
+                                toolId: selectedTool.id,
+                                description: value
+                              })
                             }}
                           />
+                          
+                          {/* Submit Button - под полем ввода тулзы */}
+                          {task.status === 'in_progress' && (
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
+                              <Button
+                                variant='contained'
+                                color='primary'
+                                size='large'
+                                onClick={async () => {
+                                  try {
+                                    // Сначала сохраняем все несохранённые изменения
+                                    const tools = task.tools || (task.tool ? [task.tool] : [])
+                                    
+                                    // Сохраняем все описания инструментов, которые есть в toolDescriptions
+                                    for (const [toolId, description] of Object.entries(toolDescriptions)) {
+                                      const tool = tools.find(t => t.id === parseInt(toolId))
+                                      if (tool) {
+                                        try {
+                                          await api.put(`/moderator/tasks/${taskId}/report/tool`, {
+                                            tool_id: parseInt(toolId),
+                                            description: description
+                                          })
+                                        } catch (err) {
+                                          console.error(`Error saving tool ${toolId}:`, err)
+                                        }
+                                      }
+                                    }
+
+                                    // Сохраняем дополнительную информацию, если она изменилась
+                                    if (additionalInfo !== (task.result?.additional_info || '')) {
+                                      try {
+                                        await api.put(`/moderator/tasks/${taskId}/report/additional`, {
+                                          additional_info: additionalInfo
+                                        })
+                                      } catch (err) {
+                                        console.error('Error saving additional info:', err)
+                                      }
+                                    }
+
+                                    // Формируем ответы из данных инструментов
+                                    const toolDataArray = []
+                                    tools.forEach(tool => {
+                                      const savedData = task.result?.tool_data?.find(td => td.tool_id === tool.id)
+                                      const unsavedData = toolDescriptions[tool.id]
+                                      toolDataArray.push({
+                                        tool_id: tool.id,
+                                        description: unsavedData || savedData?.description || ''
+                                      })
+                                    })
+
+                                    const answers = {
+                                      tools: toolDataArray,
+                                      additional_info: additionalInfo || task.result?.additional_info || ''
+                                    }
+
+                                    // Отправляем задачу на проверку
+                                    const formData = new FormData()
+                                    formData.append('answers', JSON.stringify(answers))
+                                    formData.append('comment', additionalInfo || task.result?.additional_info || '')
+
+                                    await api.post(`/moderator/tasks/${taskId}/complete`, formData, {
+                                      headers: {
+                                        'Content-Type': 'multipart/form-data',
+                                      },
+                                    })
+
+                                    alert('Report submitted successfully for review!')
+                                    // Перезагружаем задачу
+                                    loadTask()
+                                  } catch (error) {
+                                    console.error('Error submitting report:', error)
+                                    alert('Error submitting report: ' + (error.response?.data?.message || error.message))
+                                  }
+                                }}
+                                disabled={loading}
+                              >
+                                Submit for Review
+                              </Button>
+                            </Box>
+                          )}
                         </Box>
                       )
                     })()}
