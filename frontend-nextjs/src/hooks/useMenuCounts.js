@@ -11,13 +11,14 @@ export const useMenuCounts = () => {
     support: 0,
     tasks: 0,
     chat_by_admin: [],
+    tasks_by_admin: [],
   })
   const [loading, setLoading] = useState(true)
 
   const fetchCounts = async () => {
     try {
       if (!user) {
-        setCounts({ chat: 0, support: 0, tasks: 0, chat_by_admin: [] })
+        setCounts({ chat: 0, support: 0, tasks: 0, chat_by_admin: [], tasks_by_admin: [] })
         setLoading(false)
         return
       }
@@ -28,10 +29,10 @@ export const useMenuCounts = () => {
         : '/moderator/dashboard/counts'
 
       const response = await api.get(endpoint)
-      setCounts(response.data || { chat: 0, support: 0, tasks: 0, chat_by_admin: [] })
+      setCounts(response.data || { chat: 0, support: 0, tasks: 0, chat_by_admin: [], tasks_by_admin: [] })
     } catch (error) {
       console.error('Error fetching menu counts:', error)
-      setCounts({ chat: 0, support: 0, tasks: 0, chat_by_admin: [] })
+      setCounts({ chat: 0, support: 0, tasks: 0, chat_by_admin: [], tasks_by_admin: [] })
     } finally {
       setLoading(false)
     }

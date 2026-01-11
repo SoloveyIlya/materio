@@ -396,11 +396,34 @@ class DashboardController extends Controller
                     ->count();
                 $counts['support'] = $unreadSupportTickets;
 
-                // Задачи на проверке (under_admin_review)
-                $tasksUnderReview = Task::where('domain_id', $user->domain_id)
-                    ->where('status', 'under_admin_review')
-                    ->count();
-                $counts['tasks'] = $tasksUnderReview;
+                // Задачи на проверке (under_admin_review) для каждого админа
+                $taskCountsByAdmin = [];
+                foreach ($allAdmins as $admin) {
+                    $adminModeratorIds = User::where('domain_id', $user->domain_id)
+                        ->where('administrator_id', $admin->id)
+                        ->whereHas('roles', function ($q) {
+                            $q->where('name', 'moderator');
+                        })
+                        ->pluck('id')
+                        ->toArray();
+
+                    $adminTasksUnderReview = 0;
+                    if (count($adminModeratorIds) > 0) {
+                        $adminTasksUnderReview = Task::where('domain_id', $user->domain_id)
+                            ->whereIn('assigned_to', $adminModeratorIds)
+                            ->where('status', 'under_admin_review')
+                            ->count();
+                    }
+                    
+                    if ($adminTasksUnderReview > 0) {
+                        $taskCountsByAdmin[] = [
+                            'admin_id' => $admin->id,
+                            'admin_name' => $admin->name,
+                            'count' => $adminTasksUnderReview
+                        ];
+                    }
+                }
+                $counts['tasks_by_admin'] = $taskCountsByAdmin;
             }
             // Для модераторов
             else if ($user->isModerator()) {
