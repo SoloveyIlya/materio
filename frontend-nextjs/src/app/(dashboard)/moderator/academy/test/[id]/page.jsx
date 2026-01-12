@@ -19,6 +19,7 @@ export default function ModeratorTestPage() {
   const [timeRemaining, setTimeRemaining] = useState(null)
   const [startTime, setStartTime] = useState(null)
   const [testCompleted, setTestCompleted] = useState(false)
+  const [testPassed, setTestPassed] = useState(null)
 
   useEffect(() => {
     if (testId) {
@@ -122,6 +123,7 @@ export default function ModeratorTestPage() {
       })
 
       setTestCompleted(true)
+      setTestPassed(response.data.is_passed)
       
       if (response.data.is_passed) {
         showToast.success(`Test passed! Score: ${response.data.score}/${response.data.total} (${response.data.percentage}%)`)
@@ -171,12 +173,32 @@ export default function ModeratorTestPage() {
   }
 
   if (testCompleted) {
+    const isPassed = testPassed === true
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="success" sx={{ mb: 2 }}>
-          Test completed successfully!
+        <Alert 
+          severity={isPassed ? "success" : "error"} 
+          sx={{ 
+            mb: 2,
+            bgcolor: isPassed ? 'success.light' : 'error.light',
+            color: isPassed ? 'success.dark' : 'error.dark',
+            '& .MuiAlert-icon': {
+              color: isPassed ? 'success.dark' : 'error.dark',
+            }
+          }}
+        >
+          {isPassed ? 'Test completed successfully!' : 'Test failed'}
         </Alert>
-        <Button variant="contained" onClick={() => router.push('/moderator/academy')}>
+        <Button 
+          variant="contained" 
+          onClick={() => router.push('/moderator/academy')}
+          sx={{
+            bgcolor: isPassed ? 'success.main' : 'error.main',
+            '&:hover': {
+              bgcolor: isPassed ? 'success.dark' : 'error.dark',
+            }
+          }}
+        >
           Back to Academy
         </Button>
       </Box>
