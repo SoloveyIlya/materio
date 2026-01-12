@@ -24,12 +24,11 @@ class TaskController extends Controller
         $query = Task::where('domain_id', $user->domain_id)
             ->with(['categories', 'template', 'assignedUser', 'documentations', 'tools', 'result']);
 
-        // Фильтр по админу - показываем таски модераторов выбранного админа
+        // Фильтр по админу - применяется только если явно запрошен
+        // По умолчанию показываем ВСЕ задачи домена (единый Task Manager для всех админов)
         if ($request->has('administrator_id')) {
             $administratorId = $request->administrator_id;
-            if ($administratorId === 'all') {
-                // Показываем все таски (без фильтра)
-            } else {
+            if ($administratorId !== 'all') {
                 // Фильтруем таски модераторов выбранного админа ИЛИ таски без назначения
                 $query->where(function ($q) use ($administratorId) {
                     $q->whereHas('assignedUser', function ($subQ) use ($administratorId) {
@@ -37,14 +36,9 @@ class TaskController extends Controller
                     })->orWhereNull('assigned_to');
                 });
             }
-        } else {
-            // По умолчанию показываем таски модераторов текущего админа ИЛИ таски без назначения
-            $query->where(function ($q) use ($user) {
-                $q->whereHas('assignedUser', function ($subQ) use ($user) {
-                    $subQ->where('administrator_id', $user->id);
-                })->orWhereNull('assigned_to');
-            });
+            // Если administrator_id === 'all', показываем все задачи (без фильтра)
         }
+        // Если administrator_id не передан, показываем все задачи домена (без фильтра)
 
         if ($request->has('status')) {
             $status = $request->status;
