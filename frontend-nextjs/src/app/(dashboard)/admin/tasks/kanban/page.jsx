@@ -57,10 +57,19 @@ const KanbanPage = () => {
     // For default columns (Day 1-5), filter by work_day
     if (column.id <= 5) {
       const dayNumber = column.id
-      return tasks.filter(task => {
-        // Match by work_day (exact match)
-        return task.work_day === dayNumber
+      const filtered = tasks.filter(task => {
+        // Match by work_day (exact match) - приводим к числу для корректного сравнения
+        const taskWorkDay = task.work_day !== null && task.work_day !== undefined 
+          ? Number(task.work_day) 
+          : null
+        const matches = taskWorkDay === dayNumber
+        // Отладочная информация
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Task ${task.id}: work_day=${task.work_day} (${typeof task.work_day}), converted=${taskWorkDay}, dayNumber=${dayNumber}, matches=${matches}`)
+        }
+        return matches
       })
+      return filtered
     } else {
       // For custom columns, return empty for now
       // You can implement custom filtering logic here

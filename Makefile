@@ -67,6 +67,9 @@ list-users: ## Показать всех пользователей в базе 
 check-database: ## Проверить базу данных (все таблицы и записи)
 	docker compose exec backend php check-database.php
 
+check-tasks: ## Проверить таски в базе данных
+	docker compose exec backend php check-tasks.php
+
 create-user: ## Создать пользователя (использование: make create-user EMAIL="email@example.com" PASSWORD="password" NAME="User Name" ROLE="admin|moderator")
 	@if [ -z "$(EMAIL)" ] || [ -z "$(PASSWORD)" ]; then \
 		echo "Использование: make create-user EMAIL=\"email@example.com\" PASSWORD=\"password\" NAME=\"User Name\" ROLE=\"admin|moderator\""; \

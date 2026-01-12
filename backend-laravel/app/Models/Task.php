@@ -37,6 +37,7 @@ class Task extends Model
         'document_image',
         'document_image_name',
         'selfie_image',
+        'video',
         'comment',
     ];
 

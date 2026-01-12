@@ -415,14 +415,19 @@ const TaskDrawer = props => {
         formDataToSend.append('video', formData.video)
       }
 
+      let response
       if (task && task.id) {
         // Для PUT запросов с FormData в Laravel нужно использовать POST с _method: 'PUT'
         // Это связано с тем, как Laravel обрабатывает multipart/form-data
         formDataToSend.append('_method', 'PUT')
-        await api.post(`/admin/tasks/${task.id}`, formDataToSend)
+        response = await api.post(`/admin/tasks/${task.id}`, formDataToSend)
       } else {
-        await api.post('/admin/tasks', formDataToSend)
+        response = await api.post('/admin/tasks', formDataToSend)
       }
+
+      // Логируем созданный/обновленный таск для отладки
+      console.log('Task saved:', response.data)
+      console.log('Task work_day:', response.data?.work_day, 'Type:', typeof response.data?.work_day)
 
       if (onSave) {
         onSave()

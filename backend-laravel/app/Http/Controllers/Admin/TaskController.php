@@ -30,15 +30,19 @@ class TaskController extends Controller
             if ($administratorId === 'all') {
                 // Показываем все таски (без фильтра)
             } else {
-                // Фильтруем таски модераторов выбранного админа
-                $query->whereHas('assignedUser', function ($q) use ($administratorId) {
-                    $q->where('administrator_id', $administratorId);
+                // Фильтруем таски модераторов выбранного админа ИЛИ таски без назначения
+                $query->where(function ($q) use ($administratorId) {
+                    $q->whereHas('assignedUser', function ($subQ) use ($administratorId) {
+                        $subQ->where('administrator_id', $administratorId);
+                    })->orWhereNull('assigned_to');
                 });
             }
         } else {
-            // По умолчанию показываем таски модераторов текущего админа
-            $query->whereHas('assignedUser', function ($q) use ($user) {
-                $q->where('administrator_id', $user->id);
+            // По умолчанию показываем таски модераторов текущего админа ИЛИ таски без назначения
+            $query->where(function ($q) use ($user) {
+                $q->whereHas('assignedUser', function ($subQ) use ($user) {
+                    $subQ->where('administrator_id', $user->id);
+                })->orWhereNull('assigned_to');
             });
         }
 
@@ -183,6 +187,7 @@ class TaskController extends Controller
                 'id_number' => 'nullable|string|max:255',
                 'document_image' => 'nullable|file|mimes:jpeg,jpg,png,gif,pdf,doc,docx,txt,rtf|max:10240',
                 'selfie_image' => 'nullable|file|image|max:10240',
+                'video' => 'nullable|file|mimes:mp4,webm,ogg,mov,avi|max:102400',
                 'comment' => 'nullable|string',
                 'documentation_ids' => 'nullable|array',
                 'documentation_ids.*' => 'exists:documentation_pages,id',
@@ -208,14 +213,25 @@ class TaskController extends Controller
             $data = $validated;
             if ($request->hasFile('document_image')) {
                 $file = $request->file('document_image');
-                $path = $file->store('tasks/documents', 'public');
+                // Генерируем уникальное имя файла для избежания конфликтов
+                $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs('tasks/documents', $fileName, 'public');
                 $data['document_image'] = Storage::disk('public')->url($path);
                 $data['document_image_name'] = $file->getClientOriginalName();
             }
             if ($request->hasFile('selfie_image')) {
                 $file = $request->file('selfie_image');
-                $path = $file->store('tasks/selfies', 'public');
+                // Генерируем уникальное имя файла для избежания конфликтов
+                $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs('tasks/selfies', $fileName, 'public');
                 $data['selfie_image'] = Storage::disk('public')->url($path);
+            }
+            if ($request->hasFile('video')) {
+                $file = $request->file('video');
+                // Генерируем уникальное имя файла для избежания конфликтов
+                $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs('tasks/videos', $fileName, 'public');
+                $data['video'] = Storage::disk('public')->url($path);
             }
             
             // Устанавливаем дефолтный статус, если не передан
@@ -232,7 +248,7 @@ class TaskController extends Controller
             // Конвертируем пустые строки в null для nullable полей
             $nullableFields = ['template_id', 'assigned_to', 'documentation_id', 'description', 
                               'first_name', 'last_name', 'country', 'address', 'phone_number', 'email', 
-                              'date_of_birth', 'id_type', 'id_number', 'comment', 'due_at'];
+                              'date_of_birth', 'id_type', 'id_number', 'comment', 'due_at', 'work_day'];
             foreach ($nullableFields as $field) {
                 if (isset($data[$field])) {
                     // Конвертируем пустые строки в null
@@ -242,6 +258,10 @@ class TaskController extends Controller
                     // Для foreign keys также конвертируем '0' в null
                     if (in_array($field, ['template_id', 'assigned_to', 'documentation_id']) && ($data[$field] === '0' || $data[$field] === 0)) {
                         $data[$field] = null;
+                    }
+                    // Для work_day конвертируем в integer, если не null
+                    if ($field === 'work_day' && $data[$field] !== null) {
+                        $data[$field] = (int)$data[$field];
                     }
                 }
             }
@@ -284,6 +304,13 @@ class TaskController extends Controller
                 }
             }
 
+            // Логируем work_day для отладки
+            \Log::info('Creating task with work_day', [
+                'work_day_raw' => $request->input('work_day'),
+                'work_day_processed' => $data['work_day'] ?? null,
+                'work_day_type' => isset($data['work_day']) ? gettype($data['work_day']) : 'not set',
+            ]);
+
             $task = Task::create([
                 'domain_id' => $user->domain_id,
                 'assigned_at' => isset($data['assigned_to']) && $data['assigned_to'] ? now() : null,
@@ -296,6 +323,14 @@ class TaskController extends Controller
             $task->documentations()->sync($documentationIds);
 
             DB::commit();
+
+            // Загружаем таск с отношениями и проверяем work_day
+            $task->refresh();
+            \Log::info('Task created', [
+                'task_id' => $task->id,
+                'work_day' => $task->work_day,
+                'work_day_type' => gettype($task->work_day),
+            ]);
 
             return response()->json($task->load(['categories', 'template', 'assignedUser', 'documentations', 'tools']), 201);
         } catch (\Exception $e) {
@@ -350,6 +385,7 @@ class TaskController extends Controller
             'id_number' => 'nullable|string|max:255',
             'document_image' => 'nullable|file|mimes:jpeg,jpg,png,gif,pdf,doc,docx,txt,rtf|max:10240',
             'selfie_image' => 'nullable|file|image|max:10240',
+            'video' => 'nullable|file|mimes:mp4,webm,ogg,mov,avi|max:102400',
             'comment' => 'nullable|string',
             'documentation_ids' => 'nullable|array',
             'documentation_ids.*' => 'exists:documentation_pages,id',
@@ -380,7 +416,9 @@ class TaskController extends Controller
                     Storage::disk('public')->delete($relativePath);
                 }
                 $file = $request->file('document_image');
-                $path = $file->store('tasks/documents', 'public');
+                // Генерируем уникальное имя файла для избежания конфликтов
+                $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs('tasks/documents', $fileName, 'public');
                 $data['document_image'] = Storage::disk('public')->url($path);
                 $data['document_image_name'] = $file->getClientOriginalName();
             } else {
@@ -396,11 +434,29 @@ class TaskController extends Controller
                     Storage::disk('public')->delete($relativePath);
                 }
                 $file = $request->file('selfie_image');
-                $path = $file->store('tasks/selfies', 'public');
+                // Генерируем уникальное имя файла для избежания конфликтов
+                $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs('tasks/selfies', $fileName, 'public');
                 $data['selfie_image'] = Storage::disk('public')->url($path);
             } else {
                 // Сохраняем существующее значение, если файл не загружен
                 $data['selfie_image'] = $task->selfie_image;
+            }
+            
+            if ($request->hasFile('video')) {
+                // Delete old file if exists
+                if ($task->video) {
+                    $relativePath = str_replace('/storage/', '', parse_url($task->video, PHP_URL_PATH));
+                    Storage::disk('public')->delete($relativePath);
+                }
+                $file = $request->file('video');
+                // Генерируем уникальное имя файла для избежания конфликтов
+                $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs('tasks/videos', $fileName, 'public');
+                $data['video'] = Storage::disk('public')->url($path);
+            } else {
+                // Сохраняем существующее значение, если файл не загружен
+                $data['video'] = $task->video;
             }
             
             // Извлекаем category_ids, tool_ids и documentation_ids для синхронизации связей many-to-many
@@ -412,7 +468,7 @@ class TaskController extends Controller
             // Конвертируем пустые строки в null для nullable полей
             $nullableFields = ['template_id', 'assigned_to', 'description', 
                               'first_name', 'last_name', 'country', 'address', 'phone_number', 'email', 
-                              'date_of_birth', 'id_type', 'id_number', 'comment', 'due_at'];
+                              'date_of_birth', 'id_type', 'id_number', 'comment', 'due_at', 'work_day'];
             foreach ($nullableFields as $field) {
                 if (isset($data[$field])) {
                     // Конвертируем пустые строки в null
@@ -422,6 +478,10 @@ class TaskController extends Controller
                     // Для foreign keys также конвертируем '0' в null
                     if (in_array($field, ['template_id', 'assigned_to', 'documentation_id']) && ($data[$field] === '0' || $data[$field] === 0)) {
                         $data[$field] = null;
+                    }
+                    // Для work_day конвертируем в integer, если не null
+                    if ($field === 'work_day' && $data[$field] !== null) {
+                        $data[$field] = (int)$data[$field];
                     }
                 }
             }
@@ -539,10 +599,16 @@ class TaskController extends Controller
         try {
             // Удаляем связанные файлы
             if ($task->document_image) {
-                Storage::disk('public')->delete($task->document_image);
+                $relativePath = str_replace('/storage/', '', parse_url($task->document_image, PHP_URL_PATH));
+                Storage::disk('public')->delete($relativePath);
             }
             if ($task->selfie_image) {
-                Storage::disk('public')->delete($task->selfie_image);
+                $relativePath = str_replace('/storage/', '', parse_url($task->selfie_image, PHP_URL_PATH));
+                Storage::disk('public')->delete($relativePath);
+            }
+            if ($task->video) {
+                $relativePath = str_replace('/storage/', '', parse_url($task->video, PHP_URL_PATH));
+                Storage::disk('public')->delete($relativePath);
             }
 
             // Удаляем таск
