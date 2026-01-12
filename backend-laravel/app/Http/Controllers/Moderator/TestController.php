@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Test;
 use App\Models\TestResult;
 use App\Models\TestAnswer;
+use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TestController extends Controller
 {
@@ -134,6 +136,31 @@ class TestController extends Controller
                 'is_passed' => $isPassed,
             ]
         );
+
+        // Если тест пройден успешно, обновляем статус задачи с категорией "Test"
+        if ($isPassed) {
+            DB::transaction(function () use ($user) {
+                // Находим задачу с категорией "Test" для этого пользователя
+                // которая еще не пройдена (статус "pending" или "in_progress")
+                $task = Task::where('domain_id', $user->domain_id)
+                    ->where(function ($query) use ($user) {
+                        $query->where('assigned_to', $user->id)
+                              ->orWhereNull('assigned_to');
+                    })
+                    ->whereIn('status', ['pending', 'in_progress'])
+                    ->whereHas('categories', function ($q) {
+                        $q->where('name', 'Test');
+                    })
+                    ->first();
+
+                if ($task) {
+                    // Обновляем статус задачи на "test_passed"
+                    $task->update([
+                        'status' => 'test_passed',
+                    ]);
+                }
+            });
+        }
 
         return response()->json([
             'message' => 'Test submitted successfully',

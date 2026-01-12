@@ -155,6 +155,11 @@ class TaskController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        // Запрещаем запуск задач со статусом "test_passed"
+        if ($task->status === 'test_passed') {
+            return response()->json(['message' => 'Task cannot be started. Test has already been passed.'], 400);
+        }
+
         if ($task->status !== 'pending') {
             return response()->json(['message' => 'Task cannot be started. Only pending tasks can be claimed.'], 400);
         }
