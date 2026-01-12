@@ -1,0 +1,19 @@
+{$DOMAIN} {
+
+  encode gzip zstd
+
+  # API -> Laravel (nginx внутри сети)
+  handle_path /api/* {
+    reverse_proxy nginx:80
+  }
+
+  # Можно отдельно отдать статику Laravel, если нужно:
+  # handle_path /storage/* {
+  #   reverse_proxy nginx:80
+  # }
+
+  # Всё остальное -> Next.js
+  handle {
+    reverse_proxy frontend:3000
+  }
+}
