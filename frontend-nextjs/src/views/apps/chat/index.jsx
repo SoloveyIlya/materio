@@ -385,8 +385,8 @@ const ChatWrapper = () => {
     }
   }
 
-  const handleSendMessage = async (messageText, attachments = [], voiceFile = null) => {
-    if (!messageText.trim() && attachments.length === 0 && !voiceFile) return
+  const handleSendMessage = async (messageText, attachments = [], voiceFile = null, videoFile = null) => {
+    if (!messageText.trim() && attachments.length === 0 && !voiceFile && !videoFile) return
     if (!selectedChat || !selectedChat.user) return
 
     try {
@@ -411,14 +411,13 @@ const ChatWrapper = () => {
         messageData.from_user_id = fromUserId
       }
 
-      // If there are files or voice, use FormData
-      if (attachments.some(f => f instanceof File) || voiceFile) {
+      // If there are files, voice, or video, use FormData
+      if (attachments.some(f => f instanceof File) || voiceFile || videoFile) {
         const formData = new FormData()
         formData.append('to_user_id', selectedChat.user.id.toString())
         formData.append('type', 'message')
-        if (messageText) {
-          formData.append('body', messageText)
-        }
+        // Всегда отправляем body, даже если пустой (для совместимости с бэкендом)
+        formData.append('body', messageText || '')
         
         if (fromUserId) {
           formData.append('from_user_id', fromUserId.toString())
@@ -431,10 +430,16 @@ const ChatWrapper = () => {
         if (voiceFile) {
           formData.append('voice', voiceFile)
         }
+
+        if (videoFile) {
+          // Отправляем видео как attachment с типом video
+          formData.append(`attachments[0]`, videoFile)
+        }
         
         attachments.forEach((file, index) => {
           if (file instanceof File) {
-            formData.append(`attachments[${index}]`, file)
+            const attachmentIndex = videoFile ? index + 1 : index
+            formData.append(`attachments[${attachmentIndex}]`, file)
           }
         })
 

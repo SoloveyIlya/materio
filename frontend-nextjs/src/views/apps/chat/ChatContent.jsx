@@ -29,6 +29,7 @@ import { statusObj } from './SidebarLeft'
 import CustomAvatar from '@core/components/mui/Avatar'
 import SendMsgForm from './SendMsgForm'
 import UserProfileRight from './UserProfileRight'
+import VideoRecorder from '@/components/VideoRecorder'
 
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
@@ -91,6 +92,8 @@ const ChatContent = props => {
   const [attachments, setAttachments] = useState([])
   const [messageText, setMessageText] = useState('')
   const [voiceFile, setVoiceFile] = useState(null)
+  const [videoFile, setVideoFile] = useState(null)
+  const [videoRecorderOpen, setVideoRecorderOpen] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [mediaRecorder, setMediaRecorder] = useState(null)
   const [audioChunks, setAudioChunks] = useState([])
@@ -131,6 +134,7 @@ const ChatContent = props => {
     setMessageText('')
     setAttachments([])
     setVoiceFile(null)
+    setVideoFile(null)
     setEditingMessage(null)
     if (mediaRecorder && isRecording) {
       mediaRecorder.stop()
@@ -192,16 +196,26 @@ const ChatContent = props => {
   }
 
   const handleSend = async () => {
-    if (!messageText.trim() && attachments.length === 0 && !voiceFile) return
+    if (!messageText.trim() && attachments.length === 0 && !voiceFile && !videoFile) return
 
     try {
-      await onSendMessage(messageText, attachments, voiceFile)
+      await onSendMessage(messageText, attachments, voiceFile, videoFile)
       setMessageText('')
       setAttachments([])
       setVoiceFile(null)
+      setVideoFile(null)
     } catch (error) {
       console.error('Error sending message:', error)
     }
+  }
+
+  const handleVideoRecordComplete = (file) => {
+    setVideoFile(file)
+    setVideoRecorderOpen(false)
+  }
+
+  const removeVideoFile = () => {
+    setVideoFile(null)
   }
 
   // Voice recording functions
@@ -544,8 +558,12 @@ const ChatContent = props => {
                                   {msg.attachments.map((att, idx) => {
                                     // Обработка разных типов attachments
                                     const attachment = typeof att === 'string' ? { url: att, type: 'file' } : att
-                                    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(attachment.url || '')
+                                    const isImage = attachment.type === 'image' || /\.(jpg|jpeg|png|gif|webp)$/i.test(attachment.url || '')
                                     const isVoice = attachment.type === 'voice'
+                                    const isVideo = attachment.type === 'video' || 
+                                                   /\.(mp4|webm|mov|avi)$/i.test(attachment.url || '') || 
+                                                   attachment.url?.includes('video-circle') ||
+                                                   attachment.name?.includes('video-circle')
                                     const url = attachment.url 
                                       ? (attachment.url.startsWith('http') ? attachment.url : `${API_URL}${attachment.url}`)
                                       : null
@@ -554,6 +572,41 @@ const ChatContent = props => {
                                       return (
                                         <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
                                           <audio controls src={url} style={{ maxWidth: 250 }} />
+                                        </Box>
+                                      )
+                                    }
+
+                                    if (isVideo && url) {
+                                      return (
+                                        <Box
+                                          key={idx}
+                                          sx={{
+                                            position: 'relative',
+                                            width: 200,
+                                            height: 200,
+                                            borderRadius: '50%',
+                                            overflow: 'hidden',
+                                            border: '3px solid',
+                                            borderColor: 'primary.main',
+                                            cursor: 'pointer',
+                                            '&:hover': { opacity: 0.9 }
+                                          }}
+                                          onClick={() => window.open(url, '_blank')}
+                                        >
+                                          <Box
+                                            component="video"
+                                            src={url}
+                                            controls
+                                            autoPlay={false}
+                                            loop
+                                            muted
+                                            sx={{
+                                              width: '100%',
+                                              height: '100%',
+                                              objectFit: 'cover',
+                                              borderRadius: '50%'
+                                            }}
+                                          />
                                         </Box>
                                       )
                                     }
@@ -656,6 +709,10 @@ const ChatContent = props => {
             setAttachments={setAttachments}
             voiceFile={voiceFile}
             setVoiceFile={setVoiceFile}
+            videoFile={videoFile}
+            setVideoFile={setVideoFile}
+            videoRecorderOpen={videoRecorderOpen}
+            setVideoRecorderOpen={setVideoRecorderOpen}
             isRecording={isRecording}
             onSend={handleSend}
             onFileSelect={handleFileSelect}
@@ -664,8 +721,16 @@ const ChatContent = props => {
             onStartRecording={startRecording}
             onStopRecording={stopRecording}
             onRemoveVoiceFile={removeVoiceFile}
+            onRemoveVideoFile={removeVideoFile}
             isBelowSmScreen={isBelowSmScreen}
             messageInputRef={messageInputRef}
+          />
+
+          {/* Video Recorder Dialog */}
+          <VideoRecorder
+            open={videoRecorderOpen}
+            onClose={() => setVideoRecorderOpen(false)}
+            onRecordComplete={handleVideoRecordComplete}
           />
         </div>
       )}

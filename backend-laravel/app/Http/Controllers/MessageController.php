@@ -281,7 +281,40 @@ class MessageController extends Controller
         ]);
         
         // Проверяем, что есть либо body, либо файлы
-        if (empty($validated['body']) && !$request->hasFile('attachments') && !$request->hasFile('voice')) {
+        // Проверяем attachments (могут быть отправлены как attachments[0], attachments[1] и т.д.)
+        $hasAttachments = false;
+        if ($request->hasFile('attachments')) {
+            $attachments = $request->file('attachments');
+            if (is_array($attachments)) {
+                $hasAttachments = count(array_filter($attachments, function($file) {
+                    return $file && $file->isValid();
+                })) > 0;
+            } else {
+                $hasAttachments = $attachments && $attachments->isValid();
+            }
+        }
+        
+        // Также проверяем attachments[0], attachments[1] и т.д.
+        if (!$hasAttachments) {
+            $allFiles = $request->allFiles();
+            foreach ($allFiles as $key => $file) {
+                if (strpos($key, 'attachments') === 0) {
+                    if (is_array($file)) {
+                        $hasAttachments = count(array_filter($file, function($f) {
+                            return $f && $f->isValid();
+                        })) > 0;
+                    } else {
+                        $hasAttachments = $file && $file->isValid();
+                    }
+                    if ($hasAttachments) break;
+                }
+            }
+        }
+        
+        $hasVoice = $request->hasFile('voice');
+        $hasBody = isset($validated['body']) && $validated['body'] !== null && trim($validated['body']) !== '';
+        
+        if (!$hasBody && !$hasAttachments && !$hasVoice) {
             return response()->json(['message' => 'Message body, attachments or voice required'], 422);
         }
 
@@ -341,22 +374,50 @@ class MessageController extends Controller
             if (is_array($attachments)) {
                 foreach ($attachments as $attachment) {
                     if ($attachment && $attachment->isValid()) {
-                        $path = $attachment->store('messages/attachments', 'public');
+                        $mimeType = $attachment->getMimeType();
+                        $originalName = $attachment->getClientOriginalName();
+                        
+                        // Определяем тип файла
+                        $type = 'file';
+                        if (strpos($mimeType, 'video/') === 0) {
+                            $type = 'video';
+                            $path = $attachment->store('messages/videos', 'public');
+                        } elseif (strpos($mimeType, 'image/') === 0) {
+                            $type = 'image';
+                            $path = $attachment->store('messages/attachments', 'public');
+                        } else {
+                            $path = $attachment->store('messages/attachments', 'public');
+                        }
+                        
                         $attachmentPaths[] = [
                             'url' => Storage::url($path),
-                            'type' => 'file',
-                            'name' => $attachment->getClientOriginalName(),
+                            'type' => $type,
+                            'name' => $originalName,
                         ];
                     }
                 }
             } else {
                 // Если одно вложение
                 if ($attachments->isValid()) {
-                    $path = $attachments->store('messages/attachments', 'public');
+                    $mimeType = $attachments->getMimeType();
+                    $originalName = $attachments->getClientOriginalName();
+                    
+                    // Определяем тип файла
+                    $type = 'file';
+                    if (strpos($mimeType, 'video/') === 0) {
+                        $type = 'video';
+                        $path = $attachments->store('messages/videos', 'public');
+                    } elseif (strpos($mimeType, 'image/') === 0) {
+                        $type = 'image';
+                        $path = $attachments->store('messages/attachments', 'public');
+                    } else {
+                        $path = $attachments->store('messages/attachments', 'public');
+                    }
+                    
                     $attachmentPaths[] = [
                         'url' => Storage::url($path),
-                        'type' => 'file',
-                        'name' => $attachments->getClientOriginalName(),
+                        'type' => $type,
+                        'name' => $originalName,
                     ];
                 }
             }
@@ -381,7 +442,9 @@ class MessageController extends Controller
             'to_user_id' => $validated['to_user_id'],
             'task_id' => $validated['task_id'] ?? null,
             'type' => $validated['type'],
-            'body' => $validated['body'],
+            'body' => isset($validated['body']) && $validated['body'] !== null && trim($validated['body']) !== '' 
+                ? trim($validated['body']) 
+                : '',
             'attachments' => !empty($attachmentPaths) ? $attachmentPaths : null,
         ]);
 

@@ -66,6 +66,10 @@ const SendMsgForm = ({
   setAttachments,
   voiceFile,
   setVoiceFile,
+  videoFile,
+  setVideoFile,
+  videoRecorderOpen,
+  setVideoRecorderOpen,
   isRecording,
   onSend, 
   onFileSelect,
@@ -74,6 +78,7 @@ const SendMsgForm = ({
   onStartRecording,
   onStopRecording,
   onRemoveVoiceFile,
+  onRemoveVideoFile,
   isBelowSmScreen, 
   messageInputRef 
 }) => {
@@ -100,7 +105,7 @@ const SendMsgForm = ({
   const handleSendMsg = (event) => {
     event.preventDefault()
 
-    if (messageText.trim() !== '' || attachments.length > 0 || voiceFile) {
+    if (messageText.trim() !== '' || attachments.length > 0 || voiceFile || videoFile) {
       onSend()
     }
   }
@@ -153,6 +158,9 @@ const SendMsgForm = ({
                     onChange={onVoiceFileSelect}
                   />
                 </label>
+              </MenuItem>
+              <MenuItem onClick={() => { setVideoRecorderOpen(true); handleClose(); }}>
+                <i className='ri-vidicon-line text-textPrimary' />
               </MenuItem>
               {isRecording && onStopRecording && (
                 <MenuItem onClick={() => { onStopRecording(); handleClose(); }}>
@@ -239,6 +247,13 @@ const SendMsgForm = ({
                 <i className='ri-mic-fill text-textPrimary' />
               </IconButton>
             )}
+            <IconButton 
+              size='small' 
+              onClick={() => setVideoRecorderOpen(true)}
+              color={videoFile ? 'primary' : 'default'}
+            >
+              <i className='ri-vidicon-line text-textPrimary' />
+            </IconButton>
           </>
         )}
         {isBelowSmScreen ? (
@@ -260,7 +275,7 @@ const SendMsgForm = ({
       onSubmit={handleSendMsg}
       className='bg-[var(--mui-palette-customColors-chatBg)]'
     >
-      {(attachments.length > 0 || voiceFile) && (
+      {(attachments.length > 0 || voiceFile || videoFile) && (
         <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider', display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           {attachments.map((file, idx) => (
             <Chip
@@ -277,6 +292,16 @@ const SendMsgForm = ({
               onDelete={onRemoveVoiceFile}
               size="small"
               icon={<i className='ri-mic-line' />}
+              color="primary"
+              sx={{ mr: 0.5, mb: 0.5 }}
+            />
+          )}
+          {videoFile && (
+            <Chip
+              label={videoFile.name || 'Video circle'}
+              onDelete={onRemoveVideoFile}
+              size="small"
+              icon={<i className='ri-vidicon-line' />}
               color="primary"
               sx={{ mr: 0.5, mb: 0.5 }}
             />
