@@ -96,6 +96,7 @@ const ChatContent = props => {
   const [audioChunks, setAudioChunks] = useState([])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [messageToDelete, setMessageToDelete] = useState(null)
+  const [newMessageIds, setNewMessageIds] = useState(new Set())
 
   // Refs
   const scrollRef = useRef(null)
@@ -136,6 +137,42 @@ const ChatContent = props => {
       setIsRecording(false)
     }
   }, [selectedChat?.user?.id])
+
+  // Определяем новые (непрочитанные) сообщения при открытии чата
+  useEffect(() => {
+    if (selectedChat?.messages && selectedChat.messages.length > 0 && selectedChat?.user?.id) {
+      // Находим непрочитанные сообщения (не от текущего пользователя)
+      const unreadMessages = selectedChat.messages.filter(msg => {
+        // Определяем, является ли сообщение отправленным от нас
+        let isSender = false
+        if (user?.roles?.some(r => r.name === 'admin') && selectedAdminTab) {
+          isSender = msg.from_user_id === user.id || msg.from_user_id === selectedAdminTab
+        } else {
+          isSender = msg.from_user_id === user?.id
+        }
+        
+        // Сообщение считается новым, если оно непрочитанное и не от нас
+        return !isSender && (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+      })
+
+      if (unreadMessages.length > 0) {
+        // Сохраняем ID новых сообщений
+        const newIds = new Set(unreadMessages.map(msg => msg.id))
+        setNewMessageIds(newIds)
+
+        // Убираем подсветку через 7 секунд
+        const timer = setTimeout(() => {
+          setNewMessageIds(new Set())
+        }, 7000)
+
+        return () => clearTimeout(timer)
+      } else {
+        setNewMessageIds(new Set())
+      }
+    } else {
+      setNewMessageIds(new Set())
+    }
+  }, [selectedChat?.user?.id, selectedChat?.messages?.length, user?.id, selectedAdminTab])
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files)
@@ -393,10 +430,23 @@ const ChatContent = props => {
                       isSender = msg.from_user_id === user?.id
                     }
 
+                    const isNewMessage = newMessageIds.has(msg.id)
+
                     return (
                       <div
                         key={msg.id}
-                        className={classnames('flex gap-4 p-5', { 'flex-row-reverse': isSender })}
+                        className={classnames('flex gap-4', { 
+                          'flex-row-reverse': isSender
+                        })}
+                        style={{
+                          backgroundColor: isNewMessage && !isSender 
+                            ? 'rgba(25, 118, 210, 0.12)' 
+                            : 'transparent',
+                          borderRadius: isNewMessage && !isSender ? '8px' : '0',
+                          margin: isNewMessage && !isSender ? '4px 8px' : '0',
+                          padding: '20px',
+                          transition: 'background-color 0.6s ease-out, border-radius 0.6s ease-out, margin 0.6s ease-out'
+                        }}
                       >
                         {!isSender ? (
                           activeUser?.avatar ? (
