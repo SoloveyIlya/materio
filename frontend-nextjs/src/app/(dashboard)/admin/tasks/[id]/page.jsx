@@ -636,7 +636,69 @@ export default function AdminTaskViewPage() {
                     <Typography variant='h6' gutterBottom sx={{ mb: 4 }}>Additional Materials</Typography>
                     
                     <Box sx={{ position: 'relative', pl: 2 }}>
-                      {/* Answers Section - новейший (сверху) */}
+                      {/* Revision Section - самое последнее действие (вверху) */}
+                      {task.result?.admin_comment && task.status === 'sent_for_revision' && (
+                        <Box sx={{ mb: 4, position: 'relative' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  bgcolor: '#FF9800',
+                                  flexShrink: 0,
+                                  zIndex: 2
+                                }}
+                              />
+                              {(() => {
+                                const hasNextSections = task.result?.answers || 
+                                                       task.result?.moderator_comment || 
+                                                       tools.length > 0 || 
+                                                       documentations.length > 0;
+                                if (!hasNextSections) return null;
+                                
+                                let height = 60; // Base height
+                                if (task.result?.answers) height += 40;
+                                if (task.result?.moderator_comment) height += 40;
+                                if (tools.length > 0) height += 40;
+                                if (documentations.length > 0) height += 40;
+                                
+                                return (
+                                  <Box
+                                    sx={{
+                                      position: 'absolute',
+                                      left: 5,
+                                      top: 12,
+                                      width: 2,
+                                      height: height,
+                                      bgcolor: '#E0E0E0',
+                                      zIndex: 1
+                                    }}
+                                  />
+                                );
+                              })()}
+                            </Box>
+                            <Typography 
+                              variant='h6' 
+                              sx={{ 
+                                fontWeight: 700, 
+                                color: 'text.primary',
+                                fontSize: '1.1rem'
+                              }}
+                            >
+                              Sent for Revision
+                            </Typography>
+                          </Box>
+                          <Box sx={{ pl: 4, mt: 1 }}>
+                            <Typography variant='body2' sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
+                              {task.result.admin_comment}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Answers Section */}
                       {task.result?.answers && (
                         <Box sx={{ mb: 4, position: 'relative' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -653,14 +715,12 @@ export default function AdminTaskViewPage() {
                               />
                               {(() => {
                                 const hasNextSections = task.result?.moderator_comment || 
-                                                       (task.result?.admin_comment && task.status === 'sent_for_revision') || 
                                                        tools.length > 0 || 
                                                        documentations.length > 0;
                                 if (!hasNextSections) return null;
                                 
                                 let height = 60; // Base height
                                 if (task.result?.moderator_comment) height += 40;
-                                if (task.result?.admin_comment && task.status === 'sent_for_revision') height += 40;
                                 if (tools.length > 0) height += 40;
                                 if (documentations.length > 0) height += 40;
                                 
@@ -728,13 +788,11 @@ export default function AdminTaskViewPage() {
                                 }}
                               />
                               {(() => {
-                                const hasNextSections = (task.result?.admin_comment && task.status === 'sent_for_revision') || 
-                                                       tools.length > 0 || 
+                                const hasNextSections = tools.length > 0 || 
                                                        documentations.length > 0;
                                 if (!hasNextSections) return null;
                                 
                                 let height = 60; // Base height
-                                if (task.result?.admin_comment && task.status === 'sent_for_revision') height += 40;
                                 if (tools.length > 0) height += 40;
                                 if (documentations.length > 0) height += 40;
                                 
@@ -771,63 +829,6 @@ export default function AdminTaskViewPage() {
                                 {task.result.moderator_comment}
                               </Typography>
                             </Box>
-                          </Box>
-                        </Box>
-                      )}
-
-                      {/* Revision Section */}
-                      {task.result?.admin_comment && task.status === 'sent_for_revision' && (
-                        <Box sx={{ mb: 4, position: 'relative' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                              <Box
-                                sx={{
-                                  width: 12,
-                                  height: 12,
-                                  borderRadius: '50%',
-                                  bgcolor: '#FF9800',
-                                  flexShrink: 0,
-                                  zIndex: 2
-                                }}
-                              />
-                              {(() => {
-                                const hasNextSections = tools.length > 0 || documentations.length > 0;
-                                if (!hasNextSections) return null;
-                                
-                                let height = 60; // Base height
-                                if (tools.length > 0) height += 40;
-                                if (documentations.length > 0) height += 40;
-                                
-                                return (
-                                  <Box
-                                    sx={{
-                                      position: 'absolute',
-                                      left: 5,
-                                      top: 12,
-                                      width: 2,
-                                      height: height,
-                                      bgcolor: '#E0E0E0',
-                                      zIndex: 1
-                                    }}
-                                  />
-                                );
-                              })()}
-                            </Box>
-                            <Typography 
-                              variant='h6' 
-                              sx={{ 
-                                fontWeight: 700, 
-                                color: 'text.primary',
-                                fontSize: '1.1rem'
-                              }}
-                            >
-                              Sent for Revision
-                            </Typography>
-                          </Box>
-                          <Box sx={{ pl: 4, mt: 1 }}>
-                            <Typography variant='body2' sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
-                              {task.result.admin_comment}
-                            </Typography>
                           </Box>
                         </Box>
                       )}

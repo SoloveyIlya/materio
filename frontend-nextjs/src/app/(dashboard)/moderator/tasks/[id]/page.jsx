@@ -588,6 +588,63 @@ export default function ModeratorTaskViewPage() {
                   <Typography variant='h6' gutterBottom sx={{ mb: 4 }}>Additional Materials</Typography>
                   
                   <Box sx={{ position: 'relative', pl: 2 }}>
+                    {/* Revision Section - самое последнее действие (вверху) */}
+                    {task.result?.admin_comment && task.status === 'sent_for_revision' && (
+                      <Box sx={{ mb: 4, position: 'relative' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                          <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                bgcolor: '#FF9800',
+                                flexShrink: 0,
+                                zIndex: 2
+                              }}
+                            />
+                            {(() => {
+                              const hasNextSections = task.documentation || tools.length > 0;
+                              if (!hasNextSections) return null;
+                              
+                              let height = 60; // Base height
+                              if (task.documentation) height += 40;
+                              if (tools.length > 0) height += 40;
+                              
+                              return (
+                                <Box
+                                  sx={{
+                                    position: 'absolute',
+                                    left: 5,
+                                    top: 12,
+                                    width: 2,
+                                    height: height,
+                                    bgcolor: '#E0E0E0',
+                                    zIndex: 1
+                                  }}
+                                />
+                              );
+                            })()}
+                          </Box>
+                          <Typography 
+                            variant='h6' 
+                            sx={{ 
+                              fontWeight: 700, 
+                              color: 'text.primary',
+                              fontSize: '1.1rem'
+                            }}
+                          >
+                            Отправка на исправление
+                          </Typography>
+                        </Box>
+                        <Box sx={{ pl: 4, mt: 1 }}>
+                          <Typography variant='body2' sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
+                            {task.result.admin_comment}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
+
                     {/* Documentation Section */}
                     {task.documentation && (
                       <Box sx={{ mb: 4, position: 'relative' }}>
@@ -603,14 +660,14 @@ export default function ModeratorTaskViewPage() {
                                 zIndex: 2
                               }}
                             />
-                            {(task.tool || (task.result?.admin_comment && task.status === 'sent_for_revision')) && (
+                            {tools.length > 0 && (
                               <Box
                                 sx={{
                                   position: 'absolute',
                                   left: 5,
                                   top: 12,
                                   width: 2,
-                                  height: task.tool ? 80 : 60,
+                                  height: 60,
                                   bgcolor: '#E0E0E0',
                                   zIndex: 1
                                 }}
@@ -652,19 +709,6 @@ export default function ModeratorTaskViewPage() {
                                 zIndex: 2
                               }}
                             />
-                            {task.result?.admin_comment && task.status === 'sent_for_revision' && (
-                              <Box
-                                sx={{
-                                  position: 'absolute',
-                                  left: 5,
-                                  top: 12,
-                                  width: 2,
-                                  height: 40,
-                                  bgcolor: '#E0E0E0',
-                                  zIndex: 1
-                                }}
-                              />
-                            )}
                           </Box>
                           <Typography 
                             variant='h6' 
@@ -684,38 +728,6 @@ export default function ModeratorTaskViewPage() {
                               <Typography variant='body1' sx={{ color: 'text.primary' }}>{tool.name}</Typography>
                             </Box>
                           ))}
-                        </Box>
-                      </Box>
-                    )}
-
-                    {/* Revision Section */}
-                    {task.result?.admin_comment && task.status === 'sent_for_revision' && (
-                      <Box sx={{ position: 'relative' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                          <Box
-                            sx={{
-                              width: 12,
-                              height: 12,
-                              borderRadius: '50%',
-                              bgcolor: '#FF9800',
-                              flexShrink: 0
-                            }}
-                          />
-                          <Typography 
-                            variant='h6' 
-                            sx={{ 
-                              fontWeight: 700, 
-                              color: 'text.primary',
-                              fontSize: '1.1rem'
-                            }}
-                          >
-                            Отправка на исправление
-                          </Typography>
-                        </Box>
-                        <Box sx={{ pl: 4, mt: 1 }}>
-                          <Typography variant='body2' sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
-                            {task.result.admin_comment}
-                          </Typography>
                         </Box>
                       </Box>
                     )}
