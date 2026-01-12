@@ -409,6 +409,10 @@ class TaskController extends Controller
         try {
             // Handle file uploads
             $data = $validated;
+            
+            // Удаляем поля файлов из $data, чтобы они не перезаписывались, если файлы не загружены
+            unset($data['document_image'], $data['selfie_image'], $data['video']);
+            
             if ($request->hasFile('document_image')) {
                 // Delete old file if exists
                 if ($task->document_image) {
@@ -421,11 +425,8 @@ class TaskController extends Controller
                 $path = $file->storeAs('tasks/documents', $fileName, 'public');
                 $data['document_image'] = Storage::disk('public')->url($path);
                 $data['document_image_name'] = $file->getClientOriginalName();
-            } else {
-                // Сохраняем существующее значение, если файл не загружен
-                $data['document_image'] = $task->document_image;
-                $data['document_image_name'] = $task->document_image_name;
             }
+            // Если файл не загружен, не трогаем существующие значения (они останутся в БД)
             
             if ($request->hasFile('selfie_image')) {
                 // Delete old file if exists
@@ -438,10 +439,8 @@ class TaskController extends Controller
                 $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
                 $path = $file->storeAs('tasks/selfies', $fileName, 'public');
                 $data['selfie_image'] = Storage::disk('public')->url($path);
-            } else {
-                // Сохраняем существующее значение, если файл не загружен
-                $data['selfie_image'] = $task->selfie_image;
             }
+            // Если файл не загружен, не трогаем существующие значения (они останутся в БД)
             
             if ($request->hasFile('video')) {
                 // Delete old file if exists
@@ -454,10 +453,8 @@ class TaskController extends Controller
                 $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
                 $path = $file->storeAs('tasks/videos', $fileName, 'public');
                 $data['video'] = Storage::disk('public')->url($path);
-            } else {
-                // Сохраняем существующее значение, если файл не загружен
-                $data['video'] = $task->video;
             }
+            // Если файл не загружен, не трогаем существующие значения (они останутся в БД)
             
             // Извлекаем category_ids, tool_ids и documentation_ids для синхронизации связей many-to-many
             $categoryIds = $data['category_ids'] ?? null;
