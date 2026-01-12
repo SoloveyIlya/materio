@@ -22,6 +22,7 @@ import {
   Chip
 } from '@mui/material'
 import api from '@/lib/api'
+import { useAuthStore } from '@/store/authStore'
 
 // Components Imports
 import Award from '@/views/dashboards/analytics/Award'
@@ -47,47 +48,25 @@ import MyTasksCard from '@/views/dashboards/moderator/MyTasksCard'
 import TasksTable from '@/views/dashboards/moderator/TasksTable'
 
 const DashboardPage = () => {
-  const [user, setUser] = useState(null)
+  const { user, isLoading: authLoading } = useAuthStore()
   const [dashboardData, setDashboardData] = useState(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    loadUser()
-  }, [])
-
-  useEffect(() => {
-    if (user) {
+    if (!authLoading && user) {
       if (user.roles?.some(r => r.name === 'moderator')) {
-        loadModeratorDashboard()
+        // Компоненты модератора сами загружают данные
+        setLoading(false)
       } else if (user.roles?.some(r => r.name === 'admin')) {
         loadAdminDashboard()
       } else {
         setLoading(false)
       }
-    }
-  }, [user])
-
-  const loadUser = async () => {
-    try {
-      const response = await api.get('/auth/user')
-      setUser(response.data)
-    } catch (error) {
-      console.error('Error loading user:', error)
+    } else if (!authLoading && !user) {
       setLoading(false)
     }
-  }
-
-  const loadModeratorDashboard = async () => {
-    try {
-      const response = await api.get('/moderator/dashboard')
-      setDashboardData(response.data)
-    } catch (error) {
-      console.error('Error loading dashboard:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [user, authLoading])
 
   const loadAdminDashboard = async () => {
     try {
@@ -111,12 +90,20 @@ const DashboardPage = () => {
     }
   }
 
+  // Показываем loading, пока проверяется аутентификация или загружаются данные
+  if (authLoading || loading) {
+    return (
+      <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </Box>
+    )
+  }
+
   // Если админ - показываем админ dashboard
   if (user?.roles?.some(r => r.name === 'admin')) {
-    if (loading) {
-      return <Box sx={{ p: 3 }}>Loading...</Box>
-    }
-
     if (!dashboardData) {
       return <Box sx={{ p: 3 }}>Error loading dashboard</Box>
     }
@@ -259,7 +246,16 @@ const DashboardPage = () => {
     )
   }
 
-  // Для админа или других ролей - показываем стандартный dashboard
+  // Если пользователь не определен или нет роли - показываем loading или редирект
+  if (!user) {
+    return (
+      <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+        <Typography>Please log in to view the dashboard.</Typography>
+      </Box>
+    )
+  }
+
+  // Для других ролей (если есть) - показываем стандартный dashboard
   return (
     <Grid container spacing={6}>
       <Grid size={{ xs: 12, md: 4 }}>

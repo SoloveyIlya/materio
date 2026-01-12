@@ -13,6 +13,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
 import IconButton from '@mui/material/IconButton'
+import Skeleton from '@mui/material/Skeleton'
 
 // Third-party Imports
 import classnames from 'classnames'
@@ -68,6 +69,7 @@ const TasksTable = () => {
   // States
   const [data, setData] = useState([])
   const [globalFilter, setGlobalFilter] = useState('')
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
@@ -76,12 +78,15 @@ const TasksTable = () => {
 
   const loadTasks = async () => {
     try {
+      setLoading(true)
       const response = await api.get('/moderator/tasks?limit=10')
       const tasks = response.data?.data || response.data || []
       setData(tasks)
     } catch (error) {
       console.error('Error loading tasks:', error)
       setData([])
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -286,7 +291,19 @@ const TasksTable = () => {
               </tr>
             ))}
           </thead>
-          {table.getFilteredRowModel().rows.length === 0 ? (
+          {loading ? (
+            <tbody>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <tr key={i}>
+                  {table.getVisibleFlatColumns().map((_, colIndex) => (
+                    <td key={colIndex}>
+                      <Skeleton variant='text' width='80%' height={24} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          ) : table.getFilteredRowModel().rows.length === 0 ? (
             <tbody>
               <tr>
                 <td colSpan={table.getVisibleFlatColumns().length} className='text-center'>

@@ -9,6 +9,7 @@ import Card from '@mui/material/Card'
 import CardHeader from '@mui/material/CardHeader'
 import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
+import Skeleton from '@mui/material/Skeleton'
 
 // Components Imports
 import CustomAvatar from '@core/components/mui/Avatar'
@@ -16,6 +17,7 @@ import api from '@/lib/api'
 
 const TopCourses = () => {
   const [topPages, setTopPages] = useState([])
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
@@ -24,12 +26,15 @@ const TopCourses = () => {
 
   const loadTopPages = async () => {
     try {
+      setLoading(true)
       const response = await api.get('/moderator/documentation/pages?latest=true')
       const pages = response.data || []
       setTopPages(pages.slice(0, 5)) // Берем первые 5
     } catch (error) {
       console.error('Error loading latest documentation:', error)
       setTopPages([])
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -47,30 +52,41 @@ const TopCourses = () => {
     return colors[index] || 'primary'
   }
 
-  if (topPages.length === 0) {
-    return null
-  }
-
   return (
     <Card className='bs-full'>
       <CardHeader
         title='Last Documentation'
       />
       <CardContent className='flex flex-col gap-[1.625rem]'>
-        {topPages.map((page, i) => (
-          <div 
-            key={page.id || i} 
-            className='flex items-center gap-4 cursor-pointer hover:bg-actionHover rounded p-2 -m-2 transition-colors'
-            onClick={() => handlePageClick(page.id)}
-          >
-            <CustomAvatar variant='rounded' skin='light' color={getColorForPage(i)}>
-              <i className={getIconForPage(i)} />
-            </CustomAvatar>
-            <Typography className='font-medium flex-1' color='text.primary'>
-              {page.title}
-            </Typography>
-          </div>
-        ))}
+        {loading ? (
+          <>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className='flex items-center gap-4'>
+                <Skeleton variant='rectangular' width={40} height={40} />
+                <Skeleton variant='text' width='70%' height={24} />
+              </div>
+            ))}
+          </>
+        ) : topPages.length === 0 ? (
+          <Typography variant='body2' color='text.secondary'>
+            No documentation available
+          </Typography>
+        ) : (
+          topPages.map((page, i) => (
+            <div 
+              key={page.id || i} 
+              className='flex items-center gap-4 cursor-pointer hover:bg-actionHover rounded p-2 -m-2 transition-colors'
+              onClick={() => handlePageClick(page.id)}
+            >
+              <CustomAvatar variant='rounded' skin='light' color={getColorForPage(i)}>
+                <i className={getIconForPage(i)} />
+              </CustomAvatar>
+              <Typography className='font-medium flex-1' color='text.primary'>
+                {page.title}
+              </Typography>
+            </div>
+          ))
+        )}
       </CardContent>
     </Card>
   )

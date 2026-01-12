@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import Divider from '@mui/material/Divider'
 import Chip from '@mui/material/Chip'
 import Typography from '@mui/material/Typography'
+import Skeleton from '@mui/material/Skeleton'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 
@@ -20,6 +21,7 @@ const WelcomeCard = () => {
   const belowMdScreen = useMediaQuery(theme.breakpoints.down('md'))
   const [user, setUser] = useState(null)
   const [dashboardData, setDashboardData] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadData()
@@ -27,6 +29,7 @@ const WelcomeCard = () => {
 
   const loadData = async () => {
     try {
+      setLoading(true)
       const [userResponse, dashboardResponse] = await Promise.all([
         api.get('/auth/user'),
         api.get('/moderator/dashboard')
@@ -35,6 +38,8 @@ const WelcomeCard = () => {
       setDashboardData(dashboardResponse.data)
     } catch (error) {
       console.error('Error loading data:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -105,6 +110,46 @@ const WelcomeCard = () => {
       )
     }
   ]
+
+  if (loading) {
+    return (
+      <div className='flex max-md:flex-col md:items-center gap-6 plb-5'>
+        <div className='md:is-8/12'>
+          <div className='flex items-baseline gap-1 mbe-2'>
+            <Skeleton variant='text' width={120} height={32} />
+            <Skeleton variant='text' width={150} height={40} />
+          </div>
+          <div className='mbe-4'>
+            <Skeleton variant='text' width='80%' height={24} />
+          </div>
+          <div className='flex flex-wrap max-md:flex-col justify-between gap-6'>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className='flex gap-4'>
+                <Skeleton variant='rectangular' width={54} height={54} />
+                <div>
+                  <Skeleton variant='text' width={80} height={20} />
+                  <Skeleton variant='text' width={100} height={32} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <Divider orientation={belowMdScreen ? 'horizontal' : 'vertical'} flexItem />
+        <div className='flex justify-between md:is-4/12'>
+          <div className='flex flex-col justify-between gap-6'>
+            <div>
+              <Skeleton variant='text' width={120} height={28} />
+              <Skeleton variant='text' width={100} height={20} />
+            </div>
+            <div>
+              <Skeleton variant='text' width={100} height={40} />
+              <Skeleton variant='rectangular' width={80} height={24} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!user || !dashboardData) {
     return null
