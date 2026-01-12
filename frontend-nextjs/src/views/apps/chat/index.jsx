@@ -91,7 +91,12 @@ const ChatWrapper = () => {
         const currentTab = messagesData.tabs[activeTab]
         const chat = currentTab.chats.find(c => c.user.id === selectedUserId)
         if (chat) {
+          // Обновляем чат только если он найден в текущей вкладке
           setSelectedChat(chat)
+        } else {
+          // Если чат не найден в текущей вкладке, сбрасываем selectedChat
+          // Это предотвращает отображение чата из другой вкладки
+          setSelectedChat(null)
         }
       } else if (messagesData && Array.isArray(messagesData) && selectedChat.user) {
         // For moderator
@@ -150,11 +155,13 @@ const ChatWrapper = () => {
       const response = await api.get(`/messages?type=${type}`)
       setMessagesData(response.data)
       
-      // Для админов: устанавливаем вкладку текущего админа по умолчанию
-      if (user?.roles?.some(r => r.name === 'admin') && response.data?.tabs && response.data.tabs.length > 0) {
+      // Для админов: устанавливаем вкладку текущего админа по умолчанию ТОЛЬКО при первой загрузке
+      // Не меняем вкладку при автоматических обновлениях (silent = true), чтобы не сбрасывать выбранный чат
+      if (!silent && user?.roles?.some(r => r.name === 'admin') && response.data?.tabs && response.data.tabs.length > 0) {
         // Находим индекс вкладки с текущим админом
         const currentAdminTabIndex = response.data.tabs.findIndex(tab => tab.admin.id === user.id)
-        if (currentAdminTabIndex >= 0) {
+        if (currentAdminTabIndex >= 0 && activeTab === 0 && !selectedAdminTab) {
+          // Устанавливаем вкладку текущего админа только если вкладка еще не была выбрана пользователем
           setActiveTab(currentAdminTabIndex)
           setSelectedAdminTab(response.data.tabs[currentAdminTabIndex].admin.id)
         } else if (activeTab === 0 && !selectedAdminTab) {
