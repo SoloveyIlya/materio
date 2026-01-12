@@ -233,6 +233,56 @@ export default function AdminTaskViewPage() {
     return task.result.tool_data.find(td => td.tool_id === toolId)
   }
 
+  // Форматируем answers в формат "вопрос-ответ"
+  const formatAnswers = (answers) => {
+    if (!answers) return ''
+    
+    if (typeof answers === 'string') {
+      // Если это строка, пытаемся распарсить JSON
+      try {
+        const parsed = JSON.parse(answers)
+        return formatAnswers(parsed)
+      } catch {
+        // Если не JSON, возвращаем как есть
+        return answers
+      }
+    }
+    
+    if (typeof answers === 'object' && answers !== null) {
+      // Если это массив, преобразуем в строку
+      if (Array.isArray(answers)) {
+        return answers.map((item, index) => {
+          if (typeof item === 'object') {
+            return Object.entries(item).map(([key, value]) => `${key}: ${value}`).join('\n')
+          }
+          return `${index + 1}: ${item}`
+        }).join('\n\n')
+      }
+      
+      // Если это объект, форматируем как "ключ: значение"
+      return Object.entries(answers)
+        .map(([key, value]) => {
+          // Преобразуем ключи типа "answer1" в "Question 1"
+          const formattedKey = key.replace(/answer(\d+)/i, (match, num) => `Question ${num}`)
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, l => l.toUpperCase())
+          
+          // Если значение - объект, преобразуем его тоже
+          if (typeof value === 'object' && value !== null) {
+            if (Array.isArray(value)) {
+              return `${formattedKey}:\n${value.map((item, idx) => `  ${idx + 1}. ${typeof item === 'object' ? JSON.stringify(item) : item}`).join('\n')}`
+            }
+            return `${formattedKey}:\n${Object.entries(value).map(([k, v]) => `  ${k}: ${v}`).join('\n')}`
+          }
+          
+          return `${formattedKey}: ${value}`
+        })
+        .join('\n\n')
+    }
+    
+    return String(answers)
+  }
+
   // Функция для получения URL изображения
   const getImageUrl = (path) => {
     if (!path) return ''
@@ -651,13 +701,11 @@ export default function AdminTaskViewPage() {
                                   p: 2, 
                                   borderRadius: 1,
                                   color: 'text.secondary',
-                                  lineHeight: 1.7,
+                                  lineHeight: 1.8,
                                   flex: 1
                                 }}
                               >
-                                {typeof task.result.answers === 'object' 
-                                  ? JSON.stringify(task.result.answers, null, 2)
-                                  : task.result.answers}
+                                {formatAnswers(task.result.answers)}
                               </Typography>
                             </Box>
                           </Box>
