@@ -25,6 +25,7 @@ import { useSettings } from '@core/hooks/useSettings'
 import { commonLayoutClasses } from '@layouts/utils/layoutClasses'
 import api from '@/lib/api'
 import { useMenuCounts } from '@/hooks/useMenuCounts'
+import { playNotificationSoundIfVisible } from '@/utils/soundNotification'
 
 const ChatWrapper = () => {
   // States
@@ -39,6 +40,7 @@ const ChatWrapper = () => {
 
   // Refs
   const messageInputRef = useRef(null)
+  const previousMessagesDataRef = useRef(null)
 
   // Hooks
   const { settings } = useSettings()
@@ -153,7 +155,19 @@ const ChatWrapper = () => {
       // Для админов всегда используем type='message', для модераторов тоже
       const type = 'message'
       const response = await api.get(`/messages?type=${type}`)
-      setMessagesData(response.data)
+      
+      // Проверяем наличие новых сообщений перед обновлением состояния
+      const previousData = previousMessagesDataRef.current
+      const newData = response.data
+      
+      // Обнаруживаем новые непрочитанные сообщения
+      if (previousData && newData && user) {
+        detectNewMessages(previousData, newData, user)
+      }
+      
+      // Обновляем данные сообщений
+      setMessagesData(newData)
+      previousMessagesDataRef.current = JSON.parse(JSON.stringify(newData)) // Глубокая копия для сравнения
       
       // Для админов: устанавливаем вкладку текущего админа по умолчанию ТОЛЬКО при первой загрузке
       // Не меняем вкладку при автоматических обновлениях (silent = true), чтобы не сбрасывать выбранный чат
@@ -174,6 +188,199 @@ const ChatWrapper = () => {
     } finally {
       if (!silent) {
         setLoading(false)
+      }
+    }
+  }
+
+  // Функция для обнаружения новых сообщений и воспроизведения звука
+  const detectNewMessages = (previousData, newData, currentUser) => {
+    let hasNewUnreadMessages = false
+
+    // Для админов
+    if (currentUser?.roles?.some(r => r.name === 'admin')) {
+      if (newData?.tabs && Array.isArray(newData.tabs)) {
+        for (const tab of newData.tabs) {
+          // Находим соответствующий таб в предыдущих данных
+          const previousTab = previousData?.tabs?.find(t => t.admin.id === tab.admin.id)
+          
+          if (previousTab) {
+            for (const chat of tab.chats) {
+              const previousChat = previousTab.chats.find(c => c.user.id === chat.user.id)
+              
+              if (previousChat) {
+                // Сравниваем количество сообщений
+                const previousMessageIds = new Set(previousChat.messages.map(m => m.id))
+                const newMessages = chat.messages.filter(m => !previousMessageIds.has(m.id))
+                
+                // Проверяем, есть ли новые непрочитанные сообщения (не от текущего админа)
+                const newUnreadMessages = newMessages.filter(msg => {
+                  const isFromCurrentUser = msg.from_user_id === currentUser.id || 
+                                           (selectedAdminTab && msg.from_user_id === selectedAdminTab)
+                  return !isFromCurrentUser && (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+                })
+                
+                if (newUnreadMessages.length > 0) {
+                  hasNewUnreadMessages = true
+                }
+              } else {
+                // Новый чат с непрочитанными сообщениями
+                const unreadMessages = chat.messages.filter(msg => {
+                  const isFromCurrentUser = msg.from_user_id === currentUser.id || 
+                                           (selectedAdminTab && msg.from_user_id === selectedAdminTab)
+                  return !isFromCurrentUser && (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+                })
+                
+                if (unreadMessages.length > 0) {
+                  hasNewUnreadMessages = true
+                }
+              }
+            }
+          } else {
+            // Новый таб - проверяем все чаты
+            for (const chat of tab.chats) {
+              const unreadMessages = chat.messages.filter(msg => {
+                const isFromCurrentUser = msg.from_user_id === currentUser.id || 
+                                         (selectedAdminTab && msg.from_user_id === selectedAdminTab)
+                return !isFromCurrentUser && (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+              })
+              
+              if (unreadMessages.length > 0) {
+                hasNewUnreadMessages = true
+              }
+            }
+          }
+        }
+      }
+      
+      // Проверяем незакрепленных модераторов
+      if (newData?.unassigned?.chats) {
+        const previousUnassigned = previousData?.unassigned?.chats || []
+        for (const chat of newData.unassigned.chats) {
+          const previousChat = previousUnassigned.find(c => c.user.id === chat.user.id)
+          
+          if (previousChat) {
+            const previousMessageIds = new Set(previousChat.messages.map(m => m.id))
+            const newMessages = chat.messages.filter(m => !previousMessageIds.has(m.id))
+            
+            const newUnreadMessages = newMessages.filter(msg => {
+              const isFromCurrentUser = msg.from_user_id === currentUser.id || 
+                                       (selectedAdminTab && msg.from_user_id === selectedAdminTab)
+              return !isFromCurrentUser && (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+            })
+            
+            if (newUnreadMessages.length > 0) {
+              hasNewUnreadMessages = true
+            }
+          } else {
+            const unreadMessages = chat.messages.filter(msg => {
+              const isFromCurrentUser = msg.from_user_id === currentUser.id || 
+                                       (selectedAdminTab && msg.from_user_id === selectedAdminTab)
+              return !isFromCurrentUser && (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+            })
+            
+            if (unreadMessages.length > 0) {
+              hasNewUnreadMessages = true
+            }
+          }
+        }
+      }
+    } 
+    // Для модераторов
+    else if (currentUser?.roles?.some(r => r.name === 'moderator')) {
+      if (Array.isArray(newData) && Array.isArray(previousData)) {
+        for (const chat of newData) {
+          const previousChat = previousData.find(c => c.user?.id === chat.user?.id)
+          
+          if (previousChat) {
+            const previousMessageIds = new Set(previousChat.messages.map(m => m.id))
+            const newMessages = chat.messages.filter(m => !previousMessageIds.has(m.id))
+            
+            // Для модератора новые сообщения - это сообщения от админа (не от модератора)
+            const newUnreadMessages = newMessages.filter(msg => {
+              return msg.from_user_id !== currentUser.id && 
+                     (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+            })
+            
+            if (newUnreadMessages.length > 0) {
+              hasNewUnreadMessages = true
+            }
+          } else {
+            // Новый чат
+            const unreadMessages = chat.messages.filter(msg => {
+              return msg.from_user_id !== currentUser.id && 
+                     (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+            })
+            
+            if (unreadMessages.length > 0) {
+              hasNewUnreadMessages = true
+            }
+          }
+        }
+      }
+    }
+
+    // Воспроизводим звук, если есть новые непрочитанные сообщения
+    // И только если выбранный чат не открыт (чтобы не воспроизводить звук для открытого чата)
+    if (hasNewUnreadMessages) {
+      // Проверяем, открыт ли чат с новыми сообщениями
+      const isChatOpen = selectedChat && selectedChat.user
+      if (!isChatOpen) {
+        // Если чат не открыт, воспроизводим звук
+        playNotificationSoundIfVisible()
+      } else {
+        // Если чат открыт, проверяем, относится ли новое сообщение к открытому чату
+        // Если новое сообщение не в открытом чате, воспроизводим звук
+        let shouldPlaySound = false
+        
+        if (currentUser?.roles?.some(r => r.name === 'admin')) {
+          // Для админа проверяем все табы
+          if (newData?.tabs) {
+            for (const tab of newData.tabs) {
+              const chat = tab.chats.find(c => c.user.id === selectedChat.user.id)
+              if (chat) {
+                const previousTab = previousData?.tabs?.find(t => t.admin.id === tab.admin.id)
+                if (previousTab) {
+                  const previousChat = previousTab.chats.find(c => c.user.id === selectedChat.user.id)
+                  if (previousChat) {
+                    const previousMessageIds = new Set(previousChat.messages.map(m => m.id))
+                    const newMessages = chat.messages.filter(m => !previousMessageIds.has(m.id))
+                    const newUnreadMessages = newMessages.filter(msg => {
+                      const isFromCurrentUser = msg.from_user_id === currentUser.id || 
+                                               (selectedAdminTab && msg.from_user_id === selectedAdminTab)
+                      return !isFromCurrentUser && (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+                    })
+                    if (newUnreadMessages.length > 0) {
+                      shouldPlaySound = true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } else if (currentUser?.roles?.some(r => r.name === 'moderator')) {
+          // Для модератора проверяем, есть ли новые сообщения в открытом чате
+          if (Array.isArray(newData)) {
+            const chat = newData.find(c => c.user?.id === selectedChat.user.id)
+            if (chat) {
+              const previousChat = previousData?.find(c => c.user?.id === selectedChat.user.id)
+              if (previousChat) {
+                const previousMessageIds = new Set(previousChat.messages.map(m => m.id))
+                const newMessages = chat.messages.filter(m => !previousMessageIds.has(m.id))
+                const newUnreadMessages = newMessages.filter(msg => {
+                  return msg.from_user_id !== currentUser.id && 
+                         (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+                })
+                if (newUnreadMessages.length > 0) {
+                  shouldPlaySound = true
+                }
+              }
+            }
+          }
+        }
+        
+        if (shouldPlaySound) {
+          playNotificationSoundIfVisible()
+        }
       }
     }
   }
