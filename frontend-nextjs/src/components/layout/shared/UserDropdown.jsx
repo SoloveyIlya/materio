@@ -30,6 +30,7 @@ import { useMenuCounts } from '@/hooks/useMenuCounts'
 
 // Util Imports
 import { getLocalizedUrl } from '@/utils/i18n'
+import { API_URL } from '@/lib/api'
 
 // Styled component for badge content
 const BadgeContentSpan = styled('span')({
@@ -81,6 +82,13 @@ const UserDropdown = () => {
     }
   }
 
+  const getAvatarUrl = (avatar) => {
+    if (!avatar) return null
+    if (avatar.startsWith('http')) return avatar
+    if (avatar.startsWith('/storage')) return `${API_URL}${avatar}`
+    return `${API_URL}/storage/${avatar}`
+  }
+
   return (
     <>
       <Badge
@@ -93,7 +101,7 @@ const UserDropdown = () => {
         <Avatar
           ref={anchorRef}
           alt={user?.name || ''}
-          src={''}
+          src={getAvatarUrl(user?.avatar) || ''}
           onClick={handleDropdownOpen}
           className='cursor-pointer bs-[38px] is-[38px]'
         >
@@ -119,7 +127,7 @@ const UserDropdown = () => {
               <ClickAwayListener onClickAway={e => handleDropdownClose(e)}>
                 <MenuList>
                   <div className='flex items-center plb-2 pli-4 gap-2' tabIndex={-1}>
-                    <Avatar alt={user?.name || ''} src={''}>
+                    <Avatar alt={user?.name || ''} src={getAvatarUrl(user?.avatar) || ''}>
                       {user?.name?.charAt(0)?.toUpperCase() || 'U'}
                     </Avatar>
                     <div className='flex items-start flex-col'>
@@ -148,10 +156,22 @@ const UserDropdown = () => {
                     </div>
                   </div>
                   <Divider className='mlb-1' />
-                  <MenuItem className='gap-3' onClick={e => handleDropdownClose(e, '/pages/user-profile')}>
-                    <i className='ri-user-3-line' />
-                    <Typography color='text.primary'>My Profile</Typography>
-                  </MenuItem>
+                  {user?.id && (
+                    <MenuItem 
+                      className='gap-3' 
+                      onClick={e => {
+                        handleDropdownClose(e)
+                        // Если админ, ведем на страницу профиля админа, иначе на страницу модератора
+                        const profileUrl = user?.roles?.some(r => r.name === 'admin') 
+                          ? `/admin/users/${user.id}` 
+                          : `/moderator/profile`
+                        router.push(profileUrl)
+                      }}
+                    >
+                      <i className='ri-user-3-line' />
+                      <Typography color='text.primary'>My Profile</Typography>
+                    </MenuItem>
+                  )}
                   <MenuItem className='gap-3' onClick={e => handleDropdownClose(e, '/pages/account-settings')}>
                     <i className='ri-settings-4-line' />
                     <Typography color='text.primary'>Settings</Typography>

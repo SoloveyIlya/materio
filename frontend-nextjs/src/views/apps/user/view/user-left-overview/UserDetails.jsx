@@ -35,20 +35,33 @@ const CountryFromIP = ({ ipAddress }) => {
     // Используем бесплатный API для получения страны по IP
     const fetchCountry = async () => {
       try {
-        const response = await fetch(`https://ipapi.co/${ipAddress}/country_name/`)
+        const response = await fetch(`https://ipapi.co/${ipAddress}/country_name/`, {
+          mode: 'cors',
+          headers: {
+            'Accept': 'text/plain'
+          }
+        })
         if (response.ok) {
           const data = await response.text()
           setCountry(data.trim() || '—')
         } else {
           // Fallback на другой сервис
-          const fallbackResponse = await fetch(`https://ipapi.co/${ipAddress}/json/`)
-          if (fallbackResponse.ok) {
-            const data = await fallbackResponse.json()
-            setCountry(data.country_name || '—')
+          try {
+            const fallbackResponse = await fetch(`https://ipapi.co/${ipAddress}/json/`, {
+              mode: 'cors'
+            })
+            if (fallbackResponse.ok) {
+              const data = await fallbackResponse.json()
+              setCountry(data.country_name || '—')
+            }
+          } catch (fallbackError) {
+            // Игнорируем ошибки CORS - это нормально для локальной разработки
+            setCountry('—')
           }
         }
       } catch (error) {
-        console.error('Error fetching country:', error)
+        // Игнорируем ошибки CORS - это нормально для локальной разработки
+        // В production можно использовать прокси через бэкенд
         setCountry('—')
       }
     }
@@ -107,18 +120,22 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
       const isOwnProfile = currentUser && user.id === currentUser.id && isAdmin
       const endpoint = isOwnProfile ? '/admin/profile' : `/admin/users/${user.id}`
       
-      const response = await api.put(endpoint, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
+      console.log('Uploading avatar to:', endpoint, 'isOwnProfile:', isOwnProfile)
+      
+      // Для FormData используем POST (бэкенд поддерживает POST с method spoofing)
+      const response = await api.post(endpoint, formData)
+
+      console.log('Avatar upload response:', response.data)
 
       if (onUserUpdate) {
         // Оба эндпоинта возвращают user в response.data.user
-        onUserUpdate(response.data.user)
+        const updatedUser = response.data.user || response.data
+        console.log('Updated user:', updatedUser)
+        onUserUpdate(updatedUser)
       }
     } catch (error) {
       console.error('Error uploading avatar:', error)
+      console.error('Error response:', error.response?.data)
       alert('Ошибка загрузки аватара: ' + (error.response?.data?.message || error.message))
     } finally {
       setUploading(false)
@@ -133,7 +150,17 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
             <div className='flex flex-col items-center gap-4'>
               <Box sx={{ position: 'relative' }}>
                 {user.avatar ? (
-                  <CustomAvatar alt={user.name || user.email} src={getAvatarUrl(user.avatar)} variant='rounded' size={120} />
+                  <CustomAvatar 
+                    key={user.avatar} 
+                    alt={user.name || user.email} 
+                    src={getAvatarUrl(user.avatar)} 
+                    variant='rounded' 
+                    size={120}
+                    onError={(e) => {
+                      console.error('Avatar load error:', user.avatar, getAvatarUrl(user.avatar))
+                      e.target.style.display = 'none'
+                    }}
+                  />
                 ) : (
                   <CustomAvatar alt={user.name || user.email} variant='rounded' size={120}>
                     {getInitials(user.name || user.email || 'User')}

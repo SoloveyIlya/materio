@@ -43,11 +43,21 @@ export const GenerateVerticalMenu = ({ menuData }) => {
       if (subMenuItem.children) {
         const { children, icon, prefix, suffix, ...rest } = subMenuItem
         const Icon = icon ? <i className={icon} /> : null
-        const subMenuPrefix = prefix && prefix.label ? <Chip size='small' {...prefix} /> : prefix
+        const subMenuPrefix = prefix && prefix.label ? (() => {
+          const { key, ...prefixProps } = prefix
+          return <Chip size='small' {...prefixProps} />
+        })() : prefix
         // Поддержка массива suffix для отображения нескольких бейджей
         const subMenuSuffix = Array.isArray(suffix) 
-          ? <Fragment>{suffix.map((s, idx) => s && s.label ? <Chip key={s.key || idx} size='small' {...s} sx={{ ml: 0.5 }} /> : null).filter(Boolean)}</Fragment>
-          : (suffix && suffix.label ? <Chip size='small' {...suffix} /> : suffix)
+          ? <Fragment>{suffix.map((s, idx) => {
+              if (!s || !s.label) return null
+              const { key: sKey, ...sProps } = s
+              return <Chip key={sKey || idx} size='small' {...sProps} sx={{ ml: 0.5 }} />
+            }).filter(Boolean)}</Fragment>
+          : (suffix && suffix.label ? (() => {
+              const { key, ...suffixProps } = suffix
+              return <Chip size='small' {...suffixProps} />
+            })() : suffix)
 
         // If it is, return a SubMenu component and call generateMenu with the current subMenuItem's children
         return (
@@ -72,11 +82,21 @@ export const GenerateVerticalMenu = ({ menuData }) => {
         : rest.href || '#'
 
       const Icon = icon ? <i className={icon} /> : null
-      const menuItemPrefix = prefix && prefix.label ? <Chip size='small' {...prefix} /> : prefix
+      const menuItemPrefix = prefix && prefix.label ? (() => {
+        const { key, ...prefixProps } = prefix
+        return <Chip size='small' {...prefixProps} />
+      })() : prefix
       // Поддержка массива suffix для отображения нескольких бейджей
       const menuItemSuffix = Array.isArray(suffix) 
-        ? <Fragment>{suffix.map((s, idx) => s && s.label ? <Chip key={s.key || idx} size='small' {...s} sx={{ ml: 0.5 }} /> : null).filter(Boolean)}</Fragment>
-        : (suffix && suffix.label ? <Chip size='small' {...suffix} /> : suffix)
+        ? <Fragment>{suffix.map((s, idx) => {
+            if (!s || !s.label) return null
+            const { key: sKey, ...sProps } = s
+            return <Chip key={sKey || idx} size='small' {...sProps} sx={{ ml: 0.5 }} />
+          }).filter(Boolean)}</Fragment>
+        : (suffix && suffix.label ? (() => {
+            const { key, ...suffixProps } = suffix
+            return <Chip size='small' {...suffixProps} />
+          })() : suffix)
 
       return (
         <VerticalMenuItem
@@ -112,8 +132,14 @@ export const GenerateHorizontalMenu = ({ menuData }) => {
       if (subMenuItem.children) {
         const { children, icon, prefix, suffix, ...rest } = subMenuItem
         const Icon = icon ? <i className={icon} /> : null
-        const subMenuPrefix = prefix && prefix.label ? <Chip size='small' {...prefix} /> : prefix
-        const subMenuSuffix = suffix && suffix.label ? <Chip size='small' {...suffix} /> : suffix
+        const subMenuPrefix = prefix && prefix.label ? (() => {
+          const { key, ...prefixProps } = prefix
+          return <Chip size='small' {...prefixProps} />
+        })() : prefix
+        const subMenuSuffix = suffix && suffix.label ? (() => {
+          const { key, ...suffixProps } = suffix
+          return <Chip size='small' {...suffixProps} />
+        })() : suffix
 
         // If it is, return a SubMenu component and call generateMenu with the current subMenuItem's children
         return (
@@ -138,8 +164,14 @@ export const GenerateHorizontalMenu = ({ menuData }) => {
         : rest.href || '#'
 
       const Icon = icon ? <i className={icon} /> : null
-      const menuItemPrefix = prefix && prefix.label ? <Chip size='small' {...prefix} /> : prefix
-      const menuItemSuffix = suffix && suffix.label ? <Chip size='small' {...suffix} /> : suffix
+      const menuItemPrefix = prefix && prefix.label ? (() => {
+        const { key, ...prefixProps } = prefix
+        return <Chip size='small' {...prefixProps} />
+      })() : prefix
+      const menuItemSuffix = suffix && suffix.label ? (() => {
+        const { key, ...suffixProps } = suffix
+        return <Chip size='small' {...suffixProps} />
+      })() : suffix
 
       return (
         <HorizontalMenuItem
