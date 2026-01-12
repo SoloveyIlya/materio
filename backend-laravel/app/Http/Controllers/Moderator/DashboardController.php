@@ -84,17 +84,12 @@ class DashboardController extends Controller
                 $counts['chat'] = 0;
             }
 
-            // Непрочитанные тикеты в support (тикеты модератора с непрочитанными ответами)
-            $unreadSupportTickets = Ticket::where('domain_id', $user->domain_id)
+            // Новые тикеты в support (статус open или in_progress для тикетов модератора)
+            $newSupportTickets = Ticket::where('domain_id', $user->domain_id)
                 ->where('user_id', $user->id)
-                ->whereHas('messages', function ($q) use ($user) {
-                    $q->where('from_user_id', '!=', $user->id)
-                      ->where('to_user_id', $user->id)
-                      ->where('is_read', false)
-                      ->where('type', 'support');
-                })
+                ->whereIn('status', ['open', 'in_progress'])
                 ->count();
-            $counts['support'] = $unreadSupportTickets;
+            $counts['support'] = $newSupportTickets;
 
             // Задачи на проверке для модератора нет
             $counts['tasks'] = 0;

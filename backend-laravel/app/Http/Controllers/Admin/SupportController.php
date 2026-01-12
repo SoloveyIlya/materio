@@ -14,7 +14,7 @@ class SupportController extends Controller
         $user = $request->user();
 
         $query = Ticket::where('domain_id', $user->domain_id)
-            ->with(['user.roles', 'assignedUser', 'messages.fromUser', 'messages.toUser']);
+            ->with(['user.roles', 'assignedUser', 'messages.fromUser', 'messages.toUser', 'attachments']);
 
         // Фильтрация по категориям
         if ($request->has('category')) {
@@ -66,7 +66,7 @@ class SupportController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        return response()->json($ticket->load(['user', 'assignedUser', 'messages.fromUser', 'messages.toUser']));
+        return response()->json($ticket->load(['user', 'assignedUser', 'messages.fromUser', 'messages.toUser', 'attachments']));
     }
 
     public function reply(Ticket $ticket, Request $request): JsonResponse
@@ -119,6 +119,6 @@ class SupportController extends Controller
 
         $ticket->update($validated);
 
-        return response()->json($ticket->fresh()->load(['user', 'assignedUser']));
+        return response()->json($ticket->fresh()->load(['user', 'assignedUser', 'attachments']));
     }
 }

@@ -80,6 +80,6 @@ class SupportController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        return response()->json($ticket->load(['assignedUser']));
+        return response()->json($ticket->load(['assignedUser', 'attachments']));
     }
 }
