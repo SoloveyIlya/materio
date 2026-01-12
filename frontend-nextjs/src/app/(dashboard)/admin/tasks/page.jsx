@@ -155,7 +155,7 @@ export default function AdminTasksPage() {
 
       <Grid container spacing={6}>
         <Grid size={{ xs: 12 }}>
-          <TaskCard activeTab={activeTab} />
+          <TaskCard activeTab={activeTab} selectedAdminId={selectedAdminId} />
         </Grid>
         <Grid size={{ xs: 12 }}>
           <TaskListTable

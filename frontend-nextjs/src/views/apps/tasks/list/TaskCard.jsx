@@ -17,7 +17,7 @@ import classnames from 'classnames'
 import CustomAvatar from '@core/components/mui/Avatar'
 import api from '@/lib/api'
 
-const TaskCard = ({ activeTab }) => {
+const TaskCard = ({ activeTab, selectedAdminId }) => {
   // States
   const [stats, setStats] = useState({
     pending: 0,
@@ -33,11 +33,16 @@ const TaskCard = ({ activeTab }) => {
 
   useEffect(() => {
     loadStats()
-  }, [activeTab])
+  }, [activeTab, selectedAdminId])
 
   const loadStats = async () => {
     try {
-      const response = await api.get('/admin/tasks')
+      const params = new URLSearchParams()
+      if (selectedAdminId) {
+        params.append('administrator_id', selectedAdminId)
+      }
+      const url = `/admin/tasks${params.toString() ? `?${params.toString()}` : ''}`
+      const response = await api.get(url)
       const tasks = response.data.data || response.data || []
       
       setStats({
