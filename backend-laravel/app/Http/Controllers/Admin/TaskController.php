@@ -10,9 +10,52 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class TaskController extends Controller
 {
+    /**
+     * Форматирует дату в формат США (MM/DD/YYYY HH:MM AM/PM) с учетом часового пояса
+     */
+    private function formatDateUSA($date, $timezone = 'UTC'): ?string
+    {
+        if (!$date) {
+            return null;
+        }
+        
+        try {
+            $carbon = Carbon::parse($date)->setTimezone($timezone);
+            return $carbon->format('m/d/Y h:i A T');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Добавляет отформатированные даты к задаче
+     */
+    private function addFormattedDates($task, $timezone = 'UTC'): void
+    {
+        if ($task->created_at) {
+            $task->created_at_formatted = $this->formatDateUSA($task->created_at, $timezone);
+        }
+        if ($task->updated_at) {
+            $task->updated_at_formatted = $this->formatDateUSA($task->updated_at, $timezone);
+        }
+        if ($task->assigned_at) {
+            $task->assigned_at_formatted = $this->formatDateUSA($task->assigned_at, $timezone);
+        }
+        if ($task->completed_at) {
+            $task->completed_at_formatted = $this->formatDateUSA($task->completed_at, $timezone);
+        }
+        if ($task->due_at) {
+            $task->due_at_formatted = $this->formatDateUSA($task->due_at, $timezone);
+        }
+        if ($task->date_of_birth) {
+            $task->date_of_birth_formatted = $this->formatDateUSA($task->date_of_birth, $timezone);
+        }
+    }
+
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -57,6 +100,13 @@ class TaskController extends Controller
 
         $tasks = $query->orderBy('created_at', 'desc')->paginate(20);
 
+        // Добавляем отформатированные даты в формате США с учетом часового пояса
+        $timezone = $user->timezone ?? 'UTC';
+        $tasks->getCollection()->transform(function ($task) use ($timezone) {
+            $this->addFormattedDates($task, $timezone);
+            return $task;
+        });
+
         return response()->json($tasks);
     }
 
@@ -92,6 +142,10 @@ class TaskController extends Controller
                 }
             }
         }
+
+        // Добавляем отформатированные даты в формате США с учетом часового пояса
+        $timezone = $user->timezone ?? 'UTC';
+        $this->addFormattedDates($task, $timezone);
 
         return response()->json($task);
     }
@@ -326,7 +380,13 @@ class TaskController extends Controller
                 'work_day_type' => gettype($task->work_day),
             ]);
 
-            return response()->json($task->load(['categories', 'template', 'assignedUser', 'documentations', 'tools']), 201);
+            $task = $task->load(['categories', 'template', 'assignedUser', 'documentations', 'tools']);
+            
+            // Добавляем отформатированные даты в формате США с учетом часового пояса
+            $timezone = $user->timezone ?? 'UTC';
+            $this->addFormattedDates($task, $timezone);
+
+            return response()->json($task, 201);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error creating task: ' . $e->getMessage()], 500);
@@ -510,7 +570,13 @@ class TaskController extends Controller
 
             DB::commit();
 
-            return response()->json($task->fresh()->load(['categories', 'template', 'assignedUser', 'documentations', 'tools', 'result']));
+            $task = $task->fresh()->load(['categories', 'template', 'assignedUser', 'documentations', 'tools', 'result']);
+            
+            // Добавляем отформатированные даты в формате США с учетом часового пояса
+            $timezone = $user->timezone ?? 'UTC';
+            $this->addFormattedDates($task, $timezone);
+
+            return response()->json($task);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error updating task: ' . $e->getMessage()], 500);
@@ -568,9 +634,15 @@ class TaskController extends Controller
 
             DB::commit();
 
+            $task = $task->fresh()->load(['categories', 'template', 'assignedUser', 'result']);
+            
+            // Добавляем отформатированные даты в формате США с учетом часового пояса
+            $timezone = $user->timezone ?? 'UTC';
+            $this->addFormattedDates($task, $timezone);
+
             return response()->json([
                 'message' => 'Task moderated successfully',
-                'task' => $task->fresh()->load(['categories', 'template', 'assignedUser', 'result']),
+                'task' => $task,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
