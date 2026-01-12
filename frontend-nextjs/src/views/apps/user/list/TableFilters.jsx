@@ -99,8 +99,8 @@ const TableFilters = ({ setData, tableData, activeTab, onFilterChange, administr
             </Select>
           </FormControl>
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', gap: 2 }}>
+        <Grid size={{ xs: 12 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Button
               variant={online ? 'contained' : 'outlined'}
               onClick={() => setOnline(!online)}
