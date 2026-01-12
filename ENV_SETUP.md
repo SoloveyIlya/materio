@@ -90,3 +90,4 @@ docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d
 - Используйте сильные пароли для production
 - Регулярно обновляйте пароли
 
+
