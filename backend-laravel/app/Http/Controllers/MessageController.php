@@ -285,8 +285,33 @@ class MessageController extends Controller
             return response()->json(['message' => 'Message body, attachments or voice required'], 422);
         }
 
+        // Получаем получателя сообщения для проверки прав и определения отправителя
+        $toUser = \App\Models\User::find($validated['to_user_id']);
+        if (!$toUser) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+        
+        // Проверяем права доступа
+        if ($toUser->domain_id !== $user->domain_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
         // Определяем от имени кого отправлять сообщение
         $fromUserId = $user->id;
+        
+        // Если админ отправляет сообщение модератору, закрепленному за другим админом,
+        // автоматически отправляем от имени того админа
+        if ($user->isAdmin() && $toUser->isModerator() && $toUser->administrator_id) {
+            // Если модератор закреплен за другим админом (не текущим), отправляем от его имени
+            if ($toUser->administrator_id !== $user->id) {
+                $targetAdmin = \App\Models\User::find($toUser->administrator_id);
+                if ($targetAdmin && $targetAdmin->isAdmin() && $targetAdmin->domain_id === $user->domain_id) {
+                    $fromUserId = $targetAdmin->id;
+                }
+            }
+        }
+        
+        // Если явно указан from_user_id, используем его (приоритет выше автоматического определения)
         if ($user->isAdmin() && isset($validated['from_user_id']) && $validated['from_user_id'] !== $user->id) {
             // Проверяем, что указанный пользователь - админ из того же домена
             $fromUser = \App\Models\User::find($validated['from_user_id']);
@@ -294,12 +319,6 @@ class MessageController extends Controller
                 return response()->json(['message' => 'Invalid from_user_id'], 403);
             }
             $fromUserId = $validated['from_user_id'];
-        }
-
-        // Проверяем права доступа
-        $toUser = \App\Models\User::find($validated['to_user_id']);
-        if ($toUser->domain_id !== $user->domain_id) {
-            return response()->json(['message' => 'Forbidden'], 403);
         }
 
         // Если это сообщение по таску, проверяем доступ
