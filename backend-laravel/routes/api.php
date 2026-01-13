@@ -75,6 +75,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
 
     // Moderators (алиас для users с фильтром)
     Route::get('/moderators', [UserController::class, 'index']);
+    Route::post('/moderators', [UserController::class, 'store']);
 
     // Activity Logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);

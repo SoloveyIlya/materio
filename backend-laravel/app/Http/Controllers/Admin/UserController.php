@@ -166,6 +166,75 @@ class UserController extends Controller
         }
     }
 
+    public function store(Request $request)
+    {
+        $currentUser = $request->user();
+        
+        if (!$currentUser) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8',
+            'timezone' => 'nullable|string',
+            'administrator_id' => 'nullable|exists:users,id',
+        ]);
+
+        // Определяем администратора: если не указан, используем текущего админа
+        $administratorId = !empty($validated['administrator_id']) ? $validated['administrator_id'] : $currentUser->id;
+
+        // Проверяем, что указанный администратор существует и является админом
+        $administrator = User::find($administratorId);
+        if (!$administrator || !$administrator->isAdmin()) {
+            return response()->json(['message' => 'Invalid administrator'], 400);
+        }
+
+        // Проверяем, что администратор в том же домене
+        if ($administrator->domain_id !== $currentUser->domain_id) {
+            return response()->json(['message' => 'Administrator must be in the same domain'], 400);
+        }
+
+        // Создаем пользователя-модератора
+        $user = User::create([
+            'domain_id' => $currentUser->domain_id,
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $validated['password'],
+            'registration_password' => $validated['password'],
+            'timezone' => $validated['timezone'] ?? 'UTC',
+            'administrator_id' => $administratorId,
+        ]);
+
+        // Создаем роль moderator, если её нет
+        $role = \App\Models\Role::firstOrCreate(
+            ['name' => 'moderator'],
+            [
+                'display_name' => 'Moderator',
+                'description' => 'Moderator access',
+            ]
+        );
+
+        // Присваиваем роль moderator
+        $user->roles()->attach($role->id);
+
+        // Создаем профиль модератора
+        \App\Models\ModeratorProfile::firstOrCreate(
+            ['user_id' => $user->id],
+            ['minimum_minutes_between_tasks' => 5]
+        );
+
+        // Загружаем связи
+        $user->load(['roles', 'administrator', 'moderatorProfile']);
+        $user->makeVisible('registration_password');
+
+        return response()->json([
+            'user' => $user,
+            'message' => 'Moderator created successfully',
+        ], 201);
+    }
+
     public function update(Request $request, $id)
     {
         $user = User::withTrashed()->find($id);

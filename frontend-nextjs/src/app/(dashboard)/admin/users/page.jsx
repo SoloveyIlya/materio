@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, Typography, Tabs, Tab, Grid } from '@mui/material'
+import { Box, Typography, Tabs, Tab, Grid, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem } from '@mui/material'
 import api from '@/lib/api'
+import { showToast } from '@/utils/toast'
 
 // Component Imports
 import UserListTable from '@/views/apps/user/list/UserListTable'
@@ -17,6 +18,8 @@ export default function UsersPage() {
   const [filterMy, setFilterMy] = useState(false)
   const [filterAdministrator, setFilterAdministrator] = useState('')
   const [loading, setLoading] = useState(true)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', administrator_id: '' })
 
   useEffect(() => {
     loadAdministrators()
@@ -85,10 +88,43 @@ export default function UsersPage() {
     }
   }
 
+  const handleCreateModerator = async () => {
+    try {
+      const dataToSend = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        administrator_id: formData.administrator_id || null
+      }
+
+      await api.post('/admin/moderators', dataToSend)
+      setDialogOpen(false)
+      setFormData({ name: '', email: '', password: '', administrator_id: '' })
+      loadUsers()
+      showToast.success('Moderator created successfully')
+    } catch (error) {
+      console.error('Error creating moderator:', error)
+      const errorMessage = error.response?.data?.message || 
+                          (error.response?.data?.errors ? JSON.stringify(error.response.data.errors) : error.message) ||
+                          'Error creating moderator'
+      showToast.error(errorMessage)
+    }
+  }
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false)
+    setFormData({ name: '', email: '', password: '', administrator_id: '' })
+  }
+
   return (
     <Box sx={{ p: 6 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Typography variant='h4'>{activeTab === 0 ? 'Moderators' : 'Users'}</Typography>
+        {activeTab === 0 && (
+          <Button variant='contained' startIcon={<i className='ri-add-line' />} onClick={() => setDialogOpen(true)}>
+            Add Moderator
+          </Button>
+        )}
       </Box>
 
       <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 6 }}>
@@ -112,6 +148,65 @@ export default function UsersPage() {
           />
         </Grid>
       </Grid>
+
+      {/* Create Moderator Dialog */}
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Moderator</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Name"
+            required
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            sx={{ mt: 2 }}
+          />
+          <TextField
+            fullWidth
+            label="Email"
+            type="email"
+            required
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            sx={{ mt: 2 }}
+          />
+          <TextField
+            fullWidth
+            label="Password"
+            type="password"
+            required
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            sx={{ mt: 2 }}
+            helperText="Minimum 8 characters"
+          />
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Administrator</InputLabel>
+            <Select
+              value={formData.administrator_id || ''}
+              label="Administrator"
+              onChange={(e) => setFormData({ ...formData, administrator_id: e.target.value })}
+            >
+              <MenuItem value="">Current admin (default)</MenuItem>
+              {administrators.map((admin) => (
+                <MenuItem key={admin.id} value={admin.id.toString()}>
+                  {admin.name} ({admin.email})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button 
+            onClick={handleCreateModerator} 
+            variant="contained" 
+            disabled={!formData.name || !formData.email || !formData.password || formData.password.length < 8}
+          >
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
