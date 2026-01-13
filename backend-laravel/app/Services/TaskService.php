@@ -306,8 +306,8 @@ class TaskService
         }
 
         $scheduledAt = $startTime->copy();
-        $minInterval = $profile->task_min_interval ?? 10;
-        $maxInterval = $profile->task_max_interval ?? 120;
+        $minInterval = $profile->task_min_interval ?? 1;
+        $maxInterval = $profile->task_max_interval ?? 5;
 
         foreach ($tasksToSchedule as $task) {
             // Генерируем рандомный интервал между тасками
