@@ -130,7 +130,14 @@ const verticalMenuData = (user = null, counts = { chat: 0, support: 0, tasks: 0,
       {
         label: 'Tasks',
         icon: 'ri-task-line',
-        href: '/moderator/tasks'
+        href: '/moderator/tasks',
+        ...(counts.tasks > 0 && {
+          suffix: {
+            label: counts.tasks.toString(),
+            color: 'error',
+            size: 'small',
+          }
+        })
       },
       {
         label: 'Messages',

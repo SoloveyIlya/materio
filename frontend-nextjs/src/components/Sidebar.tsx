@@ -3,6 +3,7 @@
 import { useAuthStore } from '@/store/authStore'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { useMenuCounts } from '@/hooks/useMenuCounts'
 
 interface NavItem {
   name: string
@@ -47,6 +48,7 @@ export default function Sidebar() {
   const { user, logout } = useAuthStore()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { counts } = useMenuCounts()
 
   const isAdmin = user?.roles?.some((role) => role.name === 'admin')
   const isModerator = user?.roles?.some((role) => role.name === 'moderator')
@@ -102,16 +104,26 @@ export default function Sidebar() {
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             {navItems.map((item) => {
+              // Для модератора показываем badge с количеством pending задач для пункта Tasks
+              const showBadge = isModerator && item.key === 'tasks' && counts?.tasks > 0
+              
               return (
                 <div
                   key={item.key}
                   className={`
-                    w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200
+                    w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200
                     text-slate-300 hover:bg-slate-700 hover:text-white cursor-default
                   `}
                 >
-                  {item.icon}
-                  <span className="font-medium">{item.name}</span>
+                  <div className="flex items-center space-x-3">
+                    {item.icon}
+                    <span className="font-medium">{item.name}</span>
+                  </div>
+                  {showBadge && (
+                    <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                      {counts.tasks > 99 ? '99+' : counts.tasks}
+                    </span>
+                  )}
                 </div>
               )
             })}

@@ -91,8 +91,18 @@ class DashboardController extends Controller
                 ->count();
             $counts['support'] = $newSupportTickets;
 
-            // Задачи на проверке для модератора нет
-            $counts['tasks'] = 0;
+            // Количество задач со статусом pending (ожидают выполнения) для модератора
+            $pendingTasks = Task::where('domain_id', $user->domain_id)
+                ->where('status', 'pending')
+                ->count();
+            $counts['tasks'] = $pendingTasks;
+            
+            // Логирование для отладки
+            \Log::debug('Moderator tasks count', [
+                'user_id' => $user->id,
+                'domain_id' => $user->domain_id,
+                'pending_tasks_count' => $pendingTasks,
+            ]);
 
             return response()->json($counts);
         } catch (\Exception $e) {

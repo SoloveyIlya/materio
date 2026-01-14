@@ -29,9 +29,19 @@ export const useMenuCounts = () => {
         : '/moderator/dashboard/counts'
 
       const response = await api.get(endpoint)
-      setCounts(response.data || { chat: 0, support: 0, tasks: 0, chat_by_admin: [], tasks_by_admin: [] })
+      const data = response.data || {}
+      const newCounts = {
+        chat: data.chat ?? 0,
+        support: data.support ?? 0,
+        tasks: data.tasks ?? 0,
+        chat_by_admin: data.chat_by_admin ?? [],
+        tasks_by_admin: data.tasks_by_admin ?? [],
+      }
+      console.log('Menu counts fetched:', newCounts, 'from endpoint:', endpoint)
+      setCounts(newCounts)
     } catch (error) {
       console.error('Error fetching menu counts:', error)
+      console.error('Error details:', error.response?.data || error.message)
       setCounts({ chat: 0, support: 0, tasks: 0, chat_by_admin: [], tasks_by_admin: [] })
     } finally {
       setLoading(false)
