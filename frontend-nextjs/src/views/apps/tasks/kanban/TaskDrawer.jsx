@@ -254,7 +254,7 @@ const TaskDrawer = props => {
 
   const getSelectedNames = (field, items) => {
     const selectedIds = formData[field] || []
-    if (selectedIds.length === 0) return field === 'category_ids' ? '' : 'None'
+    if (selectedIds.length === 0) return ''
     return items
       .filter(item => selectedIds.includes(String(item.id)))
       .map(item => item.name || item.title)
