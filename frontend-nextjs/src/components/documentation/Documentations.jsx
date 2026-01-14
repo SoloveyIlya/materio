@@ -15,6 +15,9 @@ import Chip from '@mui/material/Chip'
 import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
 
 // Third-party Imports
 import classnames from 'classnames'
@@ -27,6 +30,14 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
   const [activeTab, setActiveTab] = useState('')
   const [categoryMenuAnchor, setCategoryMenuAnchor] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(null)
+  const [imageDialogOpen, setImageDialogOpen] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null)
+
+  // Handle image click
+  const handleImageClick = (imageUrl) => {
+    setSelectedImage(imageUrl)
+    setImageDialogOpen(true)
+  }
 
   // Hooks
   useEffect(() => {
@@ -42,6 +53,28 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
       }
     }
   }, [categories])
+
+  // Добавляем обработчики клика на изображения в HTML-контенте
+  useEffect(() => {
+    const handleImageClickInHTML = (e) => {
+      if (e.target.tagName === 'IMG') {
+        e.preventDefault()
+        handleImageClick(e.target.src)
+      }
+    }
+
+    // Находим все контейнеры с HTML-контентом и добавляем обработчики
+    const htmlContainers = document.querySelectorAll('[data-html-content]')
+    htmlContainers.forEach(container => {
+      container.addEventListener('click', handleImageClickInHTML)
+    })
+
+    return () => {
+      htmlContainers.forEach(container => {
+        container.removeEventListener('click', handleImageClickInHTML)
+      })
+    }
+  }, [activeTab, pages])
 
   const groupedPages = useMemo(() => {
     return categories.map(category => ({
@@ -98,6 +131,7 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
   }
 
   return (
+    <>
     <Grid container spacing={6}>
       <Grid size={{ xs: 12, sm: 5, md: 4, xl: 3 }} className='flex !flex-col items-center'>
         <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -278,7 +312,17 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
                                     >
                                       {hasHTML ? (
                                         <Box
+                                          data-html-content
                                           dangerouslySetInnerHTML={{ __html: textContent }}
+                                          sx={{
+                                            '& img': {
+                                              cursor: 'pointer',
+                                              transition: 'opacity 0.2s',
+                                              '&:hover': {
+                                                opacity: 0.8
+                                              }
+                                            }
+                                          }}
                                         />
                                       ) : (
                                         <Typography
@@ -333,11 +377,17 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
                                         component="img"
                                         src={imageUrl}
                                         alt={`${page.title} - Image ${blockIndex + 1}`}
+                                        onClick={() => handleImageClick(imageUrl)}
                                         sx={{
                                           maxWidth: '100%',
                                           height: 'auto',
                                           borderRadius: 1,
-                                          boxShadow: 2
+                                          boxShadow: 2,
+                                          cursor: 'pointer',
+                                          transition: 'opacity 0.2s',
+                                          '&:hover': {
+                                            opacity: 0.8
+                                          }
                                         }}
                                       />
                                     </Box>
@@ -435,8 +485,17 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
                             return contentBlocks.length === 0 ? (
                               // Старый способ отображения через content
                               <Box
+                                data-html-content
                                 sx={{
-                                  '& img': { maxWidth: '100%', height: 'auto' },
+                                  '& img': { 
+                                    maxWidth: '100%', 
+                                    height: 'auto',
+                                    cursor: 'pointer',
+                                    transition: 'opacity 0.2s',
+                                    '&:hover': {
+                                      opacity: 0.8
+                                    }
+                                  },
                                   '& pre': { 
                                     bgcolor: 'background.paper',
                                     p: 2,
@@ -487,11 +546,17 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
                                       component="img"
                                       src={imageUrl}
                                       alt={`${page.title} - Image ${index + 1}`}
+                                      onClick={() => handleImageClick(imageUrl)}
                                       sx={{
                                         maxWidth: '300px',
                                         height: 'auto',
                                         borderRadius: 1,
-                                        boxShadow: 2
+                                        boxShadow: 2,
+                                        cursor: 'pointer',
+                                        transition: 'opacity 0.2s',
+                                        '&:hover': {
+                                          opacity: 0.8
+                                        }
                                       }}
                                     />
                                   )
@@ -512,6 +577,35 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
           )}
         </Grid>
       </Grid>
+
+      {/* Image Fullscreen Dialog */}
+      <Dialog 
+        open={imageDialogOpen} 
+        onClose={() => setImageDialogOpen(false)} 
+        maxWidth="lg" 
+        fullWidth
+      >
+        <DialogTitle>
+          <IconButton 
+            onClick={() => setImageDialogOpen(false)} 
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <i className='ri-close-line' />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {selectedImage && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+              <img
+                src={selectedImage}
+                alt="Full size"
+                style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
+              />
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
