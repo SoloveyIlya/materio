@@ -47,7 +47,12 @@ const TaskCard = ({ activeTab, selectedAdminId }) => {
       
       setStats({
         under_review: tasks.filter(t => t.status === 'under_admin_review').length,
-        pending: tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length,
+        // Для pending и in_progress считаем только задачи с назначенным модератором
+        // Это соответствует логике фильтрации в таблице
+        pending: tasks.filter(t => 
+          (t.status === 'pending' || t.status === 'in_progress') && 
+          (t.assigned_user || t.assignedUser)
+        ).length,
         approved: tasks.filter(t => t.status === 'approved').length,
         rejected: tasks.filter(t => t.status === 'rejected').length,
         revision: tasks.filter(t => t.status === 'sent_for_revision').length

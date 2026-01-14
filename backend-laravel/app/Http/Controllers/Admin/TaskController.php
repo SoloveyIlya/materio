@@ -68,17 +68,39 @@ class TaskController extends Controller
         $query = Task::where('domain_id', $user->domain_id)
             ->with(['categories', 'template', 'assignedUser', 'documentations', 'tools', 'result', 'views.user']);
 
+        // Определяем, нужно ли исключать задачи без модератора
+        // Это нужно для статусов pending и in_progress
+        $excludeUnassigned = false;
+        if ($request->has('status')) {
+            $status = $request->status;
+            if (strpos($status, ',') !== false) {
+                $statuses = array_map('trim', explode(',', $status));
+                $excludeUnassigned = in_array('pending', $statuses) || in_array('in_progress', $statuses);
+            } else {
+                $excludeUnassigned = $status === 'pending' || $status === 'in_progress';
+            }
+        }
+
         // Фильтр по админу - применяется только если явно запрошен
         // По умолчанию показываем ВСЕ задачи домена (единый Task Manager для всех админов)
         if ($request->has('administrator_id')) {
             $administratorId = $request->administrator_id;
             if ($administratorId !== 'all') {
-                // Фильтруем таски модераторов выбранного админа ИЛИ таски без назначения
-                $query->where(function ($q) use ($administratorId) {
-                    $q->whereHas('assignedUser', function ($subQ) use ($administratorId) {
+                // Фильтруем таски модераторов выбранного админа
+                // Если исключаем задачи без назначения (для pending/in_progress), не добавляем orWhereNull
+                if ($excludeUnassigned) {
+                    // Для pending/in_progress показываем только задачи с назначенным модератором этого админа
+                    $query->whereHas('assignedUser', function ($subQ) use ($administratorId) {
                         $subQ->where('administrator_id', $administratorId);
-                    })->orWhereNull('assigned_to');
-                });
+                    });
+                } else {
+                    // Для других статусов показываем задачи модераторов этого админа ИЛИ задачи без назначения
+                    $query->where(function ($q) use ($administratorId) {
+                        $q->whereHas('assignedUser', function ($subQ) use ($administratorId) {
+                            $subQ->where('administrator_id', $administratorId);
+                        })->orWhereNull('assigned_to');
+                    });
+                }
             }
             // Если administrator_id === 'all', показываем все задачи (без фильтра)
         }
@@ -90,8 +112,19 @@ class TaskController extends Controller
             if (strpos($status, ',') !== false) {
                 $statuses = array_map('trim', explode(',', $status));
                 $query->whereIn('status', $statuses);
+                
+                // Для статусов pending и in_progress показываем только задачи с назначенным модератором
+                // Задачи без модератора (assigned_to = null) не должны попадать в таб "Pending"
+                if ($excludeUnassigned) {
+                    $query->whereNotNull('assigned_to');
+                }
             } else {
                 $query->where('status', $status);
+                
+                // Для статусов pending и in_progress показываем только задачи с назначенным модератором
+                if ($excludeUnassigned) {
+                    $query->whereNotNull('assigned_to');
+                }
             }
         }
 
