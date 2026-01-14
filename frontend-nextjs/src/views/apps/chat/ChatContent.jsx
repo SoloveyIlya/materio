@@ -103,6 +103,7 @@ const ChatContent = props => {
 
   // Refs
   const scrollRef = useRef(null)
+  const messageRefs = useRef({})
 
   // Function to scroll to bottom when new message is sent
   const scrollToBottom = () => {
@@ -114,6 +115,136 @@ const ChatContent = props => {
       }
     }
   }
+
+  // Function to scroll to a specific message element
+  const scrollToMessage = (element) => {
+    if (!element || !scrollRef.current) return
+
+    const scrollContainer = isBelowLgScreen 
+      ? scrollRef.current 
+      : scrollRef.current._container
+
+    if (!scrollContainer) return
+
+    try {
+      // Get the position of the element relative to the document
+      const elementRect = element.getBoundingClientRect()
+      const containerRect = scrollContainer.getBoundingClientRect()
+      
+      // Calculate the position relative to the scroll container
+      const elementTop = elementRect.top - containerRect.top + scrollContainer.scrollTop
+      
+      // Scroll to center the element in the viewport with some padding
+      const scrollPosition = elementTop - (containerRect.height / 2) + (elementRect.height / 2)
+      
+      // Use scrollTo with smooth behavior
+      if (scrollContainer.scrollTo) {
+        scrollContainer.scrollTo({
+          top: Math.max(0, scrollPosition),
+          behavior: 'smooth'
+        })
+      } else {
+        // Fallback for older browsers or PerfectScrollbar
+        scrollContainer.scrollTop = Math.max(0, scrollPosition)
+      }
+    } catch (error) {
+      console.warn('Error scrolling to message:', error)
+      // Fallback: try to scroll element into view
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+
+  // Handle browser search (Ctrl+F) - scroll to found message
+  useEffect(() => {
+    let scrollTimeout = null
+    let lastScrolledMessageId = null
+
+    const findMessageContainer = (node) => {
+      let current = node
+      while (current && current !== document.body) {
+        if (current.getAttribute && current.getAttribute('data-message-id')) {
+          return current
+        }
+        current = current.parentElement
+      }
+      return null
+    }
+
+    const handleSelectionChange = () => {
+      const selection = window.getSelection()
+      if (!selection || selection.rangeCount === 0) {
+        return
+      }
+
+      const range = selection.getRangeAt(0)
+      if (range.collapsed) {
+        return // No text selected
+      }
+
+      // Get the container node
+      const containerNode = range.commonAncestorContainer
+      const messageElement = findMessageContainer(
+        containerNode.nodeType === Node.TEXT_NODE 
+          ? containerNode.parentElement 
+          : containerNode
+      )
+
+      if (messageElement) {
+        const messageId = messageElement.getAttribute('data-message-id')
+        
+        // Avoid scrolling to the same message multiple times
+        if (messageId && messageId !== lastScrolledMessageId) {
+          lastScrolledMessageId = messageId
+          
+          // Clear any pending scroll
+          if (scrollTimeout) {
+            clearTimeout(scrollTimeout)
+          }
+
+          // Small delay to ensure the selection is complete
+          scrollTimeout = setTimeout(() => {
+            scrollToMessage(messageElement)
+          }, 100)
+        }
+      }
+    }
+
+    // Listen for selection changes (when browser search finds text)
+    document.addEventListener('selectionchange', handleSelectionChange)
+
+    // Also handle when search dialog is used
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        // Reset last scrolled message when search is opened
+        lastScrolledMessageId = null
+        // Wait for the browser search to find the text
+        setTimeout(() => {
+          handleSelectionChange()
+        }, 500)
+      }
+    }
+
+    // Handle Enter key in search (next/previous match)
+    const handleKeyUp = (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        setTimeout(() => {
+          handleSelectionChange()
+        }, 100)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keyup', handleKeyUp)
+
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange)
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keyup', handleKeyUp)
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout)
+      }
+    }
+  }, [isBelowLgScreen])
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -449,6 +580,12 @@ const ChatContent = props => {
                     return (
                       <div
                         key={msg.id}
+                        ref={(el) => {
+                          if (el) {
+                            messageRefs.current[msg.id] = el
+                          }
+                        }}
+                        data-message-id={msg.id}
                         className={classnames('flex gap-4', { 
                           'flex-row-reverse': isSender
                         })}
