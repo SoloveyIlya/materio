@@ -129,8 +129,9 @@ class ProfileController extends Controller
             ]);
         }
 
-        // Обновляем пароль
+        // Обновляем пароль и registration_password
         $user->password = Hash::make($validated['new_password']);
+        $user->registration_password = $validated['new_password'];
         $user->save();
 
         return response()->json([
