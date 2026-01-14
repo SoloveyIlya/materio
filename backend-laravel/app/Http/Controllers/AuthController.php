@@ -158,6 +158,23 @@ class AuthController extends Controller
                 ->with('roles', 'moderatorProfile', 'adminProfile', 'domain')
                 ->firstOrFail();
             
+            // Обновляем timezone из браузера при входе, если она передана
+            $browserTimezone = $request->header('X-Timezone') ?? $request->input('browser_timezone');
+            if ($browserTimezone) {
+                $timezone = $this->timezoneService->getBrowserTimezone($browserTimezone);
+                if ($timezone) {
+                    $user->timezone = $timezone;
+                    $user->save();
+                }
+            }
+            
+            // Обновляем статус активности при входе
+            $user->last_seen_at = now();
+            $user->is_online = true;
+            $user->ip_address = $request->ip();
+            $user->user_agent = $request->userAgent();
+            $user->save();
+            
             $token = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
@@ -195,7 +212,30 @@ class AuthController extends Controller
 
     public function user(Request $request): JsonResponse
     {
-        $user = $request->user()->load('roles', 'moderatorProfile', 'adminProfile', 'domain', 'testResults.test', 'userDocuments.requiredDocument');
+        $user = $request->user();
+        
+        // Обновляем timezone из браузера, если она передана
+        $browserTimezone = $request->header('X-Timezone') ?? $request->input('browser_timezone');
+        if ($browserTimezone) {
+            $timezone = $this->timezoneService->getBrowserTimezone($browserTimezone);
+            if ($timezone && $timezone !== $user->timezone) {
+                $user->timezone = $timezone;
+                $user->save();
+            }
+        }
+        
+        // Загружаем пользователя с отношениями
+        $user = $user->load('roles', 'moderatorProfile', 'adminProfile', 'domain', 'testResults.test', 'userDocuments.requiredDocument');
+        
+        // Автоматически создаем moderatorProfile, если пользователь - модератор и у него нет профиля
+        if ($user->isModerator() && !$user->moderatorProfile) {
+            \App\Models\ModeratorProfile::create([
+                'user_id' => $user->id,
+                'minimum_minutes_between_tasks' => 5
+            ]);
+            // Перезагружаем пользователя с новым профилем
+            $user = $user->fresh(['moderatorProfile']);
+        }
         
         return response()->json($user);
     }

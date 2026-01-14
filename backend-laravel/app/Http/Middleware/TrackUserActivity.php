@@ -50,8 +50,17 @@ class TrackUserActivity
             // Определяем location (упрощенная версия - можно интегрировать GeoIP)
             $user->location = $this->detectLocation($currentIp);
 
-            // Определяем таймзону по IP, если она не установлена, установлена как UTC, или IP изменился
-            if (!$user->timezone || $user->timezone === 'UTC' || ($previousIp && $previousIp !== $currentIp)) {
+            // Обновляем таймзону из браузера, если она передана
+            $browserTimezone = $request->header('X-Timezone') ?? $request->input('browser_timezone');
+            if ($browserTimezone) {
+                $timezone = $this->timezoneService->getBrowserTimezone($browserTimezone);
+                if ($timezone && $timezone !== $user->timezone) {
+                    $user->timezone = $timezone;
+                }
+            }
+            
+            // Если таймзона из браузера не получена, определяем по IP, если она не установлена, установлена как UTC, или IP изменился
+            if ((!$user->timezone || $user->timezone === 'UTC' || ($previousIp && $previousIp !== $currentIp)) && !$browserTimezone) {
                 $timezone = $this->timezoneService->getTimezoneByIp($currentIp);
                 if ($timezone) {
                     $user->timezone = $timezone;

@@ -15,6 +15,7 @@ import Box from '@mui/material/Box'
 import CustomAvatar from '@core/components/mui/Avatar'
 import ModeratorUserDetails from './ModeratorUserDetails'
 import UserPlan from '../user-left-overview/UserPlan'
+import WorkSchedule from '../user-right/WorkSchedule'
 
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
@@ -84,6 +85,7 @@ const ModeratorUserLeftOverview = ({ user, stats, onUserUpdate }) => {
         </CardContent>
       </Card>
       <UserPlan user={user} />
+      <WorkSchedule moderatorProfile={user?.moderatorProfile} />
     </div>
   )
 }

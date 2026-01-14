@@ -36,12 +36,6 @@ const ModeratorUserDetails = ({ user, stats, onUserUpdate }) => {
         </div>
         <div className='flex items-center flex-wrap gap-x-1.5'>
           <Typography className='font-medium' color='text.primary'>
-            ID:
-          </Typography>
-          <Typography>{user.id}</Typography>
-        </div>
-        <div className='flex items-center flex-wrap gap-x-1.5'>
-          <Typography className='font-medium' color='text.primary'>
             Timezone:
           </Typography>
           <Typography>{user.timezone || 'UTC'}</Typography>

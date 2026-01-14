@@ -25,6 +25,22 @@ const ModeratorProfilePage = () => {
   useEffect(() => {
     loadUser()
     loadRequiredDocuments()
+    
+    // Обновляем данные пользователя каждые 30 секунд для актуальной информации о Last Activity
+    const interval = setInterval(() => {
+      loadUser()
+    }, 30000)
+    
+    // Обновляем данные при возврате фокуса на вкладку
+    const handleFocus = () => {
+      loadUser()
+    }
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [])
 
   const loadUser = async () => {
