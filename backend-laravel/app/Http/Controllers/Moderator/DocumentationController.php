@@ -31,9 +31,27 @@ class DocumentationController extends Controller
         $categories->each(function ($category) use ($appUrl, $domainId) {
             if ($category->pages) {
                 $category->pages->transform(function ($page) use ($appUrl, $domainId) {
-                    // Загружаем информацию о tools, если они есть
+                    // Собираем все ID инструментов: из page.tools и из content_blocks
+                    $toolIds = [];
                     if ($page->tools && is_array($page->tools) && count($page->tools) > 0) {
-                        $tools = Tool::whereIn('id', $page->tools)
+                        $toolIds = array_merge($toolIds, $page->tools);
+                    }
+                    
+                    // Извлекаем toolId из content_blocks
+                    if ($page->content_blocks && is_array($page->content_blocks)) {
+                        foreach ($page->content_blocks as $block) {
+                            if (isset($block['type']) && $block['type'] === 'tool' && isset($block['toolId'])) {
+                                $toolId = is_numeric($block['toolId']) ? (int)$block['toolId'] : $block['toolId'];
+                                if (!in_array($toolId, $toolIds)) {
+                                    $toolIds[] = $toolId;
+                                }
+                            }
+                        }
+                    }
+
+                    // Загружаем информацию о tools
+                    if (count($toolIds) > 0) {
+                        $tools = Tool::whereIn('id', $toolIds)
                             ->where('domain_id', $domainId)
                             ->where('is_active', true)
                             ->get(['id', 'name', 'slug', 'description', 'url']);
@@ -118,9 +136,27 @@ class DocumentationController extends Controller
         $appUrl = config('app.url');
         $domainId = $request->user()->domain_id;
         $pages->transform(function ($page) use ($appUrl, $domainId) {
-            // Загружаем информацию о tools, если они есть
+            // Собираем все ID инструментов: из page.tools и из content_blocks
+            $toolIds = [];
             if ($page->tools && is_array($page->tools) && count($page->tools) > 0) {
-                $tools = Tool::whereIn('id', $page->tools)
+                $toolIds = array_merge($toolIds, $page->tools);
+            }
+            
+            // Извлекаем toolId из content_blocks
+            if ($page->content_blocks && is_array($page->content_blocks)) {
+                foreach ($page->content_blocks as $block) {
+                    if (isset($block['type']) && $block['type'] === 'tool' && isset($block['toolId'])) {
+                        $toolId = is_numeric($block['toolId']) ? (int)$block['toolId'] : $block['toolId'];
+                        if (!in_array($toolId, $toolIds)) {
+                            $toolIds[] = $toolId;
+                        }
+                    }
+                }
+            }
+
+            // Загружаем информацию о tools
+            if (count($toolIds) > 0) {
+                $tools = Tool::whereIn('id', $toolIds)
                     ->where('domain_id', $domainId)
                     ->where('is_active', true)
                     ->get(['id', 'name', 'slug', 'description', 'url']);
@@ -163,9 +199,27 @@ class DocumentationController extends Controller
 
         $page->load(['category', 'category.parent']);
 
-        // Загружаем информацию о tools, если они есть
+        // Собираем все ID инструментов: из page.tools и из content_blocks
+        $toolIds = [];
         if ($page->tools && is_array($page->tools) && count($page->tools) > 0) {
-            $tools = Tool::whereIn('id', $page->tools)
+            $toolIds = array_merge($toolIds, $page->tools);
+        }
+        
+        // Извлекаем toolId из content_blocks
+        if ($page->content_blocks && is_array($page->content_blocks)) {
+            foreach ($page->content_blocks as $block) {
+                if (isset($block['type']) && $block['type'] === 'tool' && isset($block['toolId'])) {
+                    $toolId = is_numeric($block['toolId']) ? (int)$block['toolId'] : $block['toolId'];
+                    if (!in_array($toolId, $toolIds)) {
+                        $toolIds[] = $toolId;
+                    }
+                }
+            }
+        }
+
+        // Загружаем информацию о tools
+        if (count($toolIds) > 0) {
+            $tools = Tool::whereIn('id', $toolIds)
                 ->where('domain_id', $request->user()->domain_id)
                 ->where('is_active', true)
                 ->get(['id', 'name', 'slug', 'description', 'url']);

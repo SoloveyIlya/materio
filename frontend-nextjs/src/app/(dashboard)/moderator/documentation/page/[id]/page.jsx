@@ -301,9 +301,34 @@ const DocumentationPageView = () => {
                       </Box>
                     )
                   } else if (block.type === 'tool') {
+                    // Находим инструмент в tools_data по toolId
+                    const tool = page.tools_data?.find(t => t.id?.toString() === block.toolId?.toString())
+                    const toolName = tool?.name || block.toolName || 'Unknown tool'
+                    const toolUrl = tool?.url
+
                     return (
                       <Box key={blockIndex} sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                        <Typography variant="subtitle2">Tool: {block.toolName || 'Unknown tool'}</Typography>
+                        {toolUrl ? (
+                          <Typography 
+                            component="a"
+                            href={toolUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            variant="subtitle2"
+                            sx={{
+                              color: 'primary.main',
+                              textDecoration: 'none',
+                              cursor: 'pointer',
+                              '&:hover': {
+                                textDecoration: 'underline'
+                              }
+                            }}
+                          >
+                            Tool: {toolName} →
+                          </Typography>
+                        ) : (
+                          <Typography variant="subtitle2">Tool: {toolName}</Typography>
+                        )}
                       </Box>
                     )
                   }
