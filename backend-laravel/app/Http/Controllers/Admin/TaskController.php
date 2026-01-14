@@ -105,12 +105,20 @@ class TaskController extends Controller
         $timezone = $user->timezone ?? 'UTC';
         $tasks->getCollection()->transform(function ($task) use ($timezone) {
             $this->addFormattedDates($task, $timezone);
-            // Добавляем количество уникальных просмотров
+            // Добавляем количество уникальных просмотров (только модераторы)
             if ($task->relationLoaded('views')) {
                 $uniqueViewerIds = $task->views->pluck('user_id')->unique()->values();
-                $task->views_count = $uniqueViewerIds->count();
-                if ($uniqueViewerIds->count() > 0) {
-                    $task->viewers = \App\Models\User::whereIn('id', $uniqueViewerIds->toArray())->select('id', 'name', 'email', 'avatar')->get();
+                // Фильтруем только модераторов
+                $moderatorViewerIds = \App\Models\User::whereIn('id', $uniqueViewerIds->toArray())
+                    ->whereHas('roles', function($q) {
+                        $q->where('name', 'moderator');
+                    })
+                    ->pluck('id');
+                $task->views_count = $moderatorViewerIds->count();
+                if ($moderatorViewerIds->count() > 0) {
+                    $task->viewers = \App\Models\User::whereIn('id', $moderatorViewerIds->toArray())
+                        ->select('id', 'name', 'email', 'avatar')
+                        ->get();
                 } else {
                     $task->viewers = collect([]);
                 }
@@ -162,20 +170,36 @@ class TaskController extends Controller
         $timezone = $user->timezone ?? 'UTC';
         $this->addFormattedDates($task, $timezone);
         
-        // Добавляем количество уникальных просмотров
+        // Добавляем количество уникальных просмотров (только модераторы)
         if ($task->relationLoaded('views')) {
             $uniqueViewerIds = $task->views->pluck('user_id')->unique()->values();
-            $task->views_count = $uniqueViewerIds->count();
-            if ($uniqueViewerIds->count() > 0) {
-                $task->viewers = \App\Models\User::whereIn('id', $uniqueViewerIds->toArray())->select('id', 'name', 'email', 'avatar')->get();
+            // Фильтруем только модераторов
+            $moderatorViewerIds = \App\Models\User::whereIn('id', $uniqueViewerIds->toArray())
+                ->whereHas('roles', function($q) {
+                    $q->where('name', 'moderator');
+                })
+                ->pluck('id');
+            $task->views_count = $moderatorViewerIds->count();
+            if ($moderatorViewerIds->count() > 0) {
+                $task->viewers = \App\Models\User::whereIn('id', $moderatorViewerIds->toArray())
+                    ->select('id', 'name', 'email', 'avatar')
+                    ->get();
             } else {
                 $task->viewers = collect([]);
             }
         } else {
             $uniqueViewerIds = $task->views()->pluck('user_id')->unique()->values();
-            $task->views_count = $uniqueViewerIds->count();
-            if ($uniqueViewerIds->count() > 0) {
-                $task->viewers = \App\Models\User::whereIn('id', $uniqueViewerIds->toArray())->select('id', 'name', 'email', 'avatar')->get();
+            // Фильтруем только модераторов
+            $moderatorViewerIds = \App\Models\User::whereIn('id', $uniqueViewerIds->toArray())
+                ->whereHas('roles', function($q) {
+                    $q->where('name', 'moderator');
+                })
+                ->pluck('id');
+            $task->views_count = $moderatorViewerIds->count();
+            if ($moderatorViewerIds->count() > 0) {
+                $task->viewers = \App\Models\User::whereIn('id', $moderatorViewerIds->toArray())
+                    ->select('id', 'name', 'email', 'avatar')
+                    ->get();
             } else {
                 $task->viewers = collect([]);
             }
