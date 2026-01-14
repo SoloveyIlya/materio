@@ -84,7 +84,7 @@ const ModeratorUserLeftOverview = ({ user, stats, onUserUpdate }) => {
           <ModeratorUserDetails user={user} stats={stats} onUserUpdate={onUserUpdate} />
         </CardContent>
       </Card>
-      <UserPlan user={user} />
+      <UserPlan stats={stats} />
       <WorkSchedule moderatorProfile={user?.moderatorProfile} />
     </div>
   )

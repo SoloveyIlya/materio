@@ -16,27 +16,37 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         
+        // Базовый запрос для задач модератора
+        $taskQuery = function ($q) use ($user) {
+            $q->where('assigned_to', $user->id)
+              ->orWhereHas('assignments', function ($assignmentQuery) use ($user) {
+                  $assignmentQuery->where('assigned_to', $user->id);
+              });
+        };
+        
         // Количество выполненных тасков (approved)
-        $completedTasks = Task::where(function ($q) use ($user) {
-                $q->where('assigned_to', $user->id)
-                  ->orWhereHas('assignments', function ($assignmentQuery) use ($user) {
-                      $assignmentQuery->where('assigned_to', $user->id);
-                  });
-            })
+        $completedTasks = Task::where($taskQuery)
             ->where('status', 'approved')
             ->count();
 
-        // Общее количество тасков (все завершенные)
-        $totalTasks = Task::where(function ($q) use ($user) {
-                $q->where('assigned_to', $user->id)
-                  ->orWhereHas('assignments', function ($assignmentQuery) use ($user) {
-                      $assignmentQuery->where('assigned_to', $user->id);
-                  });
-            })
-            ->whereIn('status', ['approved', 'rejected', 'completed_by_moderator', 'under_admin_review', 'sent_for_revision'])
+        // Количество задач в процессе выполнения
+        $inProgressTasks = Task::where($taskQuery)
+            ->where('status', 'in_progress')
             ->count();
 
-        // Процент успешно выполненных (approved/total)
+        // Общее количество тасков (все задачи модератора: завершенные + в процессе)
+        $totalTasks = Task::where($taskQuery)
+            ->whereIn('status', [
+                'approved', 
+                'rejected', 
+                'completed_by_moderator', 
+                'under_admin_review', 
+                'sent_for_revision',
+                'in_progress'
+            ])
+            ->count();
+
+        // Процент успешно выполненных (approved/total, если есть завершенные задачи)
         $successRate = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100, 2) : 0;
 
         // Количество проработанных дней
@@ -53,6 +63,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'completed_tasks' => $completedTasks,
+            'in_progress_tasks' => $inProgressTasks,
             'total_tasks' => $totalTasks,
             'success_rate' => $successRate,
             'work_days' => $workDays,

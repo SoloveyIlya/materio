@@ -56,8 +56,9 @@ const ModeratorProfilePage = () => {
       const dashboardResponse = await api.get('/moderator/dashboard')
       setStats({
         completed_tasks: dashboardResponse.data.completed_tasks || 0,
-        pending_tasks: 0,
-        in_progress_tasks: 0
+        in_progress_tasks: dashboardResponse.data.in_progress_tasks || 0,
+        total_tasks: dashboardResponse.data.total_tasks || 0,
+        pending_tasks: 0
       })
     } catch (error) {
       console.error('Error loading user:', error)
