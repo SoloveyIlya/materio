@@ -1,7 +1,7 @@
 'use client'
 
 // React Imports
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -25,12 +25,17 @@ import ListItemSecondaryAction from '@mui/material/ListItemSecondaryAction'
 import api from '@/lib/api'
 import { showToast } from '@/utils/toast'
 
-const DocumentsTab = ({ userId, requiredDocuments, userDocuments }) => {
+const DocumentsTab = ({ userId, requiredDocuments, userDocuments, onDocumentsChange }) => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [formData, setFormData] = useState({ name: '', file: null })
   const [editingDoc, setEditingDoc] = useState(null)
   const [documents, setDocuments] = useState(requiredDocuments || [])
   const [userDocs, setUserDocs] = useState(userDocuments || [])
+
+  // Обновляем userDocs при изменении пропса userDocuments
+  useEffect(() => {
+    setUserDocs(userDocuments || [])
+  }, [userDocuments])
 
   // Создаем мапу загруженных документов пользователя
   const userDocsMap = {}
@@ -69,9 +74,12 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments }) => {
       }
 
       if (editingDoc) {
-        // Для PUT запросов с FormData в Laravel нужно использовать POST с _method: 'PUT'
-        formDataToSend.append('_method', 'PUT')
-        await api.post(`/admin/required-documents/${editingDoc.id}`, formDataToSend)
+        // Используем PUT напрямую
+        await api.put(`/admin/required-documents/${editingDoc.id}`, formDataToSend, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
       } else {
         await api.post('/admin/required-documents', formDataToSend)
       }
@@ -79,6 +87,11 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments }) => {
       // Перезагружаем документы
       const response = await api.get('/admin/required-documents')
       setDocuments(response.data || [])
+      
+      // Обновляем данные пользователя, чтобы получить актуальные userDocuments
+      if (onDocumentsChange) {
+        await onDocumentsChange()
+      }
       
       handleCloseDialog()
       showToast.success(editingDoc ? 'Document updated successfully' : 'Document created successfully')

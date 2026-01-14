@@ -134,6 +134,23 @@ const UserViewPage = () => {
     loadUser() // Перезагружаем данные пользователя
   }
 
+  const refreshUserData = async () => {
+    try {
+      if (!userId) return
+      
+      const response = await api.get(`/admin/users/${userId}`)
+      if (response.data && response.data.user) {
+        setUser(response.data.user)
+        setStats(response.data.stats)
+        setTests(response.data.tests || [])
+        setTestResults(response.data.user?.testResults || [])
+        setRequiredDocuments(response.data.required_documents || [])
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error)
+    }
+  }
+
   if (loading) {
     return <Box sx={{ p: 6 }}>Loading...</Box>
   }
@@ -259,7 +276,7 @@ const UserViewPage = () => {
         </Grid>
       </Grid>
     ),
-    documents: <DocumentsTab userId={userId} requiredDocuments={requiredDocuments} userDocuments={user?.userDocuments || []} />,
+    documents: <DocumentsTab userId={userId} requiredDocuments={requiredDocuments} userDocuments={user?.userDocuments || []} onDocumentsChange={refreshUserData} />,
     logs: <LogsTab userId={userId} />,
     secure: <SecureTab userId={userId} user={user} />
   }

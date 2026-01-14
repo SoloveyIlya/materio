@@ -43,9 +43,11 @@ const ModeratorProfilePage = () => {
     }
   }, [])
 
-  const loadUser = async () => {
+  const loadUser = async (showLoading = true) => {
     try {
-      setLoading(true)
+      if (showLoading) {
+        setLoading(true)
+      }
       const response = await api.get('/auth/user')
       const userData = response.data
       setUser(userData)
@@ -60,24 +62,16 @@ const ModeratorProfilePage = () => {
     } catch (error) {
       console.error('Error loading user:', error)
     } finally {
-      setLoading(false)
+      if (showLoading) {
+        setLoading(false)
+      }
     }
   }
 
   const loadRequiredDocuments = async () => {
     try {
-      const [documentsResponse, userResponse] = await Promise.all([
-        api.get('/moderator/required-documents'),
-        api.get('/auth/user')
-      ])
+      const documentsResponse = await api.get('/moderator/required-documents')
       setRequiredDocuments(documentsResponse.data || [])
-      // Обновляем userDocuments из ответа пользователя
-      if (userResponse.data?.userDocuments) {
-        setUser(prev => ({
-          ...prev,
-          userDocuments: userResponse.data.userDocuments
-        }))
-      }
     } catch (error) {
       console.error('Error loading required documents:', error)
       setRequiredDocuments([])
@@ -104,9 +98,9 @@ const ModeratorProfilePage = () => {
   // Tab content list
   const tabContentList = {
     overview: <ModeratorOverviewTab user={user} />,
-    documents: <ModeratorDocumentsTab requiredDocuments={requiredDocuments} userDocuments={user?.userDocuments || []} onDocumentUpload={() => {
-      loadRequiredDocuments()
-      loadUser()
+    documents: <ModeratorDocumentsTab requiredDocuments={requiredDocuments} userDocuments={user?.userDocuments || []} onDocumentUpload={async () => {
+      await loadUser(false)
+      await loadRequiredDocuments()
     }} />,
     secure: <ModeratorSecureTab user={user} onPasswordChange={loadUser} />
   }
