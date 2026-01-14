@@ -245,7 +245,7 @@ class TaskController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::error('Task validation failed', [
                 'errors' => $e->errors(),
-                'input_data' => $request->except(['document_image', 'selfie_image']),
+                'input_data' => $request->except(['document_image', 'selfie_image', 'video']),
                 'category_ids_input' => $request->input('category_ids'),
                 'category_ids_type' => gettype($request->input('category_ids')),
             ]);
