@@ -1,3 +1,5 @@
+'use client'
+
 // Next Imports
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -17,6 +19,7 @@ import UserDropdown from '@components/layout/shared/UserDropdown'
 
 // Hook Imports
 import useHorizontalNav from '@menu/hooks/useHorizontalNav'
+import { useAuthStore } from '@/store/authStore'
 
 // Util Imports
 import { horizontalLayoutClasses } from '@layouts/utils/layoutClasses'
@@ -113,6 +116,8 @@ const NavbarContent = () => {
   // Hooks
   const { isBreakpointReached } = useHorizontalNav()
   const { lang: locale } = useParams()
+  const { user } = useAuthStore()
+  const isModerator = user?.roles?.some((role) => role.name === 'moderator')
 
   return (
     <div
@@ -129,11 +134,11 @@ const NavbarContent = () => {
       </div>
 
       <div className='flex items-center'>
-        <NavSearch />
-        <LanguageDropdown />
+        {!isModerator && <NavSearch />}
+        {!isModerator && <LanguageDropdown />}
         <ModeDropdown />
-        <ShortcutsDropdown shortcuts={shortcuts} />
-        <NotificationsDropdown notifications={notifications} />
+        {!isModerator && <ShortcutsDropdown shortcuts={shortcuts} />}
+        {!isModerator && <NotificationsDropdown notifications={notifications} />}
         <UserDropdown />
         {/* Language Dropdown, Notification Dropdown, quick access menu dropdown, user dropdown will be placed here */}
       </div>

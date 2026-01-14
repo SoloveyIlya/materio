@@ -1,3 +1,5 @@
+'use client'
+
 // Third-party Imports
 import classnames from 'classnames'
 
@@ -9,6 +11,9 @@ import ModeDropdown from '@components/layout/shared/ModeDropdown'
 import ShortcutsDropdown from '@components/layout/shared/ShortcutsDropdown'
 import NotificationsDropdown from '@components/layout/shared/NotificationsDropdown'
 import UserDropdown from '@components/layout/shared/UserDropdown'
+
+// Hook Imports
+import { useAuthStore } from '@/store/authStore'
 
 // Util Imports
 import { verticalLayoutClasses } from '@layouts/utils/layoutClasses'
@@ -101,17 +106,21 @@ const notifications = [
 ]
 
 const NavbarContent = () => {
+  // Hooks
+  const { user } = useAuthStore()
+  const isModerator = user?.roles?.some((role) => role.name === 'moderator')
+
   return (
     <div className={classnames(verticalLayoutClasses.navbarContent, 'flex items-center justify-between gap-4 is-full')}>
       <div className='flex items-center gap-[7px]'>
         <NavToggle />
-        <NavSearch />
+        {!isModerator && <NavSearch />}
       </div>
       <div className='flex items-center'>
-        <LanguageDropdown />
+        {!isModerator && <LanguageDropdown />}
         <ModeDropdown />
-        <ShortcutsDropdown shortcuts={shortcuts} />
-        <NotificationsDropdown notifications={notifications} />
+        {!isModerator && <ShortcutsDropdown shortcuts={shortcuts} />}
+        {!isModerator && <NotificationsDropdown notifications={notifications} />}
         <UserDropdown />
       </div>
     </div>
