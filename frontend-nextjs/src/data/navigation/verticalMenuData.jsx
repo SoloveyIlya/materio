@@ -133,21 +133,6 @@ const verticalMenuData = (user = null, counts = { chat: 0, support: 0, tasks: 0,
         href: '/moderator/tasks'
       },
       {
-        label: 'Academy',
-        icon: 'ri-graduation-cap-line',
-        href: '/moderator/academy'
-      },
-      {
-        label: 'Documentation',
-        icon: 'ri-file-text-line',
-        href: '/moderator/documentation'
-      },
-      {
-        label: 'Tools',
-        icon: 'ri-tools-line',
-        href: '/moderator/tools'
-      },
-      {
         label: 'Messages',
         icon: 'ri-message-3-line',
         href: '/chat',
@@ -158,6 +143,26 @@ const verticalMenuData = (user = null, counts = { chat: 0, support: 0, tasks: 0,
             size: 'small',
           }
         })
+      },
+      {
+        label: 'Profile',
+        icon: 'ri-user-line',
+        href: '/moderator/profile'
+      },
+      {
+        label: 'Documentation',
+        icon: 'ri-file-text-line',
+        href: '/moderator/documentation'
+      },
+      {
+        label: 'Academy',
+        icon: 'ri-graduation-cap-line',
+        href: '/moderator/academy'
+      },
+      {
+        label: 'Tools',
+        icon: 'ri-tools-line',
+        href: '/moderator/tools'
       },
       {
         label: 'Support',
