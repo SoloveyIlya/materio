@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DocumentationPage;
+use App\Models\Tool;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -20,6 +21,17 @@ class DocumentationPageController extends Controller
         }
 
         $pages = $query->orderBy('order')->get();
+
+        // Загружаем информацию о tools для каждой страницы
+        $domainId = $request->user()->domain_id;
+        $pages->each(function ($page) use ($domainId) {
+            if ($page->tools && is_array($page->tools) && count($page->tools) > 0) {
+                $tools = Tool::whereIn('id', $page->tools)
+                    ->where('domain_id', $domainId)
+                    ->get(['id', 'name', 'slug', 'description', 'url']);
+                $page->tools_data = $tools;
+            }
+        });
 
         return response()->json($pages);
     }
@@ -199,7 +211,17 @@ class DocumentationPageController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
         
-        return response()->json($documentationPage->load(['category', 'category.parent']));
+        $documentationPage->load(['category', 'category.parent']);
+        
+        // Загружаем информацию о tools, если они есть
+        if ($documentationPage->tools && is_array($documentationPage->tools) && count($documentationPage->tools) > 0) {
+            $tools = Tool::whereIn('id', $documentationPage->tools)
+                ->where('domain_id', $request->user()->domain_id)
+                ->get(['id', 'name', 'slug', 'description', 'url']);
+            $documentationPage->tools_data = $tools;
+        }
+        
+        return response()->json($documentationPage);
     }
 
     public function update(Request $request, DocumentationPage $documentationPage)

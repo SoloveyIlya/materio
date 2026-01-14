@@ -110,6 +110,40 @@ const DocumentationPageView = () => {
             </Typography>
           )}
 
+          {/* Отображаем информацию о tool из поля tools */}
+          {page.tools_data && Array.isArray(page.tools_data) && page.tools_data.length > 0 && (
+            <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1, border: '1px solid', borderColor: 'primary.main' }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                Related Tool{page.tools_data.length > 1 ? 's' : ''}:
+              </Typography>
+              {page.tools_data.map((tool, toolIndex) => (
+                <Box key={tool.id || toolIndex} sx={{ mb: toolIndex < page.tools_data.length - 1 ? 1 : 0 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    {tool.name}
+                  </Typography>
+                  {tool.description && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      {tool.description}
+                    </Typography>
+                  )}
+                  {tool.url && (
+                    <Typography 
+                      component="a" 
+                      href={tool.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      variant="body2" 
+                      color="primary"
+                      sx={{ mt: 0.5, display: 'block', textDecoration: 'none' }}
+                    >
+                      Open Tool →
+                    </Typography>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          )}
+
           {/* Content - рендерим content_blocks если они есть, иначе старый content */}
           <Box sx={{ mt: 3 }}>
             {page.content_blocks && Array.isArray(page.content_blocks) && page.content_blocks.length > 0 ? (

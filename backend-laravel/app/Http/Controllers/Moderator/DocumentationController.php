@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Moderator;
 use App\Http\Controllers\Controller;
 use App\Models\DocumentationCategory;
 use App\Models\DocumentationPage;
+use App\Models\Tool;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -26,9 +27,18 @@ class DocumentationController extends Controller
 
         // Преобразуем пути к изображениям в полные URL для всех страниц
         $appUrl = config('app.url');
-        $categories->each(function ($category) use ($appUrl) {
+        $domainId = $request->user()->domain_id;
+        $categories->each(function ($category) use ($appUrl, $domainId) {
             if ($category->pages) {
-                $category->pages->transform(function ($page) use ($appUrl) {
+                $category->pages->transform(function ($page) use ($appUrl, $domainId) {
+                    // Загружаем информацию о tools, если они есть
+                    if ($page->tools && is_array($page->tools) && count($page->tools) > 0) {
+                        $tools = Tool::whereIn('id', $page->tools)
+                            ->where('domain_id', $domainId)
+                            ->where('is_active', true)
+                            ->get(['id', 'name', 'slug', 'description', 'url']);
+                        $page->tools_data = $tools;
+                    }
                     if ($page->images && is_array($page->images)) {
                         $page->images = array_map(function ($imagePath) use ($appUrl) {
                             if (filter_var($imagePath, FILTER_VALIDATE_URL)) {
@@ -60,8 +70,17 @@ class DocumentationController extends Controller
 
         // Преобразуем пути к изображениям в полные URL для всех страниц
         $appUrl = config('app.url');
+        $domainId = $request->user()->domain_id;
         if ($category->pages) {
-            $category->pages->transform(function ($page) use ($appUrl) {
+            $category->pages->transform(function ($page) use ($appUrl, $domainId) {
+                // Загружаем информацию о tools, если они есть
+                if ($page->tools && is_array($page->tools) && count($page->tools) > 0) {
+                    $tools = Tool::whereIn('id', $page->tools)
+                        ->where('domain_id', $domainId)
+                        ->where('is_active', true)
+                        ->get(['id', 'name', 'slug', 'description', 'url']);
+                    $page->tools_data = $tools;
+                }
                 if ($page->images && is_array($page->images)) {
                     $page->images = array_map(function ($imagePath) use ($appUrl) {
                         if (filter_var($imagePath, FILTER_VALIDATE_URL)) {
@@ -97,7 +116,16 @@ class DocumentationController extends Controller
 
         // Преобразуем пути к изображениям в полные URL для всех страниц
         $appUrl = config('app.url');
-        $pages->transform(function ($page) use ($appUrl) {
+        $domainId = $request->user()->domain_id;
+        $pages->transform(function ($page) use ($appUrl, $domainId) {
+            // Загружаем информацию о tools, если они есть
+            if ($page->tools && is_array($page->tools) && count($page->tools) > 0) {
+                $tools = Tool::whereIn('id', $page->tools)
+                    ->where('domain_id', $domainId)
+                    ->where('is_active', true)
+                    ->get(['id', 'name', 'slug', 'description', 'url']);
+                $page->tools_data = $tools;
+            }
             if ($page->images && is_array($page->images)) {
                 $page->images = array_map(function ($imagePath) use ($appUrl) {
                     if (filter_var($imagePath, FILTER_VALIDATE_URL)) {
@@ -134,6 +162,15 @@ class DocumentationController extends Controller
         }
 
         $page->load(['category', 'category.parent']);
+
+        // Загружаем информацию о tools, если они есть
+        if ($page->tools && is_array($page->tools) && count($page->tools) > 0) {
+            $tools = Tool::whereIn('id', $page->tools)
+                ->where('domain_id', $request->user()->domain_id)
+                ->where('is_active', true)
+                ->get(['id', 'name', 'slug', 'description', 'url']);
+            $page->tools_data = $tools;
+        }
 
         $appUrl = config('app.url');
 
