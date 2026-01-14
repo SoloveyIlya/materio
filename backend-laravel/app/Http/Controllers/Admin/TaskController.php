@@ -296,14 +296,17 @@ class TaskController extends Controller
             if ($request->hasFile('document_image')) {
                 $file = $request->file('document_image');
                 // Генерируем уникальное имя файла для избежания конфликтов
+                // Одно и то же изображение может использоваться в разных задачах - каждое получит свой уникальный файл
                 $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
                 $path = $file->storeAs('tasks/documents', $fileName, 'public');
                 $data['document_image'] = Storage::disk('public')->url($path);
+                // Сохраняем оригинальное имя файла - оно может повторяться в разных задачах
                 $data['document_image_name'] = $file->getClientOriginalName();
             }
             if ($request->hasFile('selfie_image')) {
                 $file = $request->file('selfie_image');
                 // Генерируем уникальное имя файла для избежания конфликтов
+                // Одно и то же изображение может использоваться в разных задачах - каждое получит свой уникальный файл
                 $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
                 $path = $file->storeAs('tasks/selfies', $fileName, 'public');
                 $data['selfie_image'] = Storage::disk('public')->url($path);
@@ -509,9 +512,11 @@ class TaskController extends Controller
                 }
                 $file = $request->file('document_image');
                 // Генерируем уникальное имя файла для избежания конфликтов
+                // Одно и то же изображение может использоваться в разных задачах - каждое получит свой уникальный файл
                 $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
                 $path = $file->storeAs('tasks/documents', $fileName, 'public');
                 $data['document_image'] = Storage::disk('public')->url($path);
+                // Сохраняем оригинальное имя файла - оно может повторяться в разных задачах
                 $data['document_image_name'] = $file->getClientOriginalName();
             }
             // Если файл не загружен, не трогаем существующие значения (они останутся в БД)
@@ -524,6 +529,7 @@ class TaskController extends Controller
                 }
                 $file = $request->file('selfie_image');
                 // Генерируем уникальное имя файла для избежания конфликтов
+                // Одно и то же изображение может использоваться в разных задачах - каждое получит свой уникальный файл
                 $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
                 $path = $file->storeAs('tasks/selfies', $fileName, 'public');
                 $data['selfie_image'] = Storage::disk('public')->url($path);
