@@ -162,7 +162,48 @@ const ModeratorUserDetails = ({ user, stats, onUserUpdate }) => {
           <Typography className='font-medium' color='text.primary'>
             Last Activity:
           </Typography>
-          <Typography>{user.last_seen_at ? new Date(user.last_seen_at).toLocaleString() : '—'}</Typography>
+          <Typography>
+            {(() => {
+              if (!user.last_seen_at) return '—'
+              try {
+                // Если строка в формате 'YYYY-MM-DD HH:mm:ss' без timezone, добавляем 'Z' (UTC)
+                let dateString = user.last_seen_at
+                if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateString)) {
+                  dateString = dateString.replace(' ', 'T') + 'Z'
+                }
+                
+                const date = new Date(dateString)
+                if (isNaN(date.getTime())) {
+                  return '—'
+                }
+                
+                const timezone = user.timezone || 'UTC'
+                // Используем Intl.DateTimeFormat для конвертации UTC времени в указанный timezone
+                const formatter = new Intl.DateTimeFormat('en-GB', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false,
+                  timeZone: timezone
+                })
+                return formatter.format(date)
+              } catch (error) {
+                console.error('Error formatting date:', error)
+                return new Date(user.last_seen_at).toLocaleString('en-GB', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false
+                })
+              }
+            })()}
+          </Typography>
         </div>
       </div>
     </div>

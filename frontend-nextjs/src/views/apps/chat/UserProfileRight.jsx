@@ -27,16 +27,46 @@ const ScrollWrapper = ({ children, isBelowLgScreen, className }) => {
   }
 }
 
-const formatDate = (dateString) => {
+const formatDate = (dateString, timezone = 'UTC') => {
   if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  return date.toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  try {
+    // Если строка в формате 'YYYY-MM-DD HH:mm:ss' без timezone, добавляем 'Z' (UTC)
+    let dateStr = dateString
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateStr)) {
+      dateStr = dateStr.replace(' ', 'T') + 'Z'
+    }
+    
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) {
+      return 'N/A'
+    }
+    
+    // Используем Intl.DateTimeFormat для конвертации UTC времени в указанный timezone
+    const formatter = new Intl.DateTimeFormat('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZone: timezone
+    })
+    return formatter.format(date)
+  } catch (error) {
+    console.error('Error formatting date:', error, 'dateString:', dateString, 'timezone:', timezone)
+    // Fallback без timezone
+    const date = new Date(dateString)
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })
+  }
 }
 
 const formatWorkStartDate = (dateString) => {
@@ -145,7 +175,7 @@ const UserProfileRight = props => {
                     <i className='ri-time-line' />
                   </ListItemIcon>
                   <ListItemText 
-                    primary={formatDate(activeUser.last_seen_at)}
+                    primary={formatDate(activeUser.last_seen_at, activeUser.timezone)}
                     secondary='Last Activity'
                   />
                 </ListItem>

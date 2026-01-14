@@ -23,7 +23,8 @@ class TrackUserActivity
         // Обновляем информацию о пользователе при каждом запросе
         if ($request->user()) {
             $user = $request->user();
-            $currentIp = $request->ip();
+            // Получаем реальный IP адрес клиента
+            $currentIp = $this->getClientIp($request);
             $previousIp = $user->ip_address;
             
             // Проверяем, не истек ли таймаут для других пользователей (чтобы обновить их статус)
@@ -47,8 +48,56 @@ class TrackUserActivity
             $userAgent = $request->userAgent();
             $user->platform = $this->detectPlatform($userAgent);
 
-            // Определяем location (упрощенная версия - можно интегрировать GeoIP)
-            $user->location = $this->detectLocation($currentIp);
+            // Определяем location (страна) по IP через сервис
+            // Обновляем страну если IP изменился, location не установлен, или это прокси IP с неправильной страной
+            $isProxyIp = $this->isKnownProxyIp($currentIp);
+            $shouldUpdateLocation = $previousIp !== $currentIp || !$user->location;
+            
+            // Если это прокси IP и текущая страна не соответствует timezone, тоже обновляем
+            if ($isProxyIp && $user->location) {
+                $countryFromTimezone = $this->getCountryFromTimezone($user->timezone);
+                if ($countryFromTimezone && $user->location !== $countryFromTimezone) {
+                    $shouldUpdateLocation = true;
+                    \Log::info('Proxy IP detected with incorrect country, will update from timezone', [
+                        'user_id' => $user->id,
+                        'current_location' => $user->location,
+                        'timezone' => $user->timezone,
+                        'expected_country' => $countryFromTimezone,
+                    ]);
+                }
+            }
+            
+            if ($shouldUpdateLocation) {
+                $detectedCountry = $this->timezoneService->getCountryByIp($currentIp);
+                
+                // Если IP принадлежит известному прокси/балансировщику (Google, Cloudflare и т.д.)
+                // используем fallback по timezone вместо страны прокси
+                if ($isProxyIp) {
+                    $countryFromTimezone = $this->getCountryFromTimezone($user->timezone);
+                    if ($countryFromTimezone) {
+                        $detectedCountry = $countryFromTimezone;
+                        \Log::info('User location determined from timezone (proxy IP detected)', [
+                            'user_id' => $user->id,
+                            'ip' => $currentIp,
+                            'ip_country' => $this->timezoneService->getCountryByIp($currentIp),
+                            'timezone' => $user->timezone,
+                            'country' => $detectedCountry,
+                        ]);
+                    }
+                }
+                
+                if ($detectedCountry) {
+                    $user->location = $detectedCountry;
+                    \Log::info('User location updated', [
+                        'user_id' => $user->id,
+                        'ip' => $currentIp,
+                        'country' => $detectedCountry,
+                        'previous_ip' => $previousIp,
+                        'previous_location' => $user->getOriginal('location'),
+                        'is_proxy_ip' => $isProxyIp,
+                    ]);
+                }
+            }
 
             // Обновляем таймзону из браузера, если она передана
             $browserTimezone = $request->header('X-Timezone') ?? $request->input('browser_timezone');
@@ -94,16 +143,189 @@ class TrackUserActivity
         return 'Unknown';
     }
 
-    protected function detectLocation(?string $ip): ?string
+    /**
+     * Проверяет, является ли IP адресом известного прокси/балансировщика
+     * 
+     * @param string|null $ip
+     * @return bool
+     */
+    protected function isKnownProxyIp(?string $ip): bool
     {
-        // Упрощенная версия - в продакшене можно использовать GeoIP сервис
-        // Например, через пакет geoip или внешний API
-        if (!$ip || $ip === '127.0.0.1' || $ip === '::1') {
-            return 'Local';
+        if (!$ip) {
+            return false;
         }
 
-        // Здесь можно добавить интеграцию с GeoIP сервисом
-        // Пока возвращаем null или базовую информацию
-        return null;
+        // Список известных прокси/балансировщиков
+        $knownProxyRanges = [
+            // Google Cloud
+            '142.251.',
+            '172.217.',
+            '216.58.',
+            // Cloudflare
+            '104.16.',
+            '104.17.',
+            '104.18.',
+            '104.19.',
+            '104.20.',
+            '104.21.',
+            '104.22.',
+            '104.23.',
+            '104.24.',
+            '104.25.',
+            '104.26.',
+            '104.27.',
+            '104.28.',
+            '104.29.',
+            '104.30.',
+            '104.31.',
+            // AWS
+            '13.32.',
+            '13.33.',
+            '13.34.',
+            '13.35.',
+            // Azure
+            '13.107.',
+            '20.190.',
+        ];
+
+        foreach ($knownProxyRanges as $range) {
+            if (str_starts_with($ip, $range)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Определяет страну по timezone (fallback метод)
+     * 
+     * @param string|null $timezone
+     * @return string|null
+     */
+    protected function getCountryFromTimezone(?string $timezone): ?string
+    {
+        if (!$timezone) {
+            return null;
+        }
+
+        // Маппинг основных timezone на страны
+        $timezoneToCountry = [
+            'Europe/Minsk' => 'Belarus',
+            'Europe/Moscow' => 'Russia',
+            'Europe/Kiev' => 'Ukraine',
+            'Europe/Warsaw' => 'Poland',
+            'Europe/Berlin' => 'Germany',
+            'Europe/London' => 'United Kingdom',
+            'Europe/Paris' => 'France',
+            'Europe/Rome' => 'Italy',
+            'Europe/Madrid' => 'Spain',
+            'America/New_York' => 'United States',
+            'America/Los_Angeles' => 'United States',
+            'America/Chicago' => 'United States',
+            'Asia/Tokyo' => 'Japan',
+            'Asia/Shanghai' => 'China',
+            'Asia/Dubai' => 'United Arab Emirates',
+            'Asia/Kolkata' => 'India',
+            'Australia/Sydney' => 'Australia',
+            'America/Toronto' => 'Canada',
+            'America/Sao_Paulo' => 'Brazil',
+        ];
+
+        return $timezoneToCountry[$timezone] ?? null;
+    }
+
+    /**
+     * Получает реальный IP адрес клиента, учитывая прокси и заголовки
+     * 
+     * @param \Illuminate\Http\Request $request
+     * @return string|null
+     */
+    protected function getClientIp(Request $request): ?string
+    {
+        // Laravel метод ip() уже учитывает TrustProxies
+        $ip = $request->ip();
+        
+        // Логируем все доступные заголовки для отладки
+        $allHeaders = [
+            'CF-Connecting-IP' => $request->header('CF-Connecting-IP'),
+            'X-Real-IP' => $request->header('X-Real-IP'),
+            'X-Forwarded-For' => $request->header('X-Forwarded-For'),
+            'X-Forwarded' => $request->header('X-Forwarded'),
+            'Forwarded-For' => $request->header('Forwarded-For'),
+            'Forwarded' => $request->header('Forwarded'),
+            'REMOTE_ADDR' => $request->server('REMOTE_ADDR'),
+        ];
+        
+        \Log::debug('IP Detection - All headers', [
+            'laravel_ip' => $ip,
+            'headers' => $allHeaders,
+            'user_agent' => $request->userAgent(),
+        ]);
+        
+        // Проверяем заголовки в порядке приоритета для определения реального IP клиента
+        $headers = [
+            'CF-Connecting-IP', // Cloudflare - всегда реальный IP клиента (высший приоритет)
+            'X-Real-IP',        // Nginx reverse proxy
+            'X-Forwarded-For',  // Стандартный заголовок прокси (может содержать цепочку IP)
+            'X-Forwarded',      // Альтернативный формат
+            'Forwarded-For',    // Стандартный Forwarded заголовок
+            'Forwarded',        // RFC 7239 Forwarded header
+        ];
+        
+        foreach ($headers as $header) {
+            $headerValue = $request->header($header);
+            if ($headerValue) {
+                // X-Forwarded-For и подобные могут содержать несколько IP через запятую
+                // Последний IP в цепочке - это оригинальный IP клиента (самый доверенный)
+                // НО первый IP - это то, что добавил первый прокси (может быть подделан)
+                // В реальности нужно проверять весь путь, но обычно последний IP - реальный клиент
+                $ips = array_map('trim', explode(',', $headerValue));
+                
+                // Пробуем оба варианта: последний (реальный клиент) и первый (если только один прокси)
+                $candidateIps = array_filter($ips, function($ip) {
+                    return !empty($ip) && filter_var($ip, FILTER_VALIDATE_IP);
+                });
+                
+                // Берем последний IP из цепочки (оригинальный клиент)
+                $clientIp = !empty($candidateIps) ? end($candidateIps) : null;
+                
+                // Если последний IP не подходит, пробуем первый
+                if (!$clientIp || !filter_var($clientIp, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                    $clientIp = !empty($candidateIps) ? reset($candidateIps) : null;
+                }
+                
+                // Проверяем, что это валидный публичный IP (не приватный/локальный)
+                if ($clientIp && filter_var($clientIp, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                    // Если получили IP из заголовка, который отличается от стандартного метода Laravel
+                    if ($clientIp !== $ip) {
+                        \Log::info('Client IP extracted from header', [
+                            'header' => $header,
+                            'header_value' => $headerValue,
+                            'extracted_ip' => $clientIp,
+                            'laravel_ip' => $ip,
+                            'all_ips_in_chain' => $ips,
+                        ]);
+                    }
+                    return $clientIp;
+                }
+            }
+        }
+        
+        // Если получили IP от Google/прокси, логируем предупреждение
+        if ($ip && (
+            str_starts_with($ip, '142.251.') || 
+            str_starts_with($ip, '172.217.') ||
+            str_starts_with($ip, '216.58.')
+        )) {
+            \Log::warning('Possible proxy IP detected (Google)', [
+                'ip' => $ip,
+                'headers' => $allHeaders,
+                'note' => 'Real client IP may be in X-Forwarded-For header',
+            ]);
+        }
+        
+        // Если не удалось определить из заголовков, используем стандартный метод Laravel
+        return $ip;
     }
 }

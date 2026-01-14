@@ -108,4 +108,83 @@ class TimezoneService
 
         return 'UTC';
     }
+
+    /**
+     * Определяет страну по IP адресу
+     * Использует бесплатный API ip-api.com (до 45 запросов в минуту)
+     * 
+     * @param string|null $ip
+     * @return string|null
+     */
+    public function getCountryByIp(?string $ip): ?string
+    {
+        // Если IP не передан или это localhost/приватный IP, возвращаем null
+        if (!$ip || 
+            $ip === '127.0.0.1' || 
+            $ip === '::1' || 
+            !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return null;
+        }
+
+        // Кешируем результат на 24 часа, чтобы не делать лишние запросы
+        $cacheKey = "country_ip_{$ip}";
+        
+        return Cache::remember($cacheKey, now()->addHours(24), function () use ($ip) {
+            try {
+                // Используем ip-api.com (бесплатный, до 45 запросов/мин без регистрации)
+                $response = Http::timeout(3)->get("http://ip-api.com/json/{$ip}", [
+                    'fields' => 'country,status,message'
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    
+                    if (isset($data['status']) && $data['status'] === 'success' && isset($data['country'])) {
+                        return $data['country'];
+                    }
+                }
+
+                // Fallback: пробуем другой сервис (ipapi.co)
+                return $this->getCountryByIpFallback($ip);
+            } catch (\Exception $e) {
+                Log::warning("Failed to get country for IP {$ip}: " . $e->getMessage());
+                return null;
+            }
+        });
+    }
+
+    /**
+     * Резервный метод определения страны через ipapi.co
+     * 
+     * @param string $ip
+     * @return string|null
+     */
+    protected function getCountryByIpFallback(string $ip): ?string
+    {
+        try {
+            $response = Http::timeout(3)->get("https://ipapi.co/{$ip}/country_name/");
+
+            if ($response->successful()) {
+                $country = trim($response->body());
+                
+                // Проверяем, что это валидное значение
+                if ($country && $country !== 'None' && !empty($country)) {
+                    return $country;
+                }
+            }
+
+            // Попробуем полный JSON ответ
+            $jsonResponse = Http::timeout(3)->get("https://ipapi.co/{$ip}/json/");
+            if ($jsonResponse->successful()) {
+                $data = $jsonResponse->json();
+                if (isset($data['country_name']) && !empty($data['country_name'])) {
+                    return $data['country_name'];
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning("Fallback country service failed for IP {$ip}: " . $e->getMessage());
+        }
+
+        return null;
+    }
 }

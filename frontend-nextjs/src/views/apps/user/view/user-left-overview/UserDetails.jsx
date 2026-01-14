@@ -22,17 +22,25 @@ import { getInitials } from '@/utils/getInitials'
 import api from '@/lib/api'
 import { API_URL } from '@/lib/api'
 
-// Country from IP component
-const CountryFromIP = ({ ipAddress }) => {
-  const [country, setCountry] = useState('—')
+// Country from IP component - используем location из базы данных
+const CountryFromIP = ({ location, ipAddress }) => {
+  // Используем location из базы данных, если оно доступно
+  // Если location не определено, пытаемся получить через API (fallback)
+  const [country, setCountry] = useState(location || '—')
 
   useEffect(() => {
+    // Если location из БД доступно, используем его
+    if (location) {
+      setCountry(location)
+      return
+    }
+
+    // Fallback: если location не определено, пытаемся получить через API
     if (!ipAddress) {
       setCountry('—')
       return
     }
 
-    // Используем бесплатный API для получения страны по IP
     const fetchCountry = async () => {
       try {
         const response = await fetch(`https://ipapi.co/${ipAddress}/country_name/`, {
@@ -55,19 +63,16 @@ const CountryFromIP = ({ ipAddress }) => {
               setCountry(data.country_name || '—')
             }
           } catch (fallbackError) {
-            // Игнорируем ошибки CORS - это нормально для локальной разработки
             setCountry('—')
           }
         }
       } catch (error) {
-        // Игнорируем ошибки CORS - это нормально для локальной разработки
-        // В production можно использовать прокси через бэкенд
         setCountry('—')
       }
     }
 
     fetchCountry()
-  }, [ipAddress])
+  }, [location, ipAddress])
 
   return <Typography>{country}</Typography>
 }
@@ -264,7 +269,21 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
               <Typography className='font-medium' color='text.primary'>
                 IP Address:
               </Typography>
-              <Typography>{user.ip_address || '—'}</Typography>
+              <div className='flex items-center gap-1'>
+                <Typography>{user.ip_address || '—'}</Typography>
+                {user.ip_address && (
+                  (user.ip_address.startsWith('142.251.') || 
+                   user.ip_address.startsWith('172.217.') || 
+                   user.ip_address.startsWith('216.58.') ||
+                   user.ip_address.startsWith('104.16.') ||
+                   user.ip_address.startsWith('104.17.') ||
+                   user.ip_address.startsWith('104.18.')) && (
+                    <Typography variant='caption' color='text.secondary' sx={{ fontStyle: 'italic' }}>
+                      (proxy/VPN)
+                    </Typography>
+                  )
+                )}
+              </div>
             </div>
             <div className='flex items-center flex-wrap gap-x-1.5'>
               <Typography className='font-medium' color='text.primary'>
@@ -276,7 +295,7 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
               <Typography className='font-medium' color='text.primary'>
                 Country (from IP):
               </Typography>
-              <CountryFromIP ipAddress={user.ip_address} />
+              <CountryFromIP location={user.location} ipAddress={user.ip_address} />
             </div>
             {user.moderatorProfile && (
               <>
@@ -402,7 +421,73 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
               <Typography className='font-medium' color='text.primary'>
                 Last Activity:
               </Typography>
-              <Typography>{user.last_seen_at ? new Date(user.last_seen_at).toLocaleString() : '—'}</Typography>
+              <Typography>
+                {(() => {
+                  if (!user.last_seen_at) return '—'
+                  try {
+                    // Проблема: Laravel возвращает строку в формате '2026-01-14 23:26:00' без указания timezone
+                    // JavaScript парсит её как локальное время, а не UTC
+                    // Решение: если строка не содержит 'Z' или '+', добавляем 'Z' чтобы указать что это UTC
+                    let dateString = user.last_seen_at
+                    
+                    // Если строка в формате 'YYYY-MM-DD HH:mm:ss' без timezone, добавляем 'Z' (UTC)
+                    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateString)) {
+                      dateString = dateString.replace(' ', 'T') + 'Z'
+                    }
+                    
+                    const date = new Date(dateString)
+                    
+                    // Если дата невалидна, возвращаем прочерк
+                    if (isNaN(date.getTime())) {
+                      console.error('Invalid date:', user.last_seen_at, 'parsed as:', dateString)
+                      return '—'
+                    }
+                    
+                    const timezone = user.timezone || 'UTC'
+                    
+                    // Используем Intl.DateTimeFormat для конвертации UTC времени в указанный timezone
+                    const formatter = new Intl.DateTimeFormat('en-GB', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: false,
+                      timeZone: timezone
+                    })
+                    
+                    const formatted = formatter.format(date)
+                    
+                    // Отладочная информация (только в development)
+                    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+                      console.log('Last Activity formatting:', {
+                        original: user.last_seen_at,
+                        dateString,
+                        dateUTC: date.toISOString(),
+                        dateLocal: date.toString(),
+                        timezone,
+                        formatted,
+                        userTimezone: user.timezone
+                      })
+                    }
+                    
+                    return formatted
+                  } catch (error) {
+                    console.error('Error formatting date:', error, 'user:', user)
+                    // Fallback - показываем как есть
+                    return new Date(user.last_seen_at).toLocaleString('en-GB', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: false
+                    })
+                  }
+                })()}
+              </Typography>
             </div>
           </div>
         </div>
