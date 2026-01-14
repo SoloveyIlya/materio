@@ -83,6 +83,7 @@ class RequiredDocumentController extends Controller
         }
 
         $requiredDocument->update($validated);
+        $requiredDocument->refresh();
 
         return response()->json($requiredDocument);
     }

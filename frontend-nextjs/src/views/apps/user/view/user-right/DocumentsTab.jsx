@@ -69,7 +69,9 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments }) => {
       }
 
       if (editingDoc) {
-        await api.put(`/admin/required-documents/${editingDoc.id}`, formDataToSend)
+        // Для PUT запросов с FormData в Laravel нужно использовать POST с _method: 'PUT'
+        formDataToSend.append('_method', 'PUT')
+        await api.post(`/admin/required-documents/${editingDoc.id}`, formDataToSend)
       } else {
         await api.post('/admin/required-documents', formDataToSend)
       }
