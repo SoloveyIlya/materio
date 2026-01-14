@@ -41,6 +41,7 @@ export default function MessagesPage() {
   const [editingMessage, setEditingMessage] = useState(null)
   const [editText, setEditText] = useState('')
   const previousMessagesDataRef = useRef(null)
+  const isMarkingAsReadRef = useRef(false)
 
   useEffect(() => {
     loadUser()
@@ -105,6 +106,76 @@ export default function MessagesPage() {
       }
     }
   }, [messagesData])
+
+  // Помечаем сообщения как прочитанные в реальном времени, когда чат открыт
+  useEffect(() => {
+    if (!selectedChat || !selectedChat.user || !messagesData || !user) return
+    if (isMarkingAsReadRef.current) return // Предотвращаем бесконечные циклы
+
+    const checkAndMarkAsRead = async () => {
+      try {
+        let chatToMark = null
+
+        // Для админов
+        if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs) {
+          for (const tab of messagesData.tabs) {
+            const chat = tab.chats.find(c => c.user.id === selectedChat.user.id)
+            if (chat) {
+              // Проверяем, есть ли непрочитанные сообщения в открытом чате
+              const hasUnread = chat.messages.some(msg => 
+                msg.from_user_id !== user.id && 
+                (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+              )
+              if (hasUnread) {
+                chatToMark = chat
+                break
+              }
+            }
+          }
+          // Проверяем незакрепленных модераторов
+          if (!chatToMark && messagesData?.unassigned?.chats) {
+            const chat = messagesData.unassigned.chats.find(c => c.user.id === selectedChat.user.id)
+            if (chat) {
+              const hasUnread = chat.messages.some(msg => 
+                msg.from_user_id !== user.id && 
+                (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+              )
+              if (hasUnread) {
+                chatToMark = chat
+              }
+            }
+          }
+        }
+        // Для модераторов
+        else if (user?.roles?.some(r => r.name === 'moderator') && Array.isArray(messagesData)) {
+          const chat = messagesData.find(c => c.user?.id === selectedChat.user.id)
+          if (chat) {
+            const hasUnread = chat.messages.some(msg => 
+              msg.from_user_id !== user.id && 
+              (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
+            )
+            if (hasUnread) {
+              chatToMark = chat
+            }
+          }
+        }
+
+        // Помечаем чат как прочитанный, если есть непрочитанные сообщения
+        if (chatToMark) {
+          isMarkingAsReadRef.current = true
+          await markChatAsRead(chatToMark)
+          // Перезагружаем сообщения для обновления счетчиков
+          await loadMessages(true)
+          isMarkingAsReadRef.current = false
+        }
+      } catch (error) {
+        console.error('Error marking chat as read in real-time:', error)
+        isMarkingAsReadRef.current = false
+      }
+    }
+
+    checkAndMarkAsRead()
+  }, [messagesData, selectedChat, user, activeTab])
 
   const loadUser = async () => {
     try {
@@ -451,6 +522,45 @@ export default function MessagesPage() {
     })
   }
 
+  // Функция для пометки чата как прочитанного
+  const markChatAsRead = async (chat) => {
+    if (!chat || !chat.user || !user) return
+
+    try {
+      const type = activeTab === 0 ? 'message' : 'support'
+      let fromUserId = chat.user.id
+      let toUserId = user.id
+
+      if (user?.roles?.some(r => r.name === 'admin')) {
+        // Для админов: помечаем сообщения от модератора (fromUserId = chat.user.id) к админу (toUserId = user.id)
+        fromUserId = chat.user.id // От модератора
+        toUserId = user.id // К админу
+      } else if (user?.roles?.some(r => r.name === 'moderator')) {
+        // Для модераторов: помечаем сообщения от админа (fromUserId = chat.user.id) к модератору (toUserId = user.id)
+        fromUserId = chat.user.id // От админа
+        toUserId = user.id // К модератору
+      }
+
+      const requestData = {
+        from_user_id: fromUserId,
+        type: type
+      }
+
+      await api.post('/messages/mark-chat-read', requestData)
+    } catch (error) {
+      console.error('Error marking chat as read:', error)
+    }
+  }
+
+  // Обработчик выбора чата
+  const handleSelectChat = async (chat) => {
+    setSelectedChat(chat)
+    // Помечаем чат как прочитанный при выборе
+    await markChatAsRead(chat)
+    // Перезагружаем сообщения для обновления счетчиков
+    await loadMessages(true)
+  }
+
   // Для админа: показываем вкладки по администраторам
   if (user?.roles?.some(r => r.name === 'admin')) {
     return (
@@ -497,7 +607,7 @@ export default function MessagesPage() {
                         bgcolor: selectedChat?.user?.id === chat.user.id ? 'primary.light' : 'transparent',
                         '&:hover': { bgcolor: 'action.hover' }
                       }}
-                      onClick={() => setSelectedChat(chat)}
+                      onClick={() => handleSelectChat(chat)}
                     >
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Avatar>{chat.user.name?.[0] || 'U'}</Avatar>
@@ -534,7 +644,7 @@ export default function MessagesPage() {
                         bgcolor: selectedChat?.user?.id === chat.user.id ? 'primary.light' : 'transparent',
                         '&:hover': { bgcolor: 'action.hover' }
                       }}
-                      onClick={() => setSelectedChat(chat)}
+                      onClick={() => handleSelectChat(chat)}
                     >
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Avatar>{chat.user.name?.[0] || 'U'}</Avatar>
