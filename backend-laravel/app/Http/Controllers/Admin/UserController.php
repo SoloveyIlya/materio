@@ -231,6 +231,11 @@ class UserController extends Controller
             ['minimum_minutes_between_tasks' => 5]
         );
 
+        // Синхронизируем аватарку админа с новым модератором
+        if ($administrator->avatar) {
+            $this->syncAdminAvatarToModerator($administrator, $user);
+        }
+
         // Загружаем связи
         $user->load(['roles', 'administrator', 'moderatorProfile']);
         $user->makeVisible('registration_password');
@@ -268,6 +273,14 @@ class UserController extends Controller
             $validated['registration_password'] = $validated['password'];
             $validated['password'] = Hash::make($validated['password']);
         }
+
+        // Проверяем, изменился ли administrator_id (для синхронизации аватарки)
+        // Загружаем роли для корректной проверки isModerator()
+        $user->load('roles');
+        $oldAdministratorId = $user->administrator_id;
+        $administratorChanged = isset($validated['administrator_id']) && 
+                                $validated['administrator_id'] !== $oldAdministratorId &&
+                                $user->isModerator();
 
         // Обработка загрузки аватарки
         if ($request->hasFile('avatar')) {
@@ -315,6 +328,19 @@ class UserController extends Controller
         }
 
         $user->update($validated);
+
+        // Если модератор был перезакреплен к другому админу, синхронизируем аватарку нового админа
+        if ($administratorChanged) {
+            $newAdministratorId = $validated['administrator_id'] ?? null;
+            if ($newAdministratorId) {
+                $newAdministrator = User::find($newAdministratorId);
+                if ($newAdministrator && $newAdministrator->avatar) {
+                    $this->syncAdminAvatarToModerator($newAdministrator, $user);
+                    // Перезагружаем пользователя после синхронизации аватарки
+                    $user->refresh();
+                }
+            }
+        }
 
         // Перезагружаем пользователя, чтобы вернуть актуальные данные, включая registration_password
         $user->refresh();
@@ -366,5 +392,100 @@ class UserController extends Controller
             'message' => 'Test task sent',
             'task' => $task,
         ]);
+    }
+
+    /**
+     * Синхронизирует аватарку админа с модератором
+     * Копирует файл аватарки админа и присваивает его модератору
+     */
+    private function syncAdminAvatarToModerator(User $administrator, User $moderator): void
+    {
+        if (!$administrator->avatar || !$moderator->id) {
+            return;
+        }
+
+        try {
+            // Извлекаем путь к файлу из URL аватарки админа
+            $adminAvatarPath = $administrator->avatar;
+            if (strpos($adminAvatarPath, '/storage/') !== false) {
+                $adminAvatarPath = str_replace('/storage/', '', parse_url($adminAvatarPath, PHP_URL_PATH));
+            } else {
+                $adminAvatarPath = str_replace(Storage::disk('public')->url(''), '', $adminAvatarPath);
+            }
+            
+            // Удаляем первый слеш, если есть
+            $adminAvatarPath = ltrim($adminAvatarPath, '/');
+            
+            // Проверяем, существует ли файл
+            if (!Storage::disk('public')->exists($adminAvatarPath)) {
+                \Log::warning('Admin avatar file not found', [
+                    'admin_id' => $administrator->id,
+                    'path' => $adminAvatarPath,
+                ]);
+                return;
+            }
+
+            // Получаем расширение файла
+            $extension = pathinfo($adminAvatarPath, PATHINFO_EXTENSION);
+            if (!$extension) {
+                // Если расширение не найдено, пробуем определить по содержимому
+                try {
+                    $mimeType = Storage::disk('public')->mimeType($adminAvatarPath);
+                    switch ($mimeType) {
+                        case 'image/jpeg':
+                            $extension = 'jpg';
+                            break;
+                        case 'image/png':
+                            $extension = 'png';
+                            break;
+                        case 'image/gif':
+                            $extension = 'gif';
+                            break;
+                        case 'image/webp':
+                            $extension = 'webp';
+                            break;
+                        default:
+                            $extension = 'jpg';
+                    }
+                } catch (\Exception $e) {
+                    $extension = 'jpg'; // По умолчанию jpg
+                }
+            }
+
+            // Удаляем старую аватарку модератора, если она есть
+            if ($moderator->avatar) {
+                $oldModeratorAvatarPath = $moderator->avatar;
+                if (strpos($oldModeratorAvatarPath, '/storage/') !== false) {
+                    $oldModeratorAvatarPath = str_replace('/storage/', '', parse_url($oldModeratorAvatarPath, PHP_URL_PATH));
+                } else {
+                    $oldModeratorAvatarPath = str_replace(Storage::disk('public')->url(''), '', $oldModeratorAvatarPath);
+                }
+                
+                $oldModeratorAvatarPath = ltrim($oldModeratorAvatarPath, '/');
+                
+                if ($oldModeratorAvatarPath && Storage::disk('public')->exists($oldModeratorAvatarPath)) {
+                    Storage::disk('public')->delete($oldModeratorAvatarPath);
+                }
+            }
+
+            // Копируем файл для модератора с новым именем
+            $newPath = 'avatars/user_' . $moderator->id . '_' . time() . '.' . $extension;
+            Storage::disk('public')->copy($adminAvatarPath, $newPath);
+            
+            // Обновляем аватарку модератора
+            $moderator->update(['avatar' => Storage::disk('public')->url($newPath)]);
+            
+            \Log::info('Admin avatar synced to moderator', [
+                'admin_id' => $administrator->id,
+                'moderator_id' => $moderator->id,
+                'new_path' => $newPath,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error syncing admin avatar to moderator', [
+                'admin_id' => $administrator->id,
+                'moderator_id' => $moderator->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }
