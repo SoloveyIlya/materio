@@ -320,68 +320,9 @@ const ChatWrapper = () => {
     }
 
     // Воспроизводим звук, если есть новые непрочитанные сообщения
-    // И только если выбранный чат не открыт (чтобы не воспроизводить звук для открытого чата)
+    // Звук воспроизводится всегда при новых сообщениях, независимо от того, открыт чат или нет
     if (hasNewUnreadMessages) {
-      // Проверяем, открыт ли чат с новыми сообщениями
-      const isChatOpen = selectedChat && selectedChat.user
-      if (!isChatOpen) {
-        // Если чат не открыт, воспроизводим звук
-        playNotificationSoundIfVisible()
-      } else {
-        // Если чат открыт, проверяем, относится ли новое сообщение к открытому чату
-        // Если новое сообщение не в открытом чате, воспроизводим звук
-        let shouldPlaySound = false
-        
-        if (currentUser?.roles?.some(r => r.name === 'admin')) {
-          // Для админа проверяем все табы
-          if (newData?.tabs) {
-            for (const tab of newData.tabs) {
-              const chat = tab.chats.find(c => c.user.id === selectedChat.user.id)
-              if (chat) {
-                const previousTab = previousData?.tabs?.find(t => t.admin.id === tab.admin.id)
-                if (previousTab) {
-                  const previousChat = previousTab.chats.find(c => c.user.id === selectedChat.user.id)
-                  if (previousChat) {
-                    const previousMessageIds = new Set(previousChat.messages.map(m => m.id))
-                    const newMessages = chat.messages.filter(m => !previousMessageIds.has(m.id))
-                    const newUnreadMessages = newMessages.filter(msg => {
-                      const isFromCurrentUser = msg.from_user_id === currentUser.id || 
-                                               (selectedAdminTab && msg.from_user_id === selectedAdminTab)
-                      return !isFromCurrentUser && (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
-                    })
-                    if (newUnreadMessages.length > 0) {
-                      shouldPlaySound = true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        } else if (currentUser?.roles?.some(r => r.name === 'moderator')) {
-          // Для модератора проверяем, есть ли новые сообщения в открытом чате
-          if (Array.isArray(newData)) {
-            const chat = newData.find(c => c.user?.id === selectedChat.user.id)
-            if (chat) {
-              const previousChat = previousData?.find(c => c.user?.id === selectedChat.user.id)
-              if (previousChat) {
-                const previousMessageIds = new Set(previousChat.messages.map(m => m.id))
-                const newMessages = chat.messages.filter(m => !previousMessageIds.has(m.id))
-                const newUnreadMessages = newMessages.filter(msg => {
-                  return msg.from_user_id !== currentUser.id && 
-                         (msg.is_read === false || msg.is_read === 0 || msg.is_read === null)
-                })
-                if (newUnreadMessages.length > 0) {
-                  shouldPlaySound = true
-                }
-              }
-            }
-          }
-        }
-        
-        if (shouldPlaySound) {
-          playNotificationSoundIfVisible()
-        }
-      }
+      playNotificationSoundIfVisible()
     }
   }
 
