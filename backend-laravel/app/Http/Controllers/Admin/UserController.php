@@ -201,7 +201,7 @@ class UserController extends Controller
             'domain_id' => $currentUser->domain_id,
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => $validated['password'],
+            'password' => Hash::make($validated['password']), // Явно хешируем пароль
             'registration_password' => $validated['password'],
             'timezone' => $validated['timezone'] ?? 'UTC',
             'administrator_id' => $administratorId,

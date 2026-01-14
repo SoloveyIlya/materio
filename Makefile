@@ -77,6 +77,17 @@ create-user: ## Создать пользователя (использован�
 	fi
 	docker compose exec backend php artisan user:create $(EMAIL) $(PASSWORD) --name="$(NAME)" --role=$(ROLE)
 
+reset-password: ## Сбросить пароль пользователя (использование: make reset-password EMAIL="email@example.com" PASSWORD="password")
+	@if [ -z "$(EMAIL)" ]; then \
+		echo "Использование: make reset-password EMAIL=\"email@example.com\" PASSWORD=\"password\""; \
+		exit 1; \
+	fi
+	@if [ -z "$(PASSWORD)" ]; then \
+		docker compose exec backend php artisan user:reset-password $(EMAIL); \
+	else \
+		docker compose exec backend php artisan user:reset-password $(EMAIL) $(PASSWORD); \
+	fi
+
 clean: ## Остановить и удалить все контейнеры, volumes и сети
 	docker compose down -v
 	docker system prune -f

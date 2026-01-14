@@ -34,7 +34,7 @@ class AuthController extends Controller
                 'domain_id' => $domain->id,
                 'name' => $request->name,
                 'email' => $request->email,
-                'password' => $request->password, // Laravel автоматически захеширует через casts в модели
+                'password' => Hash::make($request->password), // Явно хешируем пароль
                 'registration_password' => $request->password, // ВНИМАНИЕ: Хранение в открытом виде небезопасно! Добавлено по требованию ТЗ
                 'timezone' => $request->timezone ?? 'UTC',
             ]);
