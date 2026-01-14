@@ -27,14 +27,14 @@ const TestList = ({ userId, tests, testResults }) => {
     )
   }
 
-  // Сортировка по order (меньший order первым), затем по created_at
+  // Сортировка по order (меньший order первым), затем по created_at (первый добавленный вверху)
   const sortedTests = [...tests].sort((a, b) => {
     const orderA = a.order ?? 999999
     const orderB = b.order ?? 999999
     if (orderA !== orderB) {
       return orderA - orderB
     }
-    return new Date(b.created_at) - new Date(a.created_at)
+    return new Date(a.created_at) - new Date(b.created_at)
   })
 
   // Создаем мапу результатов тестов для быстрого поиска
