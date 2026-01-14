@@ -132,7 +132,7 @@ export default function DocumentationPage() {
 
       // Process content blocks and extract images/videos
       const images = []
-      const videos = []
+      let videoIndex = 0 // Счетчик для индексации видео в FormData
       const processedBlocks = []
 
       if (formData.content_blocks && formData.content_blocks.length > 0) {
@@ -149,15 +149,27 @@ export default function DocumentationPage() {
             }
           } else if (block.type === 'video') {
             if (block.file) {
-              // New file upload
-              formDataToSend.append(`videos[${videos.length}][type]`, 'local')
-              formDataToSend.append(`videos[${videos.length}][file]`, block.file)
-              processedBlocks.push({ type: 'video', position: index, isNew: true })
+              // New file upload - используем videoIndex для правильной индексации
+              formDataToSend.append(`videos[${videoIndex}][type]`, 'local')
+              formDataToSend.append(`videos[${videoIndex}][file]`, block.file)
+              processedBlocks.push({ 
+                type: 'video', 
+                videoType: 'local',
+                position: index, 
+                isNew: true 
+              })
+              videoIndex++ // Увеличиваем счетчик после добавления видео
             } else if (block.url) {
               // Embed URL
-              formDataToSend.append(`videos[${videos.length}][type]`, 'embed')
-              formDataToSend.append(`videos[${videos.length}][url]`, block.url)
-              processedBlocks.push({ type: 'video', videoType: block.videoType, url: block.url, position: index })
+              formDataToSend.append(`videos[${videoIndex}][type]`, 'embed')
+              formDataToSend.append(`videos[${videoIndex}][url]`, block.url)
+              processedBlocks.push({ 
+                type: 'video', 
+                videoType: block.videoType || 'embed', 
+                url: block.url, 
+                position: index 
+              })
+              videoIndex++ // Увеличиваем счетчик после добавления видео
             }
           } else {
             // Text or other blocks

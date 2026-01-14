@@ -150,25 +150,28 @@ class DocumentationPageController extends Controller
         $processedVideos = [];
         if ($request->has('videos')) {
             foreach ($request->input('videos') as $index => $video) {
-                if ($video['type'] === 'embed') {
+                if (isset($video['type']) && $video['type'] === 'embed' && isset($video['url'])) {
                     // Для embed просто сохраняем URL
                     $processedVideos[] = [
                         'type' => 'embed',
                         'url' => $video['url'],
                     ];
-                } elseif ($video['type'] === 'local' && $request->hasFile("videos.{$index}.file")) {
+                } elseif (isset($video['type']) && $video['type'] === 'local' && $request->hasFile("videos.{$index}.file")) {
                     // Для локальных видео загружаем файл
                     $videoFile = $request->file("videos.{$index}.file");
-                    $path = $videoFile->store('documentation/videos', 'public');
-                    $processedVideos[] = [
-                        'type' => 'local',
-                        'url' => Storage::url($path),
-                    ];
+                    if ($videoFile && $videoFile->isValid()) {
+                        $path = $videoFile->store('documentation/videos', 'public');
+                        $processedVideos[] = [
+                            'type' => 'local',
+                            'url' => Storage::url($path),
+                        ];
+                    }
                 }
             }
         }
 
         // Обновляем content_blocks с загруженными видео
+        // Сначала обрабатываем новые видео (с isNew: true)
         $videoIndex = 0;
         foreach ($contentBlocks as &$block) {
             if ($block['type'] === 'video' && isset($block['isNew']) && $block['isNew']) {
@@ -177,8 +180,8 @@ class DocumentationPageController extends Controller
                     $block['url'] = $processedVideos[$videoIndex]['url'];
                     unset($block['isNew']);
                     unset($block['file']);
+                    $videoIndex++;
                 }
-                $videoIndex++;
             }
         }
         unset($block);
@@ -376,23 +379,26 @@ class DocumentationPageController extends Controller
         if ($request->has('videos')) {
             $processedVideos = [];
             foreach ($request->input('videos') as $index => $video) {
-                if ($video['type'] === 'embed') {
+                if (isset($video['type']) && $video['type'] === 'embed' && isset($video['url'])) {
                     $processedVideos[] = [
                         'type' => 'embed',
                         'url' => $video['url'],
                     ];
-                } elseif ($video['type'] === 'local' && $request->hasFile("videos.{$index}.file")) {
+                } elseif (isset($video['type']) && $video['type'] === 'local' && $request->hasFile("videos.{$index}.file")) {
                     $videoFile = $request->file("videos.{$index}.file");
-                    $path = $videoFile->store('documentation/videos', 'public');
-                    $processedVideos[] = [
-                        'type' => 'local',
-                        'url' => Storage::url($path),
-                    ];
+                    if ($videoFile && $videoFile->isValid()) {
+                        $path = $videoFile->store('documentation/videos', 'public');
+                        $processedVideos[] = [
+                            'type' => 'local',
+                            'url' => Storage::url($path),
+                        ];
+                    }
                 }
             }
         }
 
         // Обновляем content_blocks с загруженными видео
+        // Сначала обрабатываем новые видео (с isNew: true)
         $videoIndex = 0;
         foreach ($contentBlocks as &$block) {
             if ($block['type'] === 'video' && isset($block['isNew']) && $block['isNew']) {
@@ -401,8 +407,8 @@ class DocumentationPageController extends Controller
                     $block['url'] = $processedVideos[$videoIndex]['url'];
                     unset($block['isNew']);
                     unset($block['file']);
+                    $videoIndex++;
                 }
-                $videoIndex++;
             }
         }
         unset($block);
