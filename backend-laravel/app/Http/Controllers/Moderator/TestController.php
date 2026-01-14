@@ -154,9 +154,10 @@ class TestController extends Controller
                     ->first();
 
                 if ($task) {
-                    // Обновляем статус задачи на "test_passed"
+                    // Обновляем статус задачи на "test_passed" и устанавливаем completed_at
                     $task->update([
                         'status' => 'test_passed',
+                        'completed_at' => now(),
                     ]);
                 }
             });
