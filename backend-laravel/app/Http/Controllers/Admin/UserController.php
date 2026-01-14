@@ -18,6 +18,17 @@ class UserController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
+        // Проверяем и обновляем статус пользователей на основе last_seen_at
+        $offlineTimeoutMinutes = config('app.user_offline_timeout_minutes', 5);
+        $offlineThreshold = now()->subMinutes($offlineTimeoutMinutes);
+        
+        // Обновляем статус пользователей, которые не были активны в течение таймаута
+        User::where('domain_id', $currentUser->domain_id)
+            ->where('is_online', true)
+            ->whereNotNull('last_seen_at')
+            ->where('last_seen_at', '<', $offlineThreshold)
+            ->update(['is_online' => false]);
+
         $query = User::withTrashed()
             ->with(['roles', 'administrator', 'domain'])
             ->where('domain_id', $currentUser->domain_id);

@@ -178,7 +178,15 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+        
+        // Устанавливаем пользователя как офлайн при выходе
+        if ($user) {
+            $user->is_online = false;
+            $user->save();
+        }
+        
+        $user->currentAccessToken()->delete();
 
         return response()->json([
             'message' => 'Logged out successfully',

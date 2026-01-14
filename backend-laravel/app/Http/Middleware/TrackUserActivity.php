@@ -26,6 +26,17 @@ class TrackUserActivity
             $currentIp = $request->ip();
             $previousIp = $user->ip_address;
             
+            // Проверяем, не истек ли таймаут для других пользователей (чтобы обновить их статус)
+            // Таймаут: 5 минут без активности
+            $offlineTimeoutMinutes = config('app.user_offline_timeout_minutes', 5);
+            $offlineThreshold = now()->subMinutes($offlineTimeoutMinutes);
+            
+            // Обновляем статус пользователей, которые не были активны в течение таймаута
+            \App\Models\User::where('is_online', true)
+                ->whereNotNull('last_seen_at')
+                ->where('last_seen_at', '<', $offlineThreshold)
+                ->update(['is_online' => false]);
+            
             // Обновляем IP, user agent, location, platform
             $user->ip_address = $currentIp;
             $user->user_agent = $request->userAgent();

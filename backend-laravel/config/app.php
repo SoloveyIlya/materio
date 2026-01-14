@@ -21,6 +21,10 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    // Таймаут в минутах для автоматического перевода пользователей в статус offline
+    // Если пользователь не был активен в течение этого времени, он будет помечен как offline
+    'user_offline_timeout_minutes' => env('USER_OFFLINE_TIMEOUT_MINUTES', 5),
+
     'providers' => ServiceProvider::defaultProviders()->merge([
         App\Providers\AppServiceProvider::class,
         App\Providers\AuthServiceProvider::class,

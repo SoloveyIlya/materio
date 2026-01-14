@@ -16,6 +16,17 @@ class MessageController extends Controller
         $user = $request->user();
         $type = $request->get('type', 'message'); // message или support
 
+        // Проверяем и обновляем статус пользователей на основе last_seen_at
+        $offlineTimeoutMinutes = config('app.user_offline_timeout_minutes', 5);
+        $offlineThreshold = now()->subMinutes($offlineTimeoutMinutes);
+        
+        // Обновляем статус пользователей, которые не были активны в течение таймаута
+        \App\Models\User::where('domain_id', $user->domain_id)
+            ->where('is_online', true)
+            ->whereNotNull('last_seen_at')
+            ->where('last_seen_at', '<', $offlineThreshold)
+            ->update(['is_online' => false]);
+
         // Для админа: получаем чаты, группированные по администраторам (вкладки с админами)
         if ($user->isAdmin()) {
             // Получаем всех администраторов домена (все будут вкладками)
