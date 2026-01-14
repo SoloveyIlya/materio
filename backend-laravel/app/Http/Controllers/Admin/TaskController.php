@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Task;
 use App\Models\TaskResult;
 use App\Models\ModeratorEarning;
+use App\Models\TaskView;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -65,7 +66,7 @@ class TaskController extends Controller
         }
 
         $query = Task::where('domain_id', $user->domain_id)
-            ->with(['categories', 'template', 'assignedUser', 'documentations', 'tools', 'result']);
+            ->with(['categories', 'template', 'assignedUser', 'documentations', 'tools', 'result', 'views.user']);
 
         // Фильтр по админу - применяется только если явно запрошен
         // По умолчанию показываем ВСЕ задачи домена (единый Task Manager для всех админов)
@@ -104,6 +105,19 @@ class TaskController extends Controller
         $timezone = $user->timezone ?? 'UTC';
         $tasks->getCollection()->transform(function ($task) use ($timezone) {
             $this->addFormattedDates($task, $timezone);
+            // Добавляем количество уникальных просмотров
+            if ($task->relationLoaded('views')) {
+                $uniqueViewerIds = $task->views->pluck('user_id')->unique()->values();
+                $task->views_count = $uniqueViewerIds->count();
+                if ($uniqueViewerIds->count() > 0) {
+                    $task->viewers = \App\Models\User::whereIn('id', $uniqueViewerIds->toArray())->select('id', 'name', 'email', 'avatar')->get();
+                } else {
+                    $task->viewers = collect([]);
+                }
+            } else {
+                $task->views_count = 0;
+                $task->viewers = collect([]);
+            }
             return $task;
         });
 
@@ -127,7 +141,8 @@ class TaskController extends Controller
             'result.moderator',
             'result' => function($query) {
                 $query->with('moderator');
-            }
+            },
+            'views.user:id,name,email,avatar'
         ]);
 
         // Форматируем результат для удобного отображения
@@ -146,6 +161,25 @@ class TaskController extends Controller
         // Добавляем отформатированные даты в формате США с учетом часового пояса
         $timezone = $user->timezone ?? 'UTC';
         $this->addFormattedDates($task, $timezone);
+        
+        // Добавляем количество уникальных просмотров
+        if ($task->relationLoaded('views')) {
+            $uniqueViewerIds = $task->views->pluck('user_id')->unique()->values();
+            $task->views_count = $uniqueViewerIds->count();
+            if ($uniqueViewerIds->count() > 0) {
+                $task->viewers = \App\Models\User::whereIn('id', $uniqueViewerIds->toArray())->select('id', 'name', 'email', 'avatar')->get();
+            } else {
+                $task->viewers = collect([]);
+            }
+        } else {
+            $uniqueViewerIds = $task->views()->pluck('user_id')->unique()->values();
+            $task->views_count = $uniqueViewerIds->count();
+            if ($uniqueViewerIds->count() > 0) {
+                $task->viewers = \App\Models\User::whereIn('id', $uniqueViewerIds->toArray())->select('id', 'name', 'email', 'avatar')->get();
+            } else {
+                $task->viewers = collect([]);
+            }
+        }
 
         return response()->json($task);
     }
@@ -648,6 +682,24 @@ class TaskController extends Controller
             DB::rollBack();
             return response()->json(['message' => 'Error moderating task: ' . $e->getMessage()], 500);
         }
+    }
+
+    public function logView(Task $task, Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        if ($task->domain_id !== $user->domain_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // Логируем просмотр
+        TaskView::create([
+            'task_id' => $task->id,
+            'user_id' => $user->id,
+            'viewed_at' => now(),
+        ]);
+
+        return response()->json(['message' => 'View logged successfully'], 201);
     }
 
     public function destroy(Task $task, Request $request): JsonResponse

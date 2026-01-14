@@ -85,6 +85,19 @@ class Task extends Model
         return $this->hasOne(TaskResult::class);
     }
 
+    public function views()
+    {
+        return $this->hasMany(TaskView::class);
+    }
+
+    public function viewers()
+    {
+        return $this->belongsToMany(User::class, 'task_views', 'task_id', 'user_id')
+            ->withPivot('viewed_at')
+            ->withTimestamps()
+            ->distinct();
+    }
+
     public function schedules()
     {
         return $this->hasMany(TaskSchedule::class);

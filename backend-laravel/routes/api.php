@@ -89,6 +89,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
     Route::post('/tasks/{task}', [AdminTaskController::class, 'update']); // Для поддержки FormData с _method: 'PUT'
     Route::delete('/tasks/{task}', [AdminTaskController::class, 'destroy']);
     Route::post('/tasks/{task}/moderate', [AdminTaskController::class, 'moderateResult']);
+    Route::post('/tasks/{task}/view', [AdminTaskController::class, 'logView']);
 
     // Training Questions
     Route::get('/training-questions', [TrainingQuestionController::class, 'index']);

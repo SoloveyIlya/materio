@@ -19,6 +19,11 @@ import CustomAvatar from '@core/components/mui/Avatar'
 // Third-Party Imports
 import classnames from 'classnames'
 
+// Utils Imports
+import api from '@/lib/api'
+import { API_URL } from '@/lib/api'
+import { getInitials } from '@/utils/getInitials'
+
 // Styles Imports
 import styles from './styles.module.css'
 
@@ -43,8 +48,16 @@ const TaskCard = props => {
     setMenuOpen(false)
   }
 
-  // Handle Task Click
-  const handleTaskClick = () => {
+  // Handle Task Click - логируем просмотр
+  const handleTaskClick = async () => {
+    // Логируем просмотр задачи
+    try {
+      await api.post(`/admin/tasks/${task.id}/view`)
+    } catch (error) {
+      // Игнорируем ошибки логирования просмотра, чтобы не блокировать открытие задачи
+      console.error('Error logging task view:', error)
+    }
+
     if (onTaskClick) {
       onTaskClick(task)
     }
@@ -84,26 +97,26 @@ const TaskCard = props => {
     return count
   }
 
-  // Генерируем декоративные аватарки для визуального эффекта
-  // Используем task.id для консистентности - одна и та же задача всегда имеет одинаковые аватарки
-  const getDecorativeAvatars = () => {
-    const colors = ['primary', 'secondary', 'success', 'warning', 'error', 'info']
-    const names = ['A', 'B', 'C', 'D', 'E', 'F']
-    
-    // Генерируем хеш на основе task.id для консистентности
-    const taskId = task.id || 0
-    const hash = String(taskId).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    const count = (hash % 3) + 2 // 2-4 аватарки
-    
-    return Array.from({ length: count }, (_, i) => {
-      const nameIndex = (hash + i) % names.length
-      const colorIndex = (hash + i) % colors.length
-      return {
-        name: names[nameIndex],
-        color: colors[colorIndex],
-        key: `${taskId}-${i}`
-      }
-    })
+  // Получаем URL аватара пользователя
+  const getAvatarUrl = (avatar) => {
+    if (!avatar) return null
+    if (avatar.startsWith('http')) return avatar
+    if (avatar.startsWith('/storage')) return `${API_URL}${avatar}`
+    return `${API_URL}/storage/${avatar}`
+  }
+
+
+  // Получаем реальных пользователей, которые просмотрели задачу
+  const getViewers = () => {
+    if (!task.viewers || !Array.isArray(task.viewers)) {
+      return []
+    }
+    return task.viewers.slice(0, 4) // Показываем максимум 4 аватарки
+  }
+
+  // Получаем количество просмотров
+  const getViewsCount = () => {
+    return task.views_count || 0
   }
 
   return (
@@ -170,21 +183,16 @@ const TaskCard = props => {
                 </Box>
               )}
               
-              {/* Views/Comments count (декоративное, консистентное для каждой задачи) */}
+              {/* Views count - реальное количество просмотров */}
               <Box className='flex items-center gap-1'>
                 <i className='ri-eye-line text-base' style={{ color: 'var(--mui-palette-text-secondary)' }} />
                 <Typography variant='caption' color='text.secondary'>
-                  {(() => {
-                    // Генерируем консистентное число просмотров на основе task.id
-                    const taskId = task.id || 0
-                    const hash = String(taskId).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-                    return (hash % 20) + 5 // 5-24 просмотра
-                  })()}
+                  {getViewsCount()}
                 </Typography>
               </Box>
             </Box>
             
-            {/* Avatars group */}
+            {/* Avatars group - реальные пользователи, которые просмотрели задачу */}
             <AvatarGroup 
               max={4}
               sx={{
@@ -199,14 +207,15 @@ const TaskCard = props => {
                 }
               }}
             >
-              {getDecorativeAvatars().map((avatar) => (
-                <Tooltip key={avatar.key} title={avatar.name}>
+              {getViewers().map((viewer) => (
+                <Tooltip key={viewer.id} title={viewer.name || viewer.email || 'User'}>
                   <CustomAvatar
-                    skin='light'
-                    color={avatar.color}
+                    src={getAvatarUrl(viewer.avatar)}
+                    alt={viewer.name || viewer.email}
                     size={28}
+                    skin='light'
                   >
-                    {avatar.name}
+                    {getInitials(viewer.name || viewer.email || 'U')}
                   </CustomAvatar>
                 </Tooltip>
               ))}
