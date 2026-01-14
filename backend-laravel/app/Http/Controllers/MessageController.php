@@ -34,14 +34,16 @@ class MessageController extends Controller
                 ->whereHas('roles', function ($q) {
                     $q->where('name', 'admin');
                 })
-                ->get(['id', 'name', 'email', 'is_online', 'last_seen_at', 'avatar']);
+                ->with('roles')
+                ->get(['id', 'name', 'email', 'is_online', 'last_seen_at', 'avatar', 'timezone']);
 
             // Получаем всех модераторов для отображения
             $allModerators = \App\Models\User::where('domain_id', $user->domain_id)
                 ->whereHas('roles', function ($q) {
                     $q->where('name', 'moderator');
                 })
-                ->get(['id', 'name', 'email', 'is_online', 'last_seen_at', 'avatar', 'administrator_id']);
+                ->with('roles')
+                ->get(['id', 'name', 'email', 'is_online', 'last_seen_at', 'avatar', 'administrator_id', 'timezone', 'work_start_date', 'platform']);
 
             $tabs = [];
 
@@ -123,6 +125,8 @@ class MessageController extends Controller
                         'name' => $admin->name,
                         'email' => $admin->email,
                         'avatar' => $admin->avatar,
+                        'timezone' => $admin->timezone,
+                        'roles' => $admin->roles,
                     ],
                     'chats' => $adminChats,
                 ];
@@ -230,7 +234,7 @@ class MessageController extends Controller
         $messages = $query->orderBy('created_at', 'asc')->get();
 
         // Получаем админа модератора
-        $admin = \App\Models\User::find($administratorId);
+        $admin = \App\Models\User::with('roles')->find($administratorId);
         
         if (!$admin) {
             return response()->json([]);
@@ -272,6 +276,8 @@ class MessageController extends Controller
                     'is_online' => $admin->is_online,
                     'last_seen_at' => $admin->last_seen_at,
                     'avatar' => $admin->avatar,
+                    'timezone' => $admin->timezone,
+                    'roles' => $admin->roles,
                 ],
                 'messages' => $formattedMessages,
             ]

@@ -882,6 +882,7 @@ const ChatContent = props => {
           activeUser={activeUser}
           isBelowSmScreen={isBelowSmScreen}
           isBelowLgScreen={isBelowLgScreen}
+          user={user}
         />
       )}
 
