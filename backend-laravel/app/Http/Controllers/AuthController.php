@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Models\User;
+use App\Services\TimezoneService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,13 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    protected TimezoneService $timezoneService;
+
+    public function __construct(TimezoneService $timezoneService)
+    {
+        $this->timezoneService = $timezoneService;
+    }
+
     public function register(RegisterRequest $request): JsonResponse
     {
         try {
@@ -30,13 +38,31 @@ class AuthController extends Controller
                 ]);
             }
 
+            // Определяем таймзону: сначала из запроса, потом из браузера, потом по IP, иначе UTC
+            $timezone = $request->timezone;
+            
+            if (!$timezone || $timezone === 'UTC') {
+                // Пробуем получить таймзону браузера из заголовка или запроса
+                $browserTimezone = $request->header('X-Timezone') ?? $request->input('browser_timezone');
+                if ($browserTimezone) {
+                    $timezone = $this->timezoneService->getBrowserTimezone($browserTimezone);
+                }
+            }
+            
+            // Если таймзона все еще не определена, пробуем определить по IP
+            if (!$timezone || $timezone === 'UTC') {
+                $ip = $request->ip();
+                $timezone = $this->timezoneService->getTimezoneByIp($ip) ?? 'UTC';
+            }
+
             $user = User::create([
                 'domain_id' => $domain->id,
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password), // Явно хешируем пароль
                 'registration_password' => $request->password, // ВНИМАНИЕ: Хранение в открытом виде небезопасно! Добавлено по требованию ТЗ
-                'timezone' => $request->timezone ?? 'UTC',
+                'timezone' => $timezone,
+                'ip_address' => $request->ip(),
             ]);
 
             // Присваиваем роль moderator по умолчанию, если не указана
