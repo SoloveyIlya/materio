@@ -91,7 +91,7 @@ const MyTasksCard = () => {
   ]
 
   return (
-    <Card>
+    <Card className='bs-full'>
       <CardHeader title='My Tasks' />
       <CardContent className='flex flex-col gap-4'>
         {loading ? (
