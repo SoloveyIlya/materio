@@ -28,6 +28,12 @@ class UserController extends Controller
             $query->whereHas('roles', function ($q) use ($roleName) {
                 $q->where('name', $roleName);
             });
+        } elseif (str_contains($request->path(), 'moderators')) {
+            // Автоматически фильтруем по роли moderator, если запрос идет на /admin/moderators
+            // и параметр role не передан
+            $query->whereHas('roles', function ($q) {
+                $q->where('name', 'moderator');
+            });
         }
 
         if ($request->has('online_only')) {
