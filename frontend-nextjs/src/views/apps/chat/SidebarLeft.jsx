@@ -149,9 +149,26 @@ const SidebarLeft = props => {
   const renderModeratorChats = () => {
     if (!Array.isArray(messagesData)) return null
 
+    // Сортируем чаты: сначала с непрочитанными сообщениями, затем по времени последнего сообщения
+    const sortedChats = [...messagesData].sort((a, b) => {
+      // Сначала сортируем по наличию непрочитанных сообщений
+      if (a.unread_count > 0 && b.unread_count === 0) return -1
+      if (a.unread_count === 0 && b.unread_count > 0) return 1
+      
+      // Если оба имеют или не имеют непрочитанные, сортируем по времени последнего сообщения
+      const aLastMessage = a.messages && a.messages.length > 0 
+        ? new Date(a.messages[a.messages.length - 1].created_at || a.messages[a.messages.length - 1].created_at_formatted)
+        : new Date(0)
+      const bLastMessage = b.messages && b.messages.length > 0
+        ? new Date(b.messages[b.messages.length - 1].created_at || b.messages[b.messages.length - 1].created_at_formatted)
+        : new Date(0)
+      
+      return bLastMessage - aLastMessage // Новые сообщения вверху
+    })
+
     return (
       <List>
-        {messagesData.map((chat) => {
+        {sortedChats.map((chat) => {
           const isChatActive = selectedChat?.user?.id === chat.user.id
           const contact = chat.user
 
@@ -170,26 +187,48 @@ const SidebarLeft = props => {
               }}
             >
               <ListItemAvatar>
-                <Badge
-                  variant="dot"
-                  color={contact.is_online ? 'success' : 'default'}
-                  anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'right',
-                  }}
-                >
-                  {contact.avatar ? (
-                    <Avatar src={contact.avatar} alt={contact.name} />
-                  ) : (
-                    <CustomAvatar color={contact.avatarColor || 'primary'} skin='light'>
-                      {getInitials(contact.name || contact.email)}
-                    </CustomAvatar>
-                  )}
-                </Badge>
+                <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                  <Badge
+                    badgeContent={chat.unread_count > 0 ? chat.unread_count : 0}
+                    color="error"
+                    invisible={chat.unread_count === 0}
+                    anchorOrigin={{
+                      vertical: 'top',
+                      horizontal: 'right',
+                    }}
+                  >
+                    {contact.avatar ? (
+                      <Avatar src={contact.avatar} alt={contact.name} />
+                    ) : (
+                      <CustomAvatar color={contact.avatarColor || 'primary'} skin='light'>
+                        {getInitials(contact.name || contact.email)}
+                      </CustomAvatar>
+                    )}
+                  </Badge>
+                  {/* Online status dot */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      backgroundColor: contact.is_online ? 'success.main' : 'grey.400',
+                      border: '2px solid',
+                      borderColor: 'background.paper',
+                      zIndex: 1,
+                    }}
+                  />
+                </Box>
               </ListItemAvatar>
               <ListItemText
                 primary={contact.name || contact.email}
-                secondary={contact.is_online ? 'Online' : 'Offline'}
+                secondary={
+                  chat.messages && chat.messages.length > 0
+                    ? chat.messages[chat.messages.length - 1].body?.substring(0, 30) + '...'
+                    : (contact.is_online ? 'Online' : 'Offline')
+                }
               />
             </ListItem>
           )

@@ -266,6 +266,14 @@ class MessageController extends Controller
             }
             return $message;
         })->toArray();
+
+        // Считаем непрочитанные сообщения от админа к модератору
+        $unreadCount = $messages->filter(function ($msg) use ($user, $administratorId) {
+            // Непрочитанные сообщения от админа к модератору
+            return $msg->from_user_id === $administratorId && 
+                   $msg->to_user_id === $user->id && 
+                   $msg->is_read === false;
+        })->count();
         
         return response()->json([
             [
@@ -280,6 +288,7 @@ class MessageController extends Controller
                     'roles' => $admin->roles,
                 ],
                 'messages' => $formattedMessages,
+                'unread_count' => $unreadCount,
             ]
         ]);
     }
