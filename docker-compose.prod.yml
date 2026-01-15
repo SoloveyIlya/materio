@@ -58,7 +58,7 @@ services:
     working_dir: /var/www
     env_file:
       - ./backend-laravel/.env.production
-    command: ["php", "artisan", "queue:work", "--sleep=1", "--tries=3", "--timeout=120"]
+    command: ["php", "artisan", "queue:work", "--sleep=1", "--tries=3", "--timeout=300"]
     volumes:
       - ./backend-laravel:/var/www
       - vendor_data:/var/www/vendor
