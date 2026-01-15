@@ -29,6 +29,7 @@ import styles from './styles.module.css'
 import { getInitials } from '@/utils/getInitials'
 import api from '@/lib/api'
 import { showToast } from '@/utils/toast'
+import { useMenuCounts } from '@/hooks/useMenuCounts'
 
 const ScrollWrapper = ({ children, isBelowLgScreen }) => {
   if (isBelowLgScreen) {
@@ -70,6 +71,7 @@ const SupportDetails = ({
   const [replyText, setReplyText] = useState('')
   const [sending, setSending] = useState(false)
   const [ticketData, setTicketData] = useState(currentTicket)
+  const { refreshCounts } = useMenuCounts()
 
   useEffect(() => {
     if (currentTicket?.id) {
@@ -109,6 +111,10 @@ const SupportDetails = ({
       }
       if (onReplySent) {
         onReplySent()
+      }
+      // Обновляем счетчик в меню
+      if (refreshCounts) {
+        await refreshCounts()
       }
       showToast.success('Reply sent successfully')
     } catch (error) {

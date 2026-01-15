@@ -385,9 +385,11 @@ class DashboardController extends Controller
                 }
                 $counts['chat_by_admin'] = $chatCountsByAdmin;
 
-                // Новые тикеты в support (статус open или in_progress)
+                // Новые тикеты в support - где нет ответа от админа
                 $newSupportTickets = Ticket::where('domain_id', $user->domain_id)
-                    ->whereIn('status', ['open', 'in_progress'])
+                    ->whereDoesntHave('messages', function ($q) use ($user) {
+                        $q->where('from_user_id', $user->id);
+                    })
                     ->count();
                 $counts['support'] = $newSupportTickets;
 
