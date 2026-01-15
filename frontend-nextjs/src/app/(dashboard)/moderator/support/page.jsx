@@ -319,8 +319,7 @@ export default function SupportPage() {
                               <IconButton
                                 size="small"
                                 onClick={() => {
-                                  // Можно открыть диалог с деталями
-                                  alert(`Ticket: ${ticket.subject}\n\nDescription: ${ticket.description}`)
+                                  router.push(`/moderator/support/${ticket.id}`)
                                 }}
                               >
                                 <i className='ri-eye-line' />
