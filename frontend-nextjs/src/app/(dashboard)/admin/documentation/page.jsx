@@ -198,7 +198,29 @@ export default function DocumentationPage() {
       showToast.success(editingPage ? 'Page updated successfully' : 'Page created successfully')
     } catch (error) {
       console.error('Error saving page:', error)
-      showToast.error('Error saving page: ' + (error.response?.data?.message || error.message))
+      
+      // Обработка ошибок валидации
+      if (error.response?.status === 422 && error.response?.data?.errors) {
+        const errors = error.response.data.errors
+        const errorMessages = []
+        
+        // Собираем все сообщения об ошибках
+        Object.keys(errors).forEach(key => {
+          if (Array.isArray(errors[key])) {
+            errorMessages.push(...errors[key])
+          } else {
+            errorMessages.push(errors[key])
+          }
+        })
+        
+        const errorMessage = errorMessages.length > 0 
+          ? errorMessages.join('. ') 
+          : error.response?.data?.message || 'Ошибка валидации'
+        
+        showToast.error(errorMessage)
+      } else {
+        showToast.error('Error saving page: ' + (error.response?.data?.message || error.message))
+      }
     }
   }
 

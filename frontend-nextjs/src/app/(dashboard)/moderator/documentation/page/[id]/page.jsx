@@ -279,9 +279,18 @@ const DocumentationPageView = () => {
                     
                     if (!videoUrl) return null
                     
+                    // Определяем тип видео: embed (YouTube, Vimeo) или local
+                    const isEmbed = block.videoType === 'embed' || 
+                                   (typeof videoUrl === 'string' && (
+                                     videoUrl.includes('youtube.com') || 
+                                     videoUrl.includes('youtu.be') || 
+                                     videoUrl.includes('vimeo.com') ||
+                                     videoUrl.includes('embed')
+                                   ))
+                    
                     return (
                       <Box key={blockIndex} sx={{ mb: 2 }}>
-                        {block.videoType === 'embed' || typeof videoUrl === 'string' ? (
+                        {isEmbed ? (
                           <Box
                             component="iframe"
                             src={videoUrl}

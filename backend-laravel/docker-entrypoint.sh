@@ -99,6 +99,12 @@ fi
 echo "Skipping automatic migrations (run manually if needed)"
 echo "To run migrations: docker-compose exec backend php artisan migrate"
 
+# Create storage symlink if it doesn't exist
+if [ ! -L /var/www/public/storage ] && [ ! -d /var/www/public/storage ]; then
+    echo "Creating storage symlink..."
+    php artisan storage:link || echo "Warning: Could not create storage symlink"
+fi
+
 echo "Setup complete! Starting server..."
 
 exec "$@"

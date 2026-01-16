@@ -57,6 +57,14 @@ class DocumentationPageController extends Controller
 
     public function store(Request $request)
     {
+        // Debug logging
+        \Log::info('DocumentationPage store - Request data:', [
+            'all_input_keys' => array_keys($request->all()),
+            'all_files_keys' => array_keys($request->allFiles()),
+            'videos_input' => $request->input('videos'),
+            'has_videos' => $request->has('videos'),
+        ]);
+        
         $validated = $request->validate([
             'category_id' => 'required|exists:documentation_categories,id',
             'title' => 'required|string|max:255',
@@ -64,10 +72,6 @@ class DocumentationPageController extends Controller
             'content_blocks' => 'nullable|string', // JSON string from FormData
             'images' => 'nullable|array',
             'images.*' => 'nullable|file|image|max:10240', // 10MB max
-            'videos' => 'nullable|array',
-            'videos.*.type' => 'required_with:videos.*|in:local,embed',
-            'videos.*.url' => 'required_with:videos.*',
-            'videos.*.file' => 'required_if:videos.*.type,local|file|mimes:mp4,webm,ogg|max:102400', // 100MB max
             'tools' => 'nullable|array',
             'tools.*' => 'exists:tools,id',
             'related_task_categories' => 'nullable|array',
@@ -77,6 +81,112 @@ class DocumentationPageController extends Controller
             'order' => 'nullable|integer|min:0',
             'is_published' => 'nullable|boolean',
         ]);
+
+        // Валидация видео вручную (не используем стандартную валидацию для вложенных массивов с файлами)
+        $videoErrors = [];
+        $videosInput = $request->input('videos');
+        
+        // Собираем videos из всех параметров запроса
+        $videos = [];
+        if (is_array($videosInput)) {
+            $videos = $videosInput;
+        } else {
+            // Пытаемся собрать из всех параметров
+            $allInput = $request->all();
+            foreach ($allInput as $key => $value) {
+                if (preg_match('/^videos\[(\d+)\]\[(\w+)\]$/', $key, $matches)) {
+                    $index = (int)$matches[1];
+                    $field = $matches[2];
+                    if (!isset($videos[$index])) {
+                        $videos[$index] = [];
+                    }
+                    $videos[$index][$field] = $value;
+                }
+            }
+        }
+        
+        // Валидируем каждое видео
+        foreach ($videos as $index => $video) {
+            if (is_array($video) && isset($video['type'])) {
+                if ($video['type'] === 'embed') {
+                    if (empty($video['url'])) {
+                        $videoErrors["videos.{$index}.url"] = ['URL is required for embed video'];
+                    }
+                } elseif ($video['type'] === 'local') {
+                    // Проверяем наличие файла
+                    $hasFile = false;
+                    $videoFile = null;
+                    
+                    // Пробуем получить файл разными способами
+                    // Способ 1: стандартный путь с точкой
+                    if ($request->hasFile("videos.{$index}.file")) {
+                        $videoFile = $request->file("videos.{$index}.file");
+                    }
+                    // Способ 2: путь с квадратными скобками
+                    elseif ($request->hasFile("videos[{$index}][file]")) {
+                        $videoFile = $request->file("videos[{$index}][file]");
+                    }
+                    // Способ 3: прямой доступ через массив запроса
+                    elseif (isset($_FILES["videos"]["name"][$index]["file"])) {
+                        // Используем прямой доступ к $_FILES
+                        if (isset($_FILES["videos"]["tmp_name"][$index]["file"]) && is_uploaded_file($_FILES["videos"]["tmp_name"][$index]["file"])) {
+                            $videoFile = $request->file("videos.{$index}.file");
+                        }
+                    }
+                    // Способ 4: проверяем все файлы в запросе
+                    else {
+                        $allFiles = $request->allFiles();
+                        foreach ($allFiles as $key => $file) {
+                            // Проверяем паттерн videos[число][file]
+                            if (preg_match('/^videos\[(\d+)\]\[file\]$/', $key, $matches)) {
+                                $fileIndex = (int)$matches[1];
+                                if ($fileIndex === $index) {
+                                    $videoFile = $file;
+                                    break;
+                                }
+                            }
+                            // Проверяем паттерн videos.число.file
+                            elseif ($key === "videos.{$index}.file") {
+                                $videoFile = $file;
+                                break;
+                            }
+                            // Проверяем все варианты ключей
+                            elseif (preg_match('/videos.*' . $index . '.*file/i', $key)) {
+                                $videoFile = $file;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if ($videoFile && $videoFile->isValid()) {
+                        // Проверяем MIME тип и размер
+                        $allowedMimes = ['video/mp4', 'video/webm', 'video/ogg'];
+                        $maxSize = 102400; // 100MB в KB
+                        
+                        if (!in_array($videoFile->getMimeType(), $allowedMimes)) {
+                            $videoErrors["videos.{$index}.file"] = ['Allowed formats: mp4, webm, ogg'];
+                        } elseif ($videoFile->getSize() > $maxSize * 1024) {
+                            $videoErrors["videos.{$index}.file"] = ['Maximum file size: 100MB'];
+                        } else {
+                            $hasFile = true;
+                        }
+                    }
+                    
+                    if (!$hasFile) {
+                        $videoErrors["videos.{$index}.file"] = ['File is required for local video'];
+                    }
+                } else {
+                    $videoErrors["videos.{$index}.type"] = ['Video type must be local or embed'];
+                }
+            }
+        }
+        
+        if (!empty($videoErrors)) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => $videoErrors
+            ], 422);
+        }
 
         $validated['domain_id'] = $request->user()->domain_id;
         $validated['slug'] = Str::slug($validated['title']);
@@ -109,14 +219,24 @@ class DocumentationPageController extends Controller
                 foreach ($images as $image) {
                     if ($image && $image->isValid()) {
                         $path = $image->store('documentation/images', 'public');
-                        $uploadedImagePaths[] = Storage::url($path);
+                        $url = Storage::url($path);
+                        // Убеждаемся, что URL полный (с APP_URL)
+                        if (!str_starts_with($url, 'http')) {
+                            $url = rtrim(config('app.url'), '/') . '/' . ltrim($url, '/');
+                        }
+                        $uploadedImagePaths[] = $url;
                     }
                 }
             } else {
                 // Если одно изображение
                 if ($images->isValid()) {
                     $path = $images->store('documentation/images', 'public');
-                    $uploadedImagePaths[] = Storage::url($path);
+                    $url = Storage::url($path);
+                    // Убеждаемся, что URL полный (с APP_URL)
+                    if (!str_starts_with($url, 'http')) {
+                        $url = rtrim(config('app.url'), '/') . '/' . ltrim($url, '/');
+                    }
+                    $uploadedImagePaths[] = $url;
                 }
             }
         }
@@ -148,23 +268,76 @@ class DocumentationPageController extends Controller
 
         // Обработка видео
         $processedVideos = [];
-        if ($request->has('videos')) {
-            foreach ($request->input('videos') as $index => $video) {
-                if (isset($video['type']) && $video['type'] === 'embed' && isset($video['url'])) {
-                    // Для embed просто сохраняем URL
-                    $processedVideos[] = [
-                        'type' => 'embed',
-                        'url' => $video['url'],
-                    ];
-                } elseif (isset($video['type']) && $video['type'] === 'local' && $request->hasFile("videos.{$index}.file")) {
-                    // Для локальных видео загружаем файл
-                    $videoFile = $request->file("videos.{$index}.file");
-                    if ($videoFile && $videoFile->isValid()) {
-                        $path = $videoFile->store('documentation/videos', 'public');
+        // Пробуем получить videos разными способами
+        $videos = $request->input('videos');
+        
+        // Если videos не массив, пытаемся собрать его из всех параметров запроса
+        if (!is_array($videos)) {
+            $videos = [];
+            $allInput = $request->all();
+            foreach ($allInput as $key => $value) {
+                if (preg_match('/^videos\[(\d+)\]\[(\w+)\]$/', $key, $matches)) {
+                    $index = (int)$matches[1];
+                    $field = $matches[2];
+                    if (!isset($videos[$index])) {
+                        $videos[$index] = [];
+                    }
+                    $videos[$index][$field] = $value;
+                }
+            }
+        }
+        
+        if (is_array($videos) && !empty($videos)) {
+            foreach ($videos as $index => $video) {
+                if (is_array($video) && isset($video['type'])) {
+                    if ($video['type'] === 'embed' && isset($video['url']) && !empty($video['url'])) {
+                        // Для embed просто сохраняем URL
                         $processedVideos[] = [
-                            'type' => 'local',
-                            'url' => Storage::url($path),
+                            'type' => 'embed',
+                            'url' => $video['url'],
                         ];
+                    } elseif ($video['type'] === 'local') {
+                        // Для локальных видео загружаем файл
+                        $videoFile = null;
+                        
+                        // Пробуем получить файл разными способами
+                        // Способ 1: через стандартный путь
+                        if ($request->hasFile("videos.{$index}.file")) {
+                            $videoFile = $request->file("videos.{$index}.file");
+                        }
+                        // Способ 2: через альтернативный путь
+                        elseif ($request->hasFile("videos[{$index}][file]")) {
+                            $videoFile = $request->file("videos[{$index}][file]");
+                        }
+                        // Способ 3: проверяем все файлы в запросе
+                        else {
+                            $allFiles = $request->allFiles();
+                            foreach ($allFiles as $key => $file) {
+                                if (preg_match('/^videos\[(\d+)\]\[file\]$/', $key, $matches)) {
+                                    $fileIndex = (int)$matches[1];
+                                    if ($fileIndex === $index) {
+                                        $videoFile = $file;
+                                        break;
+                                    }
+                                } elseif ($key === "videos.{$index}.file") {
+                                    $videoFile = $file;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if ($videoFile && $videoFile->isValid()) {
+                            $path = $videoFile->store('documentation/videos', 'public');
+                            $url = Storage::url($path);
+                            // Убеждаемся, что URL полный (с APP_URL)
+                            if (!str_starts_with($url, 'http')) {
+                                $url = rtrim(config('app.url'), '/') . '/' . ltrim($url, '/');
+                            }
+                            $processedVideos[] = [
+                                'type' => 'local',
+                                'url' => $url,
+                            ];
+                        }
                     }
                 }
             }
@@ -277,10 +450,6 @@ class DocumentationPageController extends Controller
             'content_blocks' => 'nullable|string', // JSON string from FormData
             'images' => 'nullable|array',
             'images.*' => 'nullable|file|image|max:10240',
-            'videos' => 'nullable|array',
-            'videos.*.type' => 'required_with:videos.*|in:local,embed',
-            'videos.*.url' => 'required_with:videos.*',
-            'videos.*.file' => 'required_if:videos.*.type,local|file|mimes:mp4,webm,ogg|max:102400',
             'tools' => 'nullable|array',
             'tools.*' => 'exists:tools,id',
             'related_task_categories' => 'nullable|array',
@@ -290,6 +459,112 @@ class DocumentationPageController extends Controller
             'order' => 'nullable|integer|min:0',
             'is_published' => 'nullable|boolean',
         ]);
+
+        // Валидация видео вручную (не используем стандартную валидацию для вложенных массивов с файлами)
+        $videoErrors = [];
+        $videosInput = $request->input('videos');
+        
+        // Собираем videos из всех параметров запроса
+        $videos = [];
+        if (is_array($videosInput)) {
+            $videos = $videosInput;
+        } else {
+            // Пытаемся собрать из всех параметров
+            $allInput = $request->all();
+            foreach ($allInput as $key => $value) {
+                if (preg_match('/^videos\[(\d+)\]\[(\w+)\]$/', $key, $matches)) {
+                    $index = (int)$matches[1];
+                    $field = $matches[2];
+                    if (!isset($videos[$index])) {
+                        $videos[$index] = [];
+                    }
+                    $videos[$index][$field] = $value;
+                }
+            }
+        }
+        
+        // Валидируем каждое видео
+        foreach ($videos as $index => $video) {
+            if (is_array($video) && isset($video['type'])) {
+                if ($video['type'] === 'embed') {
+                    if (empty($video['url'])) {
+                        $videoErrors["videos.{$index}.url"] = ['URL is required for embed video'];
+                    }
+                } elseif ($video['type'] === 'local') {
+                    // Проверяем наличие файла
+                    $hasFile = false;
+                    $videoFile = null;
+                    
+                    // Пробуем получить файл разными способами
+                    // Способ 1: стандартный путь с точкой
+                    if ($request->hasFile("videos.{$index}.file")) {
+                        $videoFile = $request->file("videos.{$index}.file");
+                    }
+                    // Способ 2: путь с квадратными скобками
+                    elseif ($request->hasFile("videos[{$index}][file]")) {
+                        $videoFile = $request->file("videos[{$index}][file]");
+                    }
+                    // Способ 3: прямой доступ через массив запроса
+                    elseif (isset($_FILES["videos"]["name"][$index]["file"])) {
+                        // Используем прямой доступ к $_FILES
+                        if (isset($_FILES["videos"]["tmp_name"][$index]["file"]) && is_uploaded_file($_FILES["videos"]["tmp_name"][$index]["file"])) {
+                            $videoFile = $request->file("videos.{$index}.file");
+                        }
+                    }
+                    // Способ 4: проверяем все файлы в запросе
+                    else {
+                        $allFiles = $request->allFiles();
+                        foreach ($allFiles as $key => $file) {
+                            // Проверяем паттерн videos[число][file]
+                            if (preg_match('/^videos\[(\d+)\]\[file\]$/', $key, $matches)) {
+                                $fileIndex = (int)$matches[1];
+                                if ($fileIndex === $index) {
+                                    $videoFile = $file;
+                                    break;
+                                }
+                            }
+                            // Проверяем паттерн videos.число.file
+                            elseif ($key === "videos.{$index}.file") {
+                                $videoFile = $file;
+                                break;
+                            }
+                            // Проверяем все варианты ключей
+                            elseif (preg_match('/videos.*' . $index . '.*file/i', $key)) {
+                                $videoFile = $file;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if ($videoFile && $videoFile->isValid()) {
+                        // Проверяем MIME тип и размер
+                        $allowedMimes = ['video/mp4', 'video/webm', 'video/ogg'];
+                        $maxSize = 102400; // 100MB в KB
+                        
+                        if (!in_array($videoFile->getMimeType(), $allowedMimes)) {
+                            $videoErrors["videos.{$index}.file"] = ['Allowed formats: mp4, webm, ogg'];
+                        } elseif ($videoFile->getSize() > $maxSize * 1024) {
+                            $videoErrors["videos.{$index}.file"] = ['Maximum file size: 100MB'];
+                        } else {
+                            $hasFile = true;
+                        }
+                    }
+                    
+                    if (!$hasFile) {
+                        $videoErrors["videos.{$index}.file"] = ['File is required for local video'];
+                    }
+                } else {
+                    $videoErrors["videos.{$index}.type"] = ['Video type must be local or embed'];
+                }
+            }
+        }
+        
+        if (!empty($videoErrors)) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => $videoErrors
+            ], 422);
+        }
 
         // Преобразуем boolean значения
         if (isset($validated['is_published'])) {
@@ -337,13 +612,23 @@ class DocumentationPageController extends Controller
                 foreach ($images as $image) {
                     if ($image && $image->isValid()) {
                         $path = $image->store('documentation/images', 'public');
-                        $uploadedImagePaths[] = Storage::url($path);
+                        $url = Storage::url($path);
+                        // Убеждаемся, что URL полный (с APP_URL)
+                        if (!str_starts_with($url, 'http')) {
+                            $url = rtrim(config('app.url'), '/') . '/' . ltrim($url, '/');
+                        }
+                        $uploadedImagePaths[] = $url;
                     }
                 }
             } else {
                 if ($images->isValid()) {
                     $path = $images->store('documentation/images', 'public');
-                    $uploadedImagePaths[] = Storage::url($path);
+                    $url = Storage::url($path);
+                    // Убеждаемся, что URL полный (с APP_URL)
+                    if (!str_starts_with($url, 'http')) {
+                        $url = rtrim(config('app.url'), '/') . '/' . ltrim($url, '/');
+                    }
+                    $uploadedImagePaths[] = $url;
                 }
             }
         }
@@ -376,22 +661,76 @@ class DocumentationPageController extends Controller
 
         // Обработка видео
         $processedVideos = $documentationPage->videos ?? [];
-        if ($request->has('videos')) {
+        // Пробуем получить videos разными способами
+        $videos = $request->input('videos');
+        
+        // Если videos не массив, пытаемся собрать его из всех параметров запроса
+        if (!is_array($videos) && $request->has('videos')) {
+            $videos = [];
+            $allInput = $request->all();
+            foreach ($allInput as $key => $value) {
+                if (preg_match('/^videos\[(\d+)\]\[(\w+)\]$/', $key, $matches)) {
+                    $index = (int)$matches[1];
+                    $field = $matches[2];
+                    if (!isset($videos[$index])) {
+                        $videos[$index] = [];
+                    }
+                    $videos[$index][$field] = $value;
+                }
+            }
+        }
+        
+        if (is_array($videos) && !empty($videos)) {
             $processedVideos = [];
-            foreach ($request->input('videos') as $index => $video) {
-                if (isset($video['type']) && $video['type'] === 'embed' && isset($video['url'])) {
-                    $processedVideos[] = [
-                        'type' => 'embed',
-                        'url' => $video['url'],
-                    ];
-                } elseif (isset($video['type']) && $video['type'] === 'local' && $request->hasFile("videos.{$index}.file")) {
-                    $videoFile = $request->file("videos.{$index}.file");
-                    if ($videoFile && $videoFile->isValid()) {
-                        $path = $videoFile->store('documentation/videos', 'public');
+            foreach ($videos as $index => $video) {
+                if (is_array($video) && isset($video['type'])) {
+                    if ($video['type'] === 'embed' && isset($video['url']) && !empty($video['url'])) {
                         $processedVideos[] = [
-                            'type' => 'local',
-                            'url' => Storage::url($path),
+                            'type' => 'embed',
+                            'url' => $video['url'],
                         ];
+                    } elseif ($video['type'] === 'local') {
+                        // Для локальных видео загружаем файл
+                        $videoFile = null;
+                        
+                        // Пробуем получить файл разными способами
+                        // Способ 1: через стандартный путь
+                        if ($request->hasFile("videos.{$index}.file")) {
+                            $videoFile = $request->file("videos.{$index}.file");
+                        }
+                        // Способ 2: через альтернативный путь
+                        elseif ($request->hasFile("videos[{$index}][file]")) {
+                            $videoFile = $request->file("videos[{$index}][file]");
+                        }
+                        // Способ 3: проверяем все файлы в запросе
+                        else {
+                            $allFiles = $request->allFiles();
+                            foreach ($allFiles as $key => $file) {
+                                if (preg_match('/^videos\[(\d+)\]\[file\]$/', $key, $matches)) {
+                                    $fileIndex = (int)$matches[1];
+                                    if ($fileIndex === $index) {
+                                        $videoFile = $file;
+                                        break;
+                                    }
+                                } elseif ($key === "videos.{$index}.file") {
+                                    $videoFile = $file;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if ($videoFile && $videoFile->isValid()) {
+                            $path = $videoFile->store('documentation/videos', 'public');
+                            $url = Storage::url($path);
+                            // Убеждаемся, что URL полный (с APP_URL)
+                            if (!str_starts_with($url, 'http')) {
+                                $url = rtrim(config('app.url'), '/') . '/' . ltrim($url, '/');
+                            }
+                            $processedVideos[] = [
+                                'type' => 'local',
+                                'url' => $url,
+                            ];
+                        }
                     }
                 }
             }
