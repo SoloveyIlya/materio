@@ -3,6 +3,7 @@
 // Hook Imports
 import { useSettings } from '@core/hooks/useSettings'
 import useLayoutInit from '@core/hooks/useLayoutInit'
+import { useGlobalMessageNotifications } from '@/hooks/useGlobalMessageNotifications'
 
 const LayoutWrapper = props => {
   // Props
@@ -12,6 +13,9 @@ const LayoutWrapper = props => {
   const { settings } = useSettings()
 
   useLayoutInit(systemMode)
+  
+  // Глобальное отслеживание новых сообщений для звуковых уведомлений
+  useGlobalMessageNotifications()
 
   // Return the layout based on the layout context
   return (
