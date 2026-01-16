@@ -30,29 +30,29 @@ class TaskController extends Controller
         }
         
         // Получаем задачи из домена модератора
+        // Модератор видит только задачи, назначенные ему (assigned_to = user->id)
         $query = Task::where('domain_id', $user->domain_id)
+            ->where('assigned_to', $user->id) // Только назначенные модератору задачи
             ->with(['categories', 'template', 'assignments', 'result', 'assignedUser']);
 
         // Фильтрация по группе статусов для модератора
         if ($request->has('group')) {
             $group = $request->get('group');
             switch ($group) {
-                case 'waiting': // Ожидают - все задачи со статусом pending (любой модератор может откликнуться)
+                case 'waiting': // Ожидают - задачи со статусом pending, назначенные модератору
                     $query->where('status', 'pending');
                     break;
                 case 'in_work': // В работе - только задачи, которые взял этот модератор
-                    $query->where('status', 'in_progress')
-                          ->where('assigned_to', $user->id);
+                    $query->where('status', 'in_progress');
                     break;
                 case 'history': // История - только задачи, которые выполнил этот модератор
-                    $query->where('assigned_to', $user->id)
-                          ->whereIn('status', [
-                              'completed_by_moderator',
-                              'under_admin_review',
-                              'approved',
-                              'rejected',
-                              'sent_for_revision',
-                          ]);
+                    $query->whereIn('status', [
+                        'completed_by_moderator',
+                        'under_admin_review',
+                        'approved',
+                        'rejected',
+                        'sent_for_revision',
+                    ]);
                     break;
             }
         } elseif ($request->has('status')) {

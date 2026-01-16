@@ -191,45 +191,56 @@ const ModeratorTasksByDate = () => {
     }
   }
 
-  // Group tasks by date (created_at)
-  const tasksByDate = useMemo(() => {
+  // Group tasks by work_day (Day 1, Day 2, etc.)
+  const tasksByWorkDay = useMemo(() => {
+    // Create default columns for Day 1-5
+    const defaultColumns = [1, 2, 3, 4, 5]
+    
+    // Group tasks by work_day
     const grouped = {}
     
     tasks.forEach(task => {
-      // Используем created_at для группировки по дате получения
-      const dateToUse = task.created_at || task.assigned_at || task.created_at
-      if (!dateToUse) return
-      
-      const date = new Date(dateToUse)
-      const dateKey = date.toISOString().split('T')[0] // YYYY-MM-DD
-      
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = []
+      const workDay = task.work_day
+      if (workDay === null || workDay === undefined) {
+        // Tasks without work_day go to Day 1 by default
+        if (!grouped[1]) {
+          grouped[1] = []
+        }
+        grouped[1].push(task)
+      } else {
+        const dayNum = Number(workDay)
+        if (!grouped[dayNum]) {
+          grouped[dayNum] = []
+        }
+        grouped[dayNum].push(task)
       }
-      grouped[dateKey].push(task)
     })
 
-    // Sort dates in descending order (newest first)
-    const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
-    
-    // Take first 5 days that have tasks
-    const firstFiveDays = sortedDates.slice(0, 5)
-    
-    return firstFiveDays.map(date => ({
-      date,
-      tasks: grouped[date].sort((a, b) => {
-        const dateA = new Date(a.created_at || a.assigned_at || a.created_at)
-        const dateB = new Date(b.created_at || b.assigned_at || b.created_at)
-        return dateA - dateB // Oldest first within each day
+    // Return columns with tasks, sorted by work_day
+    return defaultColumns.map(dayNum => ({
+      day: dayNum,
+      tasks: (grouped[dayNum] || []).sort((a, b) => {
+        // Sort by created_at within each day
+        const dateA = new Date(a.created_at || a.assigned_at || 0)
+        const dateB = new Date(b.created_at || b.assigned_at || 0)
+        return dateA - dateB
       })
     }))
   }, [tasks])
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
+  // Calculate date for each work day based on work_start_date
+  const getDateForDay = (dayNum) => {
+    // For now, use current date + day offset
+    // In a real scenario, this should be based on user's work_start_date
+    const date = new Date()
+    date.setDate(date.getDate() + dayNum - 1)
+    return date
+  }
+
+  const formatDate = (date) => {
     return date.toLocaleDateString('en-US', { 
-      day: '2-digit', 
-      month: '2-digit', 
+      month: 'numeric',
+      day: 'numeric', 
       year: 'numeric' 
     })
   }
@@ -242,7 +253,7 @@ const ModeratorTasksByDate = () => {
     )
   }
 
-  if (tasksByDate.length === 0) {
+  if (tasksByWorkDay.length === 0) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
         <Typography color='text.secondary'>No tasks available</Typography>
@@ -252,14 +263,18 @@ const ModeratorTasksByDate = () => {
 
   return (
     <Box sx={{ px: 3, pb: 3 }}>
-      <Grid container spacing={3}>
-        {tasksByDate.map((dateGroup, index) => (
-          <Grid size={{ xs: 12, sm: 6, md: 6, lg: 4, xl: 3 }} key={dateGroup.date}>
+      <Box sx={{ display: 'flex', gap: 2.5, overflowX: 'auto', pb: 2 }}>
+        {tasksByWorkDay.map((dayGroup) => {
+          const dayDate = getDateForDay(dayGroup.day)
+          return (
             <Paper 
+              key={dayGroup.day}
               elevation={0}
               sx={{ 
                 p: 3, 
-                height: '100%',
+                minWidth: '280px',
+                maxWidth: '320px',
+                width: '100%',
                 minHeight: '400px',
                 border: '1px solid',
                 borderColor: 'divider',
@@ -268,19 +283,24 @@ const ModeratorTasksByDate = () => {
                 flexDirection: 'column'
               }}
             >
-              {/* Date Header */}
-              <Typography 
-                variant='h5' 
-                sx={{ 
-                  mb: 3, 
-                  pb: 2, 
-                  borderBottom: '2px solid',
-                  borderColor: 'primary.main',
-                  fontWeight: 'bold'
-                }}
-              >
-                {formatDate(dateGroup.date)}
-              </Typography>
+              {/* Day Header */}
+              <Box sx={{ mb: 3, pb: 2, borderBottom: '2px solid', borderColor: 'primary.main' }}>
+                <Typography 
+                  variant='h5' 
+                  sx={{ 
+                    fontWeight: 'bold',
+                    mb: 0.5
+                  }}
+                >
+                  Day {dayGroup.day}
+                </Typography>
+                <Typography 
+                  variant='caption' 
+                  color='text.secondary'
+                >
+                  {formatDate(dayDate)}
+                </Typography>
+              </Box>
 
               {/* Tasks List */}
               <Box 
@@ -301,12 +321,12 @@ const ModeratorTasksByDate = () => {
                   },
                 }}
               >
-                {dateGroup.tasks.length === 0 ? (
+                {dayGroup.tasks.length === 0 ? (
                   <Typography variant='caption' color='text.secondary' sx={{ textAlign: 'center', display: 'block', py: 3 }}>
                     No tasks
                   </Typography>
                 ) : (
-                  dateGroup.tasks.map(task => (
+                  dayGroup.tasks.map(task => (
                     <TaskCard 
                       key={task.id} 
                       task={task} 
@@ -316,9 +336,9 @@ const ModeratorTasksByDate = () => {
                 )}
               </Box>
             </Paper>
-          </Grid>
-        ))}
-      </Grid>
+          )
+        })}
+      </Box>
     </Box>
   )
 }
