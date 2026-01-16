@@ -505,6 +505,8 @@ class TaskController extends Controller
             'completion_hours' => $request->input('completion_hours'),
             'status' => $request->input('status'),
             'has_file' => $request->hasFile('document_image'),
+            'has_video_file' => $request->hasFile('video'),
+            'current_task_video' => $task->video,
         ]);
 
         $validated = $request->validate([
@@ -559,7 +561,15 @@ class TaskController extends Controller
             $data = $validated;
             
             // Удаляем поля файлов из $data, чтобы они не перезаписывались, если файлы не загружены
+            // Важно: удаляем эти поля ДО обработки файлов, чтобы они не попали в update
             unset($data['document_image'], $data['selfie_image'], $data['video']);
+            
+            // Логируем для отладки
+            \Log::info('Task update - after unset video:', [
+                'has_video_in_data' => isset($data['video']),
+                'has_video_file' => $request->hasFile('video'),
+                'current_task_video' => $task->video,
+            ]);
             
             if ($request->hasFile('document_image')) {
                 // Delete old file if exists
@@ -593,7 +603,16 @@ class TaskController extends Controller
             }
             // Если файл не загружен, не трогаем существующие значения (они останутся в БД)
             
-            if ($request->hasFile('video')) {
+            // Обработка видео: проверяем, передано ли значение для удаления видео
+            if ($request->has('video_remove') && $request->input('video_remove') === '1') {
+                // Удаляем существующее видео, если пользователь явно запросил удаление
+                if ($task->video) {
+                    $relativePath = str_replace('/storage/', '', parse_url($task->video, PHP_URL_PATH));
+                    Storage::disk('public')->delete($relativePath);
+                }
+                $data['video'] = null;
+                \Log::info('Task update - video removed');
+            } elseif ($request->hasFile('video')) {
                 // Delete old file if exists
                 if ($task->video) {
                     $relativePath = str_replace('/storage/', '', parse_url($task->video, PHP_URL_PATH));
@@ -604,8 +623,13 @@ class TaskController extends Controller
                 $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
                 $path = $file->storeAs('tasks/videos', $fileName, 'public');
                 $data['video'] = Storage::disk('public')->url($path);
+                \Log::info('Task update - new video uploaded', ['video_path' => $data['video']]);
+            } else {
+                // Если файл не загружен и не запрошено удаление, НЕ добавляем поле video в $data
+                // Это гарантирует, что существующее значение не будет перезаписано
+                \Log::info('Task update - video not changed, keeping existing', ['existing_video' => $task->video]);
             }
-            // Если файл не загружен, не трогаем существующие значения (они останутся в БД)
+            // Если файл не загружен и не запрошено удаление, не трогаем существующие значения (они останутся в БД)
             
             // Извлекаем category_ids, tool_ids и documentation_ids для синхронизации связей many-to-many
             $categoryIds = $data['category_ids'] ?? null;
@@ -651,6 +675,20 @@ class TaskController extends Controller
                 }
             }
 
+            // Убеждаемся, что поле video не попало в $data случайно
+            // (оно должно быть только если загружено новое видео или запрошено удаление)
+            if (!isset($data['video']) && !$request->hasFile('video') && !($request->has('video_remove') && $request->input('video_remove') === '1')) {
+                // Гарантируем, что поле video не будет в $data, чтобы не перезаписать существующее значение
+                unset($data['video']);
+            }
+            
+            // Логируем финальные данные перед обновлением
+            \Log::info('Task update - final data before update:', [
+                'has_video_in_data' => isset($data['video']),
+                'video_value' => $data['video'] ?? 'not set',
+                'current_task_video' => $task->video,
+            ]);
+            
             // Обновляем задачу
             $task->update($data);
 
