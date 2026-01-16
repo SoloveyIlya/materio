@@ -41,6 +41,7 @@ const ChatWrapper = () => {
   // Refs
   const messageInputRef = useRef(null)
   const previousMessagesDataRef = useRef(null)
+  const markedAsReadRef = useRef(new Set()) // Track which chats we've already marked as read in this session
 
   // Hooks
   const { settings } = useSettings()
@@ -83,10 +84,11 @@ const ChatWrapper = () => {
     return () => clearInterval(interval)
   }, [user, activeTab])
 
-  // Update selectedChat when messagesData changes
+  // Update selectedChat when messagesData changes and automatically mark messages as read if chat is open
   useEffect(() => {
     if (selectedChat && selectedChat.user && messagesData) {
       const selectedUserId = selectedChat.user.id
+      let updatedChat = null
       
       // For admin - ищем чат только в текущей вкладке
       if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs && activeTab >= 0 && activeTab < messagesData.tabs.length) {
@@ -94,6 +96,7 @@ const ChatWrapper = () => {
         const chat = currentTab.chats.find(c => c.user.id === selectedUserId)
         if (chat) {
           // Обновляем чат только если он найден в текущей вкладке
+          updatedChat = chat
           setSelectedChat(chat)
         } else {
           // Если чат не найден в текущей вкладке, сбрасываем selectedChat
@@ -102,13 +105,85 @@ const ChatWrapper = () => {
         }
       } else if (messagesData && Array.isArray(messagesData) && selectedChat.user) {
         // For moderator
-        const updatedChat = messagesData.find(c => c.user.id === selectedUserId)
-        if (updatedChat) {
-          setSelectedChat(updatedChat)
+        const chat = messagesData.find(c => c.user.id === selectedUserId)
+        if (chat) {
+          updatedChat = chat
+          setSelectedChat(chat)
         }
       }
+
+      // Если чат открыт и есть непрочитанные сообщения, автоматически помечаем их как прочитанные
+      // Используем ключ для отслеживания, чтобы не помечать повторно
+      if (updatedChat && updatedChat.unread_count > 0) {
+        const chatKey = `${updatedChat.user.id}-${selectedAdminTab || user?.id}`
+        
+        // Проверяем, были ли уже непрочитанные сообщения в предыдущих данных
+        const previousChat = previousMessagesDataRef.current
+          ? (user?.roles?.some(r => r.name === 'admin') && previousMessagesDataRef.current?.tabs
+              ? previousMessagesDataRef.current.tabs[activeTab]?.chats?.find(c => c.user.id === selectedUserId)
+              : Array.isArray(previousMessagesDataRef.current)
+                ? previousMessagesDataRef.current.find(c => c.user.id === selectedUserId)
+                : null)
+          : null
+        
+        const previousUnreadCount = previousChat?.unread_count || 0
+        const currentUnreadCount = updatedChat.unread_count || 0
+        
+        // Помечаем как прочитанные только если:
+        // 1. Есть непрочитанные сообщения
+        // 2. Это новый набор непрочитанных (количество увеличилось или чат только что открыт)
+        // 3. Мы еще не помечали этот чат как прочитанный для текущего набора сообщений
+        if (currentUnreadCount > 0 && (currentUnreadCount !== previousUnreadCount || !markedAsReadRef.current.has(chatKey))) {
+          const markChatAsRead = async () => {
+            try {
+              let fromUserId = updatedChat.user.id
+              let toUserId = null
+
+              if (user?.roles?.some(r => r.name === 'admin')) {
+                fromUserId = updatedChat.user.id // От модератора
+                toUserId = selectedAdminTab || user.id // К админу
+              } else if (user?.roles?.some(r => r.name === 'moderator')) {
+                fromUserId = updatedChat.user.id // От админа
+                toUserId = user.id // К модератору
+              }
+
+              const requestData = {
+                from_user_id: fromUserId,
+                type: 'message'
+              }
+
+              if (user?.roles?.some(r => r.name === 'admin') && toUserId && toUserId !== user.id) {
+                requestData.to_user_id = toUserId
+              }
+
+              await api.post('/messages/mark-chat-read', requestData)
+              
+              // Отмечаем, что мы пометили этот чат как прочитанный
+              markedAsReadRef.current.add(chatKey)
+              
+              // Обновляем счетчики в меню (обновление сообщений произойдет при следующем автоматическом обновлении)
+              refreshCounts()
+              
+              // Небольшая задержка перед обновлением сообщений, чтобы избежать лишних вызовов
+              setTimeout(() => {
+                loadMessages(true) // silent = true для быстрого обновления
+              }, 1000)
+            } catch (error) {
+              console.error('Error auto-marking chat as read:', error)
+            }
+          }
+          
+          // Помечаем сообщения как прочитанные с небольшой задержкой
+          const timeoutId = setTimeout(markChatAsRead, 500)
+          return () => clearTimeout(timeoutId)
+        }
+      } else if (updatedChat && updatedChat.unread_count === 0) {
+        // Если все сообщения прочитаны, очищаем отметку для этого чата
+        const chatKey = `${updatedChat.user.id}-${selectedAdminTab || user?.id}`
+        markedAsReadRef.current.delete(chatKey)
+      }
     }
-  }, [messagesData, activeTab])
+  }, [messagesData, activeTab, selectedChat?.user?.id, selectedAdminTab])
 
 
   // Check URL parameters for task_id
@@ -436,6 +511,9 @@ const ChatWrapper = () => {
     // Помечаем все непрочитанные сообщения в этом чате как прочитанные
     if (chat && chat.user) {
       try {
+        // Очищаем отслеживание для предыдущего чата и устанавливаем для нового
+        markedAsReadRef.current.clear()
+        
         // Определяем from_user_id (от кого) и to_user_id (кому) для пометки сообщений
         let fromUserId = chat.user.id
         let toUserId = null
