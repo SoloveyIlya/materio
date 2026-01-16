@@ -12,10 +12,12 @@ class AdminProfile extends Model
     protected $fillable = [
         'user_id',
         'settings',
+        'work_schedule',
     ];
 
     protected $casts = [
         'settings' => 'array',
+        'work_schedule' => 'array',
     ];
 
     public function user()

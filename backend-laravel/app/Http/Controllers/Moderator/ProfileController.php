@@ -85,5 +85,44 @@ class ProfileController extends Controller
             'message' => 'Password changed successfully',
         ]);
     }
+
+    public function updateWorkSchedule(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $user->load('moderatorProfile');
+
+        $validated = $request->validate([
+            'work_schedule' => 'nullable|array',
+            'work_schedule.*.day' => 'required|string|in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'work_schedule.*.enabled' => 'required|boolean',
+            'work_schedule.*.start_time' => 'nullable|string|regex:/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/',
+            'work_schedule.*.end_time' => 'nullable|string|regex:/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/',
+        ]);
+
+        $profile = $user->moderatorProfile;
+        if (!$profile) {
+            $profile = \App\Models\ModeratorProfile::create(['user_id' => $user->id]);
+        }
+
+        $profile->work_schedule = $validated['work_schedule'] ?? null;
+        $profile->save();
+
+        return response()->json([
+            'message' => 'Work schedule updated successfully',
+            'work_schedule' => $profile->work_schedule,
+        ]);
+    }
+
+    public function getWorkSchedule(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $user->load('moderatorProfile');
+
+        $workSchedule = $user->moderatorProfile?->work_schedule ?? null;
+
+        return response()->json([
+            'work_schedule' => $workSchedule,
+        ]);
+    }
 }
 

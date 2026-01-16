@@ -107,6 +107,8 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
     Route::put('/profile', [AdminProfileController::class, 'updateProfile']);
     Route::post('/profile', [AdminProfileController::class, 'updateProfile']); // For FormData with method spoofing
     Route::put('/profile/password', [AdminProfileController::class, 'changePassword']);
+    Route::put('/profile/work-schedule', [AdminProfileController::class, 'updateWorkSchedule']);
+    Route::get('/profile/work-schedule', [AdminProfileController::class, 'getWorkSchedule']);
 });
 
 // Moderator routes
@@ -150,6 +152,8 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
     Route::get('/required-documents', [ProfileController::class, 'getRequiredDocuments']);
     Route::post('/user-documents', [ProfileController::class, 'uploadUserDocument']);
     Route::put('/profile/password', [ProfileController::class, 'changePassword']);
+    Route::put('/profile/work-schedule', [ProfileController::class, 'updateWorkSchedule']);
+    Route::get('/profile/work-schedule', [ProfileController::class, 'getWorkSchedule']);
 
     // Support
     Route::get('/support', [SupportController::class, 'index']);

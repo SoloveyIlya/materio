@@ -19,6 +19,7 @@ import UserRight from '@/views/apps/user/view/user-right'
 import OverViewTab from '@/views/apps/user/view/user-right/overview'
 import TestList from '@/views/apps/user/view/user-right/TestList'
 import TaskList from '@/views/apps/user/view/user-right/TaskList'
+import WorkSchedule from '@/views/apps/user/view/user-right/WorkSchedule'
 import DocumentsTab from '@/views/apps/user/view/user-right/DocumentsTab'
 import LogsTab from '@/views/apps/user/view/user-right/LogsTab'
 import SecureTab from '@/views/apps/user/view/user-right/SecureTab'
@@ -270,6 +271,12 @@ const UserViewPage = () => {
         </Grid>
         <Grid size={{ xs: 12 }}>
           <TestList userId={userId} tests={tests} testResults={testResults} />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <WorkSchedule 
+            moderatorProfile={user?.moderatorProfile} 
+            adminProfile={user?.adminProfile}
+          />
         </Grid>
         <Grid size={{ xs: 12 }}>
           <TaskList tasks={user?.tasks || []} userId={userId} />

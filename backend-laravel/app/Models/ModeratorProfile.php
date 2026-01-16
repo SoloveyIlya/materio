@@ -21,6 +21,7 @@ class ModeratorProfile extends Model
         'task_end_time',
         'task_min_interval',
         'task_max_interval',
+        'work_schedule',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class ModeratorProfile extends Model
         'has_direct' => 'boolean',
         'task_min_interval' => 'integer',
         'task_max_interval' => 'integer',
+        'work_schedule' => 'array',
     ];
 
     public function user()

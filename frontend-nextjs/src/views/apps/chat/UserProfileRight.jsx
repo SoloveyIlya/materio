@@ -14,6 +14,7 @@ import PerfectScrollbar from 'react-perfect-scrollbar'
 // Component Imports
 import { statusObj } from './SidebarLeft'
 import AvatarWithBadge from './AvatarWithBadge'
+import WorkScheduleEditor from './WorkScheduleEditor'
 
 const ScrollWrapper = ({ children, isBelowLgScreen, className }) => {
   if (isBelowLgScreen) {
@@ -196,6 +197,35 @@ const UserProfileRight = props => {
             )}
           </List>
         </div>
+
+        {/* Work Schedule - показываем для админа и модератора, если это их собственный профиль или админ смотрит модератора */}
+        {(activeUser?.id === user?.id || showAdminViewingModerator) && (
+          <div className='flex flex-col gap-1'>
+            <WorkScheduleEditor
+              userId={activeUser?.id}
+              userRole={isActiveUserAdmin ? 'admin' : 'moderator'}
+              workSchedule={
+                isActiveUserAdmin 
+                  ? activeUser?.adminProfile?.work_schedule 
+                  : activeUser?.moderatorProfile?.work_schedule
+              }
+              onUpdate={(updatedSchedule) => {
+                // Обновляем локальное состояние activeUser
+                if (isActiveUserAdmin) {
+                  if (!activeUser.adminProfile) {
+                    activeUser.adminProfile = {}
+                  }
+                  activeUser.adminProfile.work_schedule = updatedSchedule
+                } else {
+                  if (!activeUser.moderatorProfile) {
+                    activeUser.moderatorProfile = {}
+                  }
+                  activeUser.moderatorProfile.work_schedule = updatedSchedule
+                }
+              }}
+            />
+          </div>
+        )}
       </ScrollWrapper>
     </Drawer>
   ) : null
