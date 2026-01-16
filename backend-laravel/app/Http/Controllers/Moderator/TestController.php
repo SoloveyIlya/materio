@@ -109,8 +109,8 @@ class TestController extends Controller
         // Вычисляем процент
         $percentage = $totalQuestions > 0 ? round(($correctAnswers / $totalQuestions) * 100) : 0;
 
-        // Определяем, прошел ли тест (обычно >= 70%, но можно настроить)
-        $passingPercentage = 70; // Можно вынести в настройки теста
+        // Тест считается пройденным только при 100% правильных ответов
+        $passingPercentage = 100;
         $isPassed = $percentage >= $passingPercentage;
 
         // Проверяем время (если время превышено, тест не засчитывается как пройденный)
@@ -139,9 +139,10 @@ class TestController extends Controller
 
         // Если тест пройден успешно, обновляем статус задачи с категорией "Test"
         if ($isPassed) {
-            DB::transaction(function () use ($user) {
+            DB::transaction(function () use ($user, $test) {
                 // Находим задачу с категорией "Test" для этого пользователя
                 // которая еще не пройдена (статус "pending" или "in_progress")
+                // и связана с этим тестом (по title или другим признакам)
                 $task = Task::where('domain_id', $user->domain_id)
                     ->where(function ($query) use ($user) {
                         $query->where('assigned_to', $user->id)

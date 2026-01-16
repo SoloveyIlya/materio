@@ -9,6 +9,7 @@ import Tests from '@/components/tests/Tests'
 
 export default function ModeratorAcademyPage() {
   const [tests, setTests] = useState([])
+  const [testResults, setTestResults] = useState([])
   const router = useRouter()
 
   useEffect(() => {
@@ -17,12 +18,17 @@ export default function ModeratorAcademyPage() {
 
   const loadTests = async () => {
     try {
-      // Загружаем тесты через модераторский API
-      const response = await api.get('/moderator/tests')
-      setTests(response.data || [])
+      // Загружаем тесты и результаты тестов пользователя
+      const [testsResponse, userResponse] = await Promise.all([
+        api.get('/moderator/tests'),
+        api.get('/auth/user')
+      ])
+      setTests(testsResponse.data || [])
+      setTestResults(userResponse.data?.testResults || [])
     } catch (error) {
       console.error('Error loading tests:', error)
       setTests([])
+      setTestResults([])
     }
   }
 
@@ -49,6 +55,7 @@ export default function ModeratorAcademyPage() {
             onEditTest={null}
             onStartTest={handleStartTest}
             readOnly={true}
+            testResults={testResults}
           />
         </Grid>
       </Grid>

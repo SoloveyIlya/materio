@@ -28,28 +28,32 @@ const AcademyCard = () => {
   const loadTestData = async () => {
     try {
       setLoading(true)
-      // Загружаем результаты тестов пользователя
-      const userResponse = await api.get('/auth/user')
+      // Загружаем результаты тестов пользователя и все доступные тесты
+      const [userResponse, testsResponse] = await Promise.all([
+        api.get('/auth/user'),
+        api.get('/moderator/tests')
+      ])
       const user = userResponse.data
+      const allTests = testsResponse.data || []
 
       // Получаем результаты тестов пользователя
       const testResults = user.testResults || []
 
-      // Проверяем, прошёл ли пользователь все 3 теста успешно
+      // Проверяем, прошёл ли пользователь все доступные тесты успешно
       const passedTests = testResults.filter(tr => tr.is_passed === true)
-      const allPassed = passedTests.length >= 3
+      const allPassed = allTests.length > 0 && passedTests.length === allTests.length
 
       setTestData({
-        totalTests: 3,
+        totalTests: allTests.length,
         passedTests: passedTests.length,
-        tests: []
+        tests: allTests
       })
       setAllTestsPassed(allPassed)
     } catch (error) {
       console.error('Error loading test data:', error)
       // Fallback данные
       setTestData({
-        totalTests: 3,
+        totalTests: 0,
         passedTests: 0,
         tests: []
       })
@@ -63,7 +67,7 @@ const AcademyCard = () => {
   }
 
   const data = [
-    { icon: 'ri-calendar-line', title: `${testData?.totalTests || 3} Tests`, value: 'Tests' },
+    { icon: 'ri-calendar-line', title: `${testData?.totalTests || 0} Tests`, value: 'Tests' },
     { icon: 'ri-time-line', title: '30 Minutes', value: 'Duration' }
   ]
 
@@ -129,8 +133,18 @@ const AcademyCard = () => {
             variant='contained' 
             onClick={handleStartClick}
             disabled={allTestsPassed}
+            sx={allTestsPassed ? {
+              bgcolor: 'success.main',
+              '&:hover': {
+                bgcolor: 'success.dark',
+              },
+              '&:disabled': {
+                bgcolor: 'success.main',
+                color: 'white'
+              }
+            } : {}}
           >
-            {allTestsPassed ? 'Completed' : 'Start'}
+            {allTestsPassed ? 'Success' : 'Start'}
           </Button>
         )}
       </CardContent>

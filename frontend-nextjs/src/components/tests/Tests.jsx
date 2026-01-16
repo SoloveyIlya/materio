@@ -13,10 +13,20 @@ import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
 import Box from '@mui/material/Box'
 
-const Tests = ({ testData, onEditTest, onStartTest, readOnly = false }) => {
+const Tests = ({ testData, onEditTest, onStartTest, readOnly = false, testResults = [] }) => {
   // States
   const [data, setData] = useState([])
   const [activePage, setActivePage] = useState(0)
+
+  // Создаем мапу результатов тестов для быстрого поиска
+  const resultsMap = {}
+  if (testResults && Array.isArray(testResults)) {
+    testResults.forEach(result => {
+      if (result.test_id) {
+        resultsMap[result.test_id] = result
+      }
+    })
+  }
 
   useEffect(() => {
     const newData = testData ?? []
@@ -69,17 +79,20 @@ const Tests = ({ testData, onEditTest, onStartTest, readOnly = false }) => {
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <Typography variant='body2'>{item.duration_minutes} min</Typography>
                         {readOnly && onStartTest ? (
-                          <Button
-                            variant='contained'
-                            size='small'
-                            startIcon={<i className='ri-play-line' />}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onStartTest(item)
-                            }}
-                          >
-                            Start
-                          </Button>
+                          // Показываем кнопку Start только если тест не пройден
+                          !resultsMap[item.id]?.is_passed && (
+                            <Button
+                              variant='contained'
+                              size='small'
+                              startIcon={<i className='ri-play-line' />}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onStartTest(item)
+                              }}
+                            >
+                              Start
+                            </Button>
+                          )
                         ) : (
                           onEditTest && (
                             <IconButton
@@ -108,12 +121,21 @@ const Tests = ({ testData, onEditTest, onStartTest, readOnly = false }) => {
                         <i className='ri-question-line text-xl' />
                         <Typography>{item.questions?.length || 0} questions</Typography>
                       </div>
-                      <Chip
-                        label={item.is_active ? 'Active' : 'Inactive'}
-                        color={item.is_active ? 'success' : 'default'}
-                        size='small'
-                        variant='outlined'
-                      />
+                      {resultsMap[item.id]?.is_passed ? (
+                        <Chip
+                          label='Test passed'
+                          color='success'
+                          size='small'
+                          variant='outlined'
+                        />
+                      ) : (
+                        <Chip
+                          label={item.is_active ? 'Active' : 'Inactive'}
+                          color={item.is_active ? 'success' : 'default'}
+                          size='small'
+                          variant='outlined'
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
