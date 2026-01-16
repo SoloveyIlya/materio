@@ -14,7 +14,16 @@ class SupportController extends Controller
         $user = $request->user();
 
         $query = Ticket::where('domain_id', $user->domain_id)
-            ->with(['user.roles', 'assignedUser', 'messages.fromUser', 'messages.toUser', 'attachments']);
+            ->with([
+                'user.roles', 
+                'assignedUser', 
+                'messages' => function ($q) {
+                    $q->where('is_deleted', false)->orderBy('created_at', 'asc');
+                },
+                'messages.fromUser', 
+                'messages.toUser', 
+                'attachments'
+            ]);
 
         // Фильтрация по категориям
         if ($request->has('category')) {
@@ -66,7 +75,12 @@ class SupportController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        return response()->json($ticket->load(['user', 'assignedUser', 'messages.fromUser', 'messages.toUser', 'attachments']));
+        $ticket->load(['user', 'assignedUser', 'attachments']);
+        $ticket->load(['messages' => function ($query) {
+            $query->where('is_deleted', false)->orderBy('created_at', 'asc');
+        }, 'messages.fromUser', 'messages.toUser']);
+        
+        return response()->json($ticket);
     }
 
     public function reply(Ticket $ticket, Request $request): JsonResponse

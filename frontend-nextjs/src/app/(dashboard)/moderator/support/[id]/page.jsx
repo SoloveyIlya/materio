@@ -18,7 +18,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Alert from '@mui/material/Alert'
 
 // Component Imports
-import api from '@/lib/api'
+import api, { API_URL } from '@/lib/api'
 import { showToast } from '@/utils/toast'
 
 const ticketStatusColors = {
@@ -102,7 +102,8 @@ export default function TicketDetailPage() {
 
       <Grid container spacing={6}>
         <Grid size={{ xs: 12, md: 8 }}>
-          <Card>
+          {/* Initial ticket message */}
+          <Card sx={{ mb: 3 }}>
             <CardContent>
               <Typography variant='h5' sx={{ mb: 2 }}>
                 {ticket.subject}
@@ -119,28 +120,64 @@ export default function TicketDetailPage() {
                     Attachments
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    {ticket.attachments.map((attachment, index) => (
-                      <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <i className='ri-file-line' style={{ fontSize: '20px' }} />
-                        <Typography variant='body2'>
-                          {attachment.file_name}
-                        </Typography>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          href={attachment.file_path}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Download
-                        </Button>
-                      </Box>
-                    ))}
+                    {ticket.attachments.map((attachment, index) => {
+                      const fileUrl = attachment.file_path?.startsWith('http') 
+                        ? attachment.file_path 
+                        : `${API_URL}${attachment.file_path}`
+                      return (
+                        <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <i className='ri-file-line' style={{ fontSize: '20px' }} />
+                          <Typography variant='body2' sx={{ flex: 1 }}>
+                            {attachment.file_name}
+                          </Typography>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Download
+                          </Button>
+                        </Box>
+                      )
+                    })}
                   </Box>
                 </>
               )}
             </CardContent>
           </Card>
+
+          {/* Messages */}
+          {ticket.messages && ticket.messages.length > 0 && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {ticket.messages.map((message) => (
+                <Card key={message.id}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                      <Box>
+                        <Typography variant='subtitle1' fontWeight='medium'>
+                          {message.fromUser?.name || message.fromUser?.email || 'Unknown'}
+                        </Typography>
+                        {message.fromUser?.email && (
+                          <Typography variant='body2' color='text.secondary'>
+                            {message.fromUser.email}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Typography variant='body2' color='text.secondary'>
+                        {formatDate(message.created_at)}
+                      </Typography>
+                    </Box>
+                    <Divider sx={{ my: 2 }} />
+                    <Typography variant='body1' sx={{ whiteSpace: 'pre-wrap' }}>
+                      {message.body}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              ))}
+            </Box>
+          )}
         </Grid>
 
         <Grid size={{ xs: 12, md: 4 }}>

@@ -81,8 +81,11 @@ class SupportController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        // Загружаем сообщения тикета
-        $ticket->load(['assignedUser', 'attachments', 'messages.fromUser', 'messages.toUser']);
+        // Загружаем сообщения тикета (только не удаленные)
+        $ticket->load(['assignedUser', 'attachments']);
+        $ticket->load(['messages' => function ($query) {
+            $query->where('is_deleted', false)->orderBy('created_at', 'asc');
+        }, 'messages.fromUser', 'messages.toUser']);
 
         // Помечаем все непрочитанные сообщения от админа как прочитанные
         $administratorId = $user->administrator_id;
