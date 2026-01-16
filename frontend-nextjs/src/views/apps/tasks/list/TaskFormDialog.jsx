@@ -23,6 +23,7 @@ import {
   OutlinedInput,
   Popover,
   ClickAwayListener,
+  IconButton,
 } from '@mui/material'
 import api from '@/lib/api'
 import { API_URL } from '@/lib/api'
@@ -62,6 +63,9 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
   const [categoriesAnchorEl, setCategoriesAnchorEl] = useState(null)
   const [documentationsAnchorEl, setDocumentationsAnchorEl] = useState(null)
   const [toolsAnchorEl, setToolsAnchorEl] = useState(null)
+  const [imageDialogOpen, setImageDialogOpen] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [imageZoom, setImageZoom] = useState(100)
 
   useEffect(() => {
     if (open) {
@@ -197,6 +201,31 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
     if (imagePath.startsWith('http')) return imagePath
     if (imagePath.startsWith('/storage/')) return `${API_URL}${imagePath}`
     return `${API_URL}/storage/${imagePath}`
+  }
+
+  // Handle image click
+  const handleImageClick = (imageUrl) => {
+    if (imageUrl) {
+      setSelectedImage(imageUrl)
+      setImageZoom(100)
+      setImageDialogOpen(true)
+    }
+  }
+
+  // Handle zoom in
+  const handleZoomIn = () => {
+    setImageZoom(prev => Math.min(prev + 25, 500))
+  }
+
+  // Handle zoom out
+  const handleZoomOut = () => {
+    setImageZoom(prev => Math.max(prev - 25, 50))
+  }
+
+  // Reset zoom when dialog closes
+  const handleImageDialogClose = () => {
+    setImageDialogOpen(false)
+    setImageZoom(100)
   }
 
   const resetForm = () => {
@@ -821,7 +850,12 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
               </Button>
               {documentPreview && (
                 <Box sx={{ mt: 1 }}>
-                  <img src={documentPreview} alt="Document preview" style={{ maxWidth: '100%', maxHeight: 200 }} />
+                  <img 
+                    src={documentPreview} 
+                    alt="Document preview" 
+                    style={{ maxWidth: '100%', maxHeight: 200, cursor: 'pointer' }}
+                    onClick={() => handleImageClick(documentPreview)}
+                  />
                 </Box>
               )}
               {documentFileName && (
@@ -845,7 +879,12 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
               </Button>
               {selfiePreview && (
                 <Box sx={{ mt: 1 }}>
-                  <img src={selfiePreview} alt="Selfie preview" style={{ maxWidth: '100%', maxHeight: 200 }} />
+                  <img 
+                    src={selfiePreview} 
+                    alt="Selfie preview" 
+                    style={{ maxWidth: '100%', maxHeight: 200, cursor: 'pointer' }}
+                    onClick={() => handleImageClick(selfiePreview)}
+                  />
                 </Box>
               )}
             </Grid>
@@ -870,6 +909,77 @@ const TaskFormDialog = ({ open, onClose, task, onSave }) => {
           Save
         </Button>
       </DialogActions>
+
+      {/* Image Fullscreen Dialog */}
+      <Dialog 
+        open={imageDialogOpen} 
+        onClose={handleImageDialogClose} 
+        maxWidth="lg" 
+        fullWidth
+      >
+        <DialogTitle sx={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <IconButton 
+              onClick={handleZoomOut}
+              disabled={imageZoom <= 50}
+              size="small"
+              sx={{ 
+                border: '1px solid',
+                borderColor: 'divider',
+                '&:hover': { bgcolor: 'action.hover' }
+              }}
+            >
+              <i className='ri-zoom-out-line' />
+            </IconButton>
+            <Typography variant="body2" sx={{ minWidth: 60, textAlign: 'center' }}>
+              {imageZoom}%
+            </Typography>
+            <IconButton 
+              onClick={handleZoomIn}
+              disabled={imageZoom >= 500}
+              size="small"
+              sx={{ 
+                border: '1px solid',
+                borderColor: 'divider',
+                '&:hover': { bgcolor: 'action.hover' }
+              }}
+            >
+              <i className='ri-zoom-in-line' />
+            </IconButton>
+          </Box>
+          <IconButton 
+            onClick={handleImageDialogClose} 
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <i className='ri-close-line' />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {selectedImage && (
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                minHeight: '50vh',
+                overflow: 'auto',
+                p: 2
+              }}
+            >
+              <img
+                src={selectedImage}
+                alt="Full size"
+                style={{ 
+                  width: `${imageZoom}%`,
+                  height: 'auto',
+                  objectFit: 'contain',
+                  transition: 'width 0.3s ease'
+                }}
+              />
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

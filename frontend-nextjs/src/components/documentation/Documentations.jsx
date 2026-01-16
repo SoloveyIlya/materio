@@ -32,11 +32,29 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
   const [selectedImage, setSelectedImage] = useState(null)
+  const [imageZoom, setImageZoom] = useState(100)
 
   // Handle image click
   const handleImageClick = (imageUrl) => {
     setSelectedImage(imageUrl)
+    setImageZoom(100)
     setImageDialogOpen(true)
+  }
+
+  // Handle zoom in
+  const handleZoomIn = () => {
+    setImageZoom(prev => Math.min(prev + 25, 500))
+  }
+
+  // Handle zoom out
+  const handleZoomOut = () => {
+    setImageZoom(prev => Math.max(prev - 25, 50))
+  }
+
+  // Reset zoom when dialog closes
+  const handleDialogClose = () => {
+    setImageDialogOpen(false)
+    setImageZoom(100)
   }
 
   // Hooks
@@ -556,13 +574,42 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
       {/* Image Fullscreen Dialog */}
       <Dialog 
         open={imageDialogOpen} 
-        onClose={() => setImageDialogOpen(false)} 
+        onClose={handleDialogClose} 
         maxWidth="lg" 
         fullWidth
       >
-        <DialogTitle>
+        <DialogTitle sx={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <IconButton 
+              onClick={handleZoomOut}
+              disabled={imageZoom <= 50}
+              size="small"
+              sx={{ 
+                border: '1px solid',
+                borderColor: 'divider',
+                '&:hover': { bgcolor: 'action.hover' }
+              }}
+            >
+              <i className='ri-zoom-out-line' />
+            </IconButton>
+            <Typography variant="body2" sx={{ minWidth: 60, textAlign: 'center' }}>
+              {imageZoom}%
+            </Typography>
+            <IconButton 
+              onClick={handleZoomIn}
+              disabled={imageZoom >= 500}
+              size="small"
+              sx={{ 
+                border: '1px solid',
+                borderColor: 'divider',
+                '&:hover': { bgcolor: 'action.hover' }
+              }}
+            >
+              <i className='ri-zoom-in-line' />
+            </IconButton>
+          </Box>
           <IconButton 
-            onClick={() => setImageDialogOpen(false)} 
+            onClick={handleDialogClose} 
             sx={{ position: 'absolute', right: 8, top: 8 }}
           >
             <i className='ri-close-line' />
@@ -570,11 +617,25 @@ const Documentations = ({ categories, pages, onEditPage, onEditCategory, onDelet
         </DialogTitle>
         <DialogContent>
           {selectedImage && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                minHeight: '50vh',
+                overflow: 'auto',
+                p: 2
+              }}
+            >
               <img
                 src={selectedImage}
                 alt="Full size"
-                style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
+                style={{ 
+                  width: `${imageZoom}%`,
+                  height: 'auto',
+                  objectFit: 'contain',
+                  transition: 'width 0.3s ease'
+                }}
               />
             </Box>
           )}
