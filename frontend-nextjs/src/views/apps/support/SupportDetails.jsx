@@ -12,6 +12,8 @@ import CardContent from '@mui/material/CardContent'
 import CardActions from '@mui/material/CardActions'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
+import Box from '@mui/material/Box'
+import Divider from '@mui/material/Divider'
 import { styled } from '@mui/material'
 
 // Third-party Imports
@@ -27,7 +29,7 @@ import styles from './styles.module.css'
 
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
-import api from '@/lib/api'
+import api, { API_URL } from '@/lib/api'
 import { showToast } from '@/utils/toast'
 import { useMenuCounts } from '@/hooks/useMenuCounts'
 
@@ -223,6 +225,39 @@ const SupportDetails = ({
               <Typography className='text-textSecondary' style={{ whiteSpace: 'pre-wrap' }}>
                 {initialMessage.body}
               </Typography>
+              {/* Ticket Attachments */}
+              {ticket.attachments && ticket.attachments.length > 0 && (
+                <>
+                  <Divider sx={{ my: 3 }} />
+                  <Typography variant='h6' sx={{ mb: 2 }}>
+                    Attachments
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {ticket.attachments.map((attachment, index) => {
+                      const fileUrl = attachment.file_path?.startsWith('http') 
+                        ? attachment.file_path 
+                        : `${API_URL}${attachment.file_path}`
+                      return (
+                        <Box key={attachment.id || index} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <i className='ri-file-line' style={{ fontSize: '20px' }} />
+                          <Typography variant='body2' sx={{ flex: 1 }}>
+                            {attachment.file_name}
+                          </Typography>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Download
+                          </Button>
+                        </Box>
+                      )
+                    })}
+                  </Box>
+                </>
+              )}
             </CardContent>
           </Card>
 
