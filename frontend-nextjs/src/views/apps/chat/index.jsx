@@ -433,6 +433,93 @@ const ChatWrapper = () => {
         messageData.from_user_id = fromUserId
       }
 
+      // Создаем временное сообщение для оптимистичного обновления
+      const tempMessageId = `temp-${Date.now()}`
+      const tempMessage = {
+        id: tempMessageId,
+        from_user_id: fromUserId || user.id,
+        to_user_id: selectedChat.user.id,
+        body: messageText || null,
+        attachments: attachments.map((file, idx) => {
+          if (file instanceof File) {
+            return {
+              url: URL.createObjectURL(file),
+              name: file.name,
+              type: file.type.startsWith('image/') ? 'image' : 'file'
+            }
+          }
+          return file
+        }),
+        task_id: taskId || null,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        created_at_formatted: new Date().toISOString(),
+        is_edited: false,
+        is_deleted: false
+      }
+
+      // Добавляем голосовое сообщение, если есть
+      if (voiceFile) {
+        tempMessage.attachments = tempMessage.attachments || []
+        tempMessage.attachments.push({
+          url: URL.createObjectURL(voiceFile),
+          name: voiceFile.name,
+          type: 'voice'
+        })
+      }
+
+      // Добавляем видео, если есть
+      if (videoFile) {
+        tempMessage.attachments = tempMessage.attachments || []
+        tempMessage.attachments.push({
+          url: URL.createObjectURL(videoFile),
+          name: videoFile.name,
+          type: 'video'
+        })
+      }
+
+      // Оптимистично добавляем сообщение в текущий чат
+      if (selectedChat) {
+        const updatedChat = {
+          ...selectedChat,
+          messages: [...(selectedChat.messages || []), tempMessage]
+        }
+        setSelectedChat(updatedChat)
+
+        // Обновляем messagesData для текущего чата
+        setMessagesData(prevData => {
+          if (user?.roles?.some(r => r.name === 'admin') && prevData?.tabs) {
+            const updatedTabs = prevData.tabs.map((tab, tabIndex) => {
+              if (tabIndex === activeTab) {
+                const updatedChats = tab.chats.map(chat => {
+                  if (chat.user.id === selectedChat.user.id) {
+                    return {
+                      ...chat,
+                      messages: [...(chat.messages || []), tempMessage]
+                    }
+                  }
+                  return chat
+                })
+                return { ...tab, chats: updatedChats }
+              }
+              return tab
+            })
+            return { ...prevData, tabs: updatedTabs }
+          } else if (Array.isArray(prevData)) {
+            return prevData.map(chat => {
+              if (chat.user.id === selectedChat.user.id) {
+                return {
+                  ...chat,
+                  messages: [...(chat.messages || []), tempMessage]
+                }
+              }
+              return chat
+            })
+          }
+          return prevData
+        })
+      }
+
       // If there are files, voice, or video, use FormData
       if (attachments.some(f => f instanceof File) || voiceFile || videoFile) {
         const formData = new FormData()
@@ -466,21 +553,144 @@ const ChatWrapper = () => {
         })
 
         // Axios автоматически установит Content-Type для FormData
-        await api.post('/messages', formData, {
+        const response = await api.post('/messages', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         })
-      } else {
-        await api.post('/messages', messageData)
-      }
 
-      await loadMessages()
+        // Заменяем временное сообщение на реальное из ответа сервера
+        if (response.data && selectedChat) {
+          const realMessage = response.data
+          setSelectedChat(prevChat => {
+            if (!prevChat) return prevChat
+            const updatedMessages = prevChat.messages.map(msg => 
+              msg.id === tempMessageId ? realMessage : msg
+            )
+            return { ...prevChat, messages: updatedMessages }
+          })
+
+          setMessagesData(prevData => {
+            if (user?.roles?.some(r => r.name === 'admin') && prevData?.tabs) {
+              const updatedTabs = prevData.tabs.map((tab, tabIndex) => {
+                if (tabIndex === activeTab) {
+                  const updatedChats = tab.chats.map(chat => {
+                    if (chat.user.id === selectedChat.user.id) {
+                      const updatedMessages = chat.messages.map(msg => 
+                        msg.id === tempMessageId ? realMessage : msg
+                      )
+                      return { ...chat, messages: updatedMessages }
+                    }
+                    return chat
+                  })
+                  return { ...tab, chats: updatedChats }
+                }
+                return tab
+              })
+              return { ...prevData, tabs: updatedTabs }
+            } else if (Array.isArray(prevData)) {
+              return prevData.map(chat => {
+                if (chat.user.id === selectedChat.user.id) {
+                  const updatedMessages = chat.messages.map(msg => 
+                    msg.id === tempMessageId ? realMessage : msg
+                  )
+                  return { ...chat, messages: updatedMessages }
+                }
+                return chat
+              })
+            }
+            return prevData
+          })
+        }
+      } else {
+        const response = await api.post('/messages', messageData)
+        
+        // Заменяем временное сообщение на реальное из ответа сервера
+        if (response.data && selectedChat) {
+          const realMessage = response.data
+          // Добавляем анимацию для нового сообщения
+          setSelectedChat(prevChat => {
+            if (!prevChat) return prevChat
+            const updatedMessages = prevChat.messages.map(msg => 
+              msg.id === tempMessageId ? realMessage : msg
+            )
+            return { ...prevChat, messages: updatedMessages }
+          })
+
+          setMessagesData(prevData => {
+            if (user?.roles?.some(r => r.name === 'admin') && prevData?.tabs) {
+              const updatedTabs = prevData.tabs.map((tab, tabIndex) => {
+                if (tabIndex === activeTab) {
+                  const updatedChats = tab.chats.map(chat => {
+                    if (chat.user.id === selectedChat.user.id) {
+                      const updatedMessages = chat.messages.map(msg => 
+                        msg.id === tempMessageId ? realMessage : msg
+                      )
+                      return { ...chat, messages: updatedMessages }
+                    }
+                    return chat
+                  })
+                  return { ...tab, chats: updatedChats }
+                }
+                return tab
+              })
+              return { ...prevData, tabs: updatedTabs }
+            } else if (Array.isArray(prevData)) {
+              return prevData.map(chat => {
+                if (chat.user.id === selectedChat.user.id) {
+                  const updatedMessages = chat.messages.map(msg => 
+                    msg.id === tempMessageId ? realMessage : msg
+                  )
+                  return { ...chat, messages: updatedMessages }
+                }
+                return chat
+              })
+            }
+            return prevData
+          })
+        }
+      }
       
-      // Обновляем счетчики в меню после отправки сообщения
+      // Обновляем счетчики в меню после отправки сообщения (без перезагрузки списка диалогов)
       refreshCounts()
     } catch (error) {
       console.error('Error sending message:', error)
+      // В случае ошибки удаляем временное сообщение
+      if (selectedChat) {
+        setSelectedChat(prevChat => {
+          if (!prevChat) return prevChat
+          const updatedMessages = prevChat.messages.filter(msg => msg.id !== tempMessageId)
+          return { ...prevChat, messages: updatedMessages }
+        })
+
+        setMessagesData(prevData => {
+          if (user?.roles?.some(r => r.name === 'admin') && prevData?.tabs) {
+            const updatedTabs = prevData.tabs.map((tab, tabIndex) => {
+              if (tabIndex === activeTab) {
+                const updatedChats = tab.chats.map(chat => {
+                  if (chat.user.id === selectedChat.user.id) {
+                    const updatedMessages = chat.messages.filter(msg => msg.id !== tempMessageId)
+                    return { ...chat, messages: updatedMessages }
+                  }
+                  return chat
+                })
+                return { ...tab, chats: updatedChats }
+              }
+              return tab
+            })
+            return { ...prevData, tabs: updatedTabs }
+          } else if (Array.isArray(prevData)) {
+            return prevData.map(chat => {
+              if (chat.user.id === selectedChat.user.id) {
+                const updatedMessages = chat.messages.filter(msg => msg.id !== tempMessageId)
+                return { ...chat, messages: updatedMessages }
+              }
+              return chat
+            })
+          }
+          return prevData
+        })
+      }
       throw error
     }
   }

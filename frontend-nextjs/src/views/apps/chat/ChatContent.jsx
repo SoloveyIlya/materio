@@ -22,6 +22,24 @@ import DialogActions from '@mui/material/DialogActions'
 import classnames from 'classnames'
 import PerfectScrollbar from 'react-perfect-scrollbar'
 
+// Styles for message animation
+const messageAnimationStyles = `
+  @keyframes messageAppear {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .message-item.message-appear {
+    animation: messageAppear 0.3s ease-out;
+  }
+`
+
 // Component Imports
 import OptionMenu from '@core/components/option-menu'
 import AvatarWithBadge from './AvatarWithBadge'
@@ -101,6 +119,7 @@ const ChatContent = props => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [messageToDelete, setMessageToDelete] = useState(null)
   const [newMessageIds, setNewMessageIds] = useState(new Set())
+  const [animatingMessageIds, setAnimatingMessageIds] = useState(new Set())
 
   // Refs
   const scrollRef = useRef(null)
@@ -310,6 +329,38 @@ const ChatContent = props => {
     }
   }, [selectedChat?.user?.id, selectedChat?.messages?.length, user?.id, selectedAdminTab])
 
+  // Отслеживаем новые сообщения для анимации
+  useEffect(() => {
+    if (selectedChat?.messages && selectedChat.messages.length > 0) {
+      const lastMessage = selectedChat.messages[selectedChat.messages.length - 1]
+      
+      // Определяем, является ли сообщение отправленным от нас
+      let isSender = false
+      if (user?.roles?.some(r => r.name === 'admin') && selectedAdminTab) {
+        isSender = lastMessage.from_user_id === user.id || lastMessage.from_user_id === selectedAdminTab
+      } else {
+        isSender = lastMessage.from_user_id === user?.id
+      }
+
+      // Если это наше сообщение или временное сообщение, добавляем анимацию
+      if (isSender || (lastMessage.id && lastMessage.id.toString().startsWith('temp-'))) {
+        const messageId = lastMessage.id
+        setAnimatingMessageIds(prev => new Set([...prev, messageId]))
+        
+        // Убираем анимацию через 500ms (после завершения анимации)
+        const timer = setTimeout(() => {
+          setAnimatingMessageIds(prev => {
+            const newSet = new Set(prev)
+            newSet.delete(messageId)
+            return newSet
+          })
+        }, 500)
+
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [selectedChat?.messages?.length, user?.id, selectedAdminTab])
+
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files)
     setAttachments(prev => [...prev, ...files])
@@ -464,6 +515,7 @@ const ChatContent = props => {
 
   return !selectedChat ? (
     <CardContent className='flex flex-col flex-auto items-center justify-center bs-full gap-[18px] bg-[var(--mui-palette-customColors-chatBg)]'>
+      <style>{messageAnimationStyles}</style>
       <CustomAvatar variant='circular' size={98} color='primary' skin='light'>
         <i className='ri-wechat-line text-[50px]' />
       </CustomAvatar>
@@ -554,6 +606,7 @@ const ChatContent = props => {
             scrollRef={scrollRef}
             className='bg-[var(--mui-palette-customColors-chatBg)] flex-1'
           >
+            <style>{messageAnimationStyles}</style>
             <CardContent className='p-0'>
               {selectedChat.messages && selectedChat.messages.length > 0 ? (
                 selectedChat.messages
@@ -577,6 +630,7 @@ const ChatContent = props => {
                     }
 
                     const isNewMessage = newMessageIds.has(msg.id)
+                    const isAnimating = animatingMessageIds.has(msg.id)
 
                     return (
                       <div
@@ -587,8 +641,9 @@ const ChatContent = props => {
                           }
                         }}
                         data-message-id={msg.id}
-                        className={classnames('flex gap-4', { 
-                          'flex-row-reverse': isSender
+                        className={classnames('flex gap-4 message-item', { 
+                          'flex-row-reverse': isSender,
+                          'message-appear': isAnimating
                         })}
                         style={{
                           backgroundColor: isNewMessage && !isSender 
@@ -597,7 +652,9 @@ const ChatContent = props => {
                           borderRadius: isNewMessage && !isSender ? '8px' : '0',
                           margin: isNewMessage && !isSender ? '4px 8px' : '0',
                           padding: '20px',
-                          transition: 'background-color 0.6s ease-out, border-radius 0.6s ease-out, margin 0.6s ease-out'
+                          transition: isAnimating 
+                            ? 'opacity 0.3s ease-out, transform 0.3s ease-out, background-color 0.6s ease-out, border-radius 0.6s ease-out, margin 0.6s ease-out'
+                            : 'background-color 0.6s ease-out, border-radius 0.6s ease-out, margin 0.6s ease-out'
                         }}
                       >
                         {!isSender ? (
