@@ -59,6 +59,14 @@ export const useMenuCounts = () => {
     return () => clearInterval(interval)
   }, [user])
 
-  return { counts, loading, refreshCounts: fetchCounts }
+  // Оптимистичное обновление счетчика чата (для мгновенного обновления UI)
+  const optimisticallyUpdateChatCount = (unreadCountToSubtract) => {
+    setCounts(prevCounts => ({
+      ...prevCounts,
+      chat: Math.max(0, (prevCounts.chat || 0) - (unreadCountToSubtract || 0))
+    }))
+  }
+
+  return { counts, loading, refreshCounts: fetchCounts, optimisticallyUpdateChatCount }
 }
 

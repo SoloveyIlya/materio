@@ -45,7 +45,7 @@ const ChatWrapper = () => {
 
   // Hooks
   const { settings } = useSettings()
-  const { refreshCounts } = useMenuCounts()
+  const { refreshCounts, optimisticallyUpdateChatCount } = useMenuCounts()
   const isBelowLgScreen = useMediaQuery(theme => theme.breakpoints.down('lg'))
   const isBelowMdScreen = useMediaQuery(theme => theme.breakpoints.down('md'))
   const isBelowSmScreen = useMediaQuery(theme => theme.breakpoints.down('sm'))
@@ -161,7 +161,13 @@ const ChatWrapper = () => {
               // Отмечаем, что мы пометили этот чат как прочитанный
               markedAsReadRef.current.add(chatKey)
               
-              // Обновляем счетчики в меню (обновление сообщений произойдет при следующем автоматическом обновлении)
+              // Оптимистично обновляем счетчик в меню сразу (для мгновенного обновления UI)
+              const unreadCount = updatedChat.unread_count || 0
+              if (unreadCount > 0) {
+                optimisticallyUpdateChatCount(unreadCount)
+              }
+              
+              // Обновляем счетчики в меню (для синхронизации с сервером)
               refreshCounts()
               
               // Небольшая задержка перед обновлением сообщений, чтобы избежать лишних вызовов
@@ -514,6 +520,12 @@ const ChatWrapper = () => {
         // Очищаем отслеживание для предыдущего чата и устанавливаем для нового
         markedAsReadRef.current.clear()
         
+        // Оптимистично обновляем счетчик в меню сразу (для мгновенного обновления UI)
+        const unreadCount = chat.unread_count || 0
+        if (unreadCount > 0) {
+          optimisticallyUpdateChatCount(unreadCount)
+        }
+        
         // Определяем from_user_id (от кого) и to_user_id (кому) для пометки сообщений
         let fromUserId = chat.user.id
         let toUserId = null
@@ -547,10 +559,12 @@ const ChatWrapper = () => {
         // Обновляем сообщения и счетчики
         await loadMessages(true) // silent = true для быстрого обновления
         
-        // Обновляем счетчики в меню
+        // Обновляем счетчики в меню (для синхронизации с сервером)
         refreshCounts()
       } catch (error) {
         console.error('Error marking chat as read:', error)
+        // В случае ошибки обновляем счетчики, чтобы восстановить правильное значение
+        refreshCounts()
       }
     }
   }
