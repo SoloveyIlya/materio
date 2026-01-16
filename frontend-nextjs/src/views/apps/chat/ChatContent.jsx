@@ -120,6 +120,10 @@ const ChatContent = props => {
   const [messageToDelete, setMessageToDelete] = useState(null)
   const [newMessageIds, setNewMessageIds] = useState(new Set())
   const [animatingMessageIds, setAnimatingMessageIds] = useState(new Set())
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(-1)
 
   // Refs
   const scrollRef = useRef(null)
@@ -140,37 +144,79 @@ const ChatContent = props => {
   const scrollToMessage = (element) => {
     if (!element || !scrollRef.current) return
 
-    const scrollContainer = isBelowLgScreen 
-      ? scrollRef.current 
-      : scrollRef.current._container
-
-    if (!scrollContainer) return
-
     try {
-      // Get the position of the element relative to the document
-      const elementRect = element.getBoundingClientRect()
-      const containerRect = scrollContainer.getBoundingClientRect()
-      
-      // Calculate the position relative to the scroll container
-      const elementTop = elementRect.top - containerRect.top + scrollContainer.scrollTop
-      
-      // Scroll to center the element in the viewport with some padding
-      const scrollPosition = elementTop - (containerRect.height / 2) + (elementRect.height / 2)
-      
-      // Use scrollTo with smooth behavior
-      if (scrollContainer.scrollTo) {
+      // For PerfectScrollbar
+      if (!isBelowLgScreen && scrollRef.current) {
+        const psInstance = scrollRef.current
+        const scrollContainer = psInstance._container || psInstance._ps?.element
+        
+        if (scrollContainer) {
+          // Get element position relative to container
+          const elementRect = element.getBoundingClientRect()
+          const containerRect = scrollContainer.getBoundingClientRect()
+          
+          // Calculate scroll position to center the element
+          const elementTop = elementRect.top - containerRect.top + scrollContainer.scrollTop
+          const scrollPosition = elementTop - (containerRect.height / 2) + (elementRect.height / 2)
+          
+          // Scroll using requestAnimationFrame for smooth animation
+          const targetScroll = Math.max(0, scrollPosition)
+          const startScroll = scrollContainer.scrollTop
+          const distance = targetScroll - startScroll
+          const duration = 500 // ms
+          let startTime = null
+          
+          const animateScroll = (currentTime) => {
+            if (startTime === null) startTime = currentTime
+            const elapsed = currentTime - startTime
+            const progress = Math.min(elapsed / duration, 1)
+            
+            // Easing function (ease-in-out)
+            const ease = progress < 0.5 
+              ? 2 * progress * progress 
+              : 1 - Math.pow(-2 * progress + 2, 2) / 2
+            
+            scrollContainer.scrollTop = startScroll + distance * ease
+            
+            if (progress < 1) {
+              requestAnimationFrame(animateScroll)
+            } else {
+              // Update PerfectScrollbar after animation
+              if (psInstance.update) {
+                psInstance.update()
+              }
+            }
+          }
+          
+          requestAnimationFrame(animateScroll)
+        } else {
+          // Fallback for PerfectScrollbar
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      } else if (isBelowLgScreen && scrollRef.current) {
+        // For regular div scrolling
+        const scrollContainer = scrollRef.current
+        const elementRect = element.getBoundingClientRect()
+        const containerRect = scrollContainer.getBoundingClientRect()
+        const elementTop = elementRect.top - containerRect.top + scrollContainer.scrollTop
+        const scrollPosition = elementTop - (containerRect.height / 2) + (elementRect.height / 2)
+        
         scrollContainer.scrollTo({
           top: Math.max(0, scrollPosition),
           behavior: 'smooth'
         })
       } else {
-        // Fallback for older browsers or PerfectScrollbar
-        scrollContainer.scrollTop = Math.max(0, scrollPosition)
+        // Fallback: use scrollIntoView
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
     } catch (error) {
       console.warn('Error scrolling to message:', error)
-      // Fallback: try to scroll element into view
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Final fallback
+      try {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } catch (e) {
+        console.warn('Fallback scroll also failed:', e)
+      }
     }
   }
 
@@ -489,6 +535,127 @@ const ChatContent = props => {
     setMessageToDelete(null)
   }
 
+  // Search functionality
+  const escapeRegex = (string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
+
+  const handleSearchChange = (value) => {
+    setSearchTerm(value)
+    if (!value.trim()) {
+      setSearchResults([])
+      setCurrentSearchIndex(-1)
+      return
+    }
+
+    if (!selectedChat?.messages) {
+      setSearchResults([])
+      return
+    }
+
+    const term = value.toLowerCase().trim()
+    const results = selectedChat.messages
+      .map((msg, index) => {
+        const body = msg.body?.toLowerCase() || ''
+        if (body.includes(term)) {
+          return { messageId: msg.id, index }
+        }
+        return null
+      })
+      .filter(Boolean)
+
+    setSearchResults(results)
+    if (results.length > 0) {
+      setCurrentSearchIndex(0)
+      // Scroll to first result after a delay to ensure DOM is ready
+      setTimeout(() => {
+        scrollToSearchResult(results[0])
+      }, 300)
+    } else {
+      setCurrentSearchIndex(-1)
+    }
+  }
+
+  const handleSearchNext = () => {
+    if (searchResults.length === 0) return
+    const nextIndex = (currentSearchIndex + 1) % searchResults.length
+    setCurrentSearchIndex(nextIndex)
+    scrollToSearchResult(searchResults[nextIndex])
+  }
+
+  const handleSearchPrevious = () => {
+    if (searchResults.length === 0) return
+    const prevIndex = currentSearchIndex <= 0 ? searchResults.length - 1 : currentSearchIndex - 1
+    setCurrentSearchIndex(prevIndex)
+    scrollToSearchResult(searchResults[prevIndex])
+  }
+
+  const scrollToSearchResult = (result) => {
+    if (!result) return
+    
+    // Use setTimeout to ensure DOM is ready
+    setTimeout(() => {
+      let messageElement = messageRefs.current[result.messageId]
+      
+      // If element not found in refs, try to find it by data attribute
+      if (!messageElement) {
+        const scrollContainer = isBelowLgScreen 
+          ? scrollRef.current 
+          : scrollRef.current?._container || scrollRef.current?._ps?.element
+        
+        if (scrollContainer) {
+          messageElement = scrollContainer.querySelector(`[data-message-id="${result.messageId}"]`)
+        }
+      }
+      
+      if (messageElement) {
+        // Scroll to message
+        scrollToMessage(messageElement)
+        
+        // Highlight the message briefly
+        const originalBg = messageElement.style.backgroundColor || ''
+        const originalTransition = messageElement.style.transition || ''
+        messageElement.style.backgroundColor = 'rgba(25, 118, 210, 0.3)'
+        messageElement.style.transition = 'background-color 0.3s ease'
+        
+        setTimeout(() => {
+          messageElement.style.backgroundColor = originalBg
+          setTimeout(() => {
+            if (!originalTransition) {
+              messageElement.style.transition = ''
+            } else {
+              messageElement.style.transition = originalTransition
+            }
+          }, 300)
+        }, 2000)
+      } else {
+        console.warn('Message element not found for ID:', result.messageId)
+      }
+    }, 150)
+  }
+
+  // Scroll to current search result when index changes
+  useEffect(() => {
+    if (currentSearchIndex >= 0 && searchResults[currentSearchIndex]) {
+      scrollToSearchResult(searchResults[currentSearchIndex])
+    }
+  }, [currentSearchIndex, searchResults])
+
+  // Scroll to first result when search results are found
+  useEffect(() => {
+    if (searchResults.length > 0 && currentSearchIndex === 0) {
+      scrollToSearchResult(searchResults[0])
+    }
+  }, [searchResults.length])
+
+  // Close search dialog and reset when chat changes
+  useEffect(() => {
+    setSearchDialogOpen(false)
+    setSearchTerm('')
+    setSearchResults([])
+    setCurrentSearchIndex(-1)
+  }, [selectedChat?.user?.id])
+
   // Renders the user avatar with badge and user information
   const UserAvatar = ({ activeUser, setUserProfileLeftOpen, setBackdropOpen }) => (
     <div
@@ -567,6 +734,15 @@ const ChatContent = props => {
                 iconClassName='text-textSecondary'
                 options={[
                   {
+                    text: 'Search Messages',
+                    icon: <i className='ri-search-line' />,
+                    menuItemProps: {
+                      onClick: () => {
+                        setSearchDialogOpen(true)
+                      }
+                    }
+                  },
+                  {
                     text: 'View Contact',
                     menuItemProps: {
                       onClick: () => {
@@ -579,7 +755,10 @@ const ChatContent = props => {
               />
             ) : (
               <div className='flex items-center gap-1'>
-                <IconButton size='small'>
+                <IconButton 
+                  size='small'
+                  onClick={() => setSearchDialogOpen(true)}
+                >
                   <i className='ri-search-line text-textSecondary' />
                 </IconButton>
                 <OptionMenu
@@ -724,7 +903,20 @@ const ChatContent = props => {
                                   })}
                                   style={{ wordBreak: 'break-word' }}
                                 >
-                                  {msg.body}
+                                  {searchTerm && searchTerm.trim() ? (() => {
+                                    const term = searchTerm.trim()
+                                    const escapedTerm = escapeRegex(term)
+                                    const parts = msg.body.split(new RegExp(`(${escapedTerm})`, 'gi'))
+                                    return parts.map((part, idx) => 
+                                      part.toLowerCase() === term.toLowerCase() ? (
+                                        <mark key={idx} style={{ backgroundColor: 'rgba(255, 255, 0, 0.5)', padding: '0 2px' }}>
+                                          {part}
+                                        </mark>
+                                      ) : (
+                                        <span key={idx}>{part}</span>
+                                      )
+                                    )
+                                  })() : msg.body}
                                 </Typography>
                               )}
                               {msg.task_id && (
@@ -999,6 +1191,113 @@ const ChatContent = props => {
             autoFocus
           >
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Search Dialog */}
+      <Dialog
+        open={searchDialogOpen}
+        onClose={() => {
+          setSearchDialogOpen(false)
+          setSearchTerm('')
+          setSearchResults([])
+          setCurrentSearchIndex(-1)
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            position: 'absolute',
+            top: 80
+          }
+        }}
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <i className='ri-search-line' style={{ fontSize: 24 }} />
+            <Typography variant="h6">Search Messages</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            autoFocus
+            placeholder="Search in messages..."
+            value={searchTerm}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                if (e.ctrlKey || e.metaKey) {
+                  handleSearchPrevious()
+                } else {
+                  handleSearchNext()
+                }
+              }
+            }}
+            InputProps={{
+              startAdornment: (
+                <Box sx={{ mr: 1 }}>
+                  <i className='ri-search-line' />
+                </Box>
+              ),
+              endAdornment: searchTerm && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {searchResults.length > 0 && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+                      {currentSearchIndex + 1} / {searchResults.length}
+                    </Typography>
+                  )}
+                  <IconButton
+                    size="small"
+                    onClick={handleSearchPrevious}
+                    disabled={searchResults.length === 0}
+                    title="Previous (Ctrl+Enter)"
+                  >
+                    <i className='ri-arrow-up-line' />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={handleSearchNext}
+                    disabled={searchResults.length === 0}
+                    title="Next (Enter)"
+                  >
+                    <i className='ri-arrow-down-line' />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      setSearchTerm('')
+                      setSearchResults([])
+                      setCurrentSearchIndex(-1)
+                    }}
+                  >
+                    <i className='ri-close-line' />
+                  </IconButton>
+                </Box>
+              )
+            }}
+          />
+          {searchTerm && searchResults.length === 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+              No messages found
+            </Typography>
+          )}
+          {searchTerm && searchResults.length > 0 && (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+              Found {searchResults.length} message{searchResults.length !== 1 ? 's' : ''}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setSearchDialogOpen(false)
+            setSearchTerm('')
+            setSearchResults([])
+            setCurrentSearchIndex(-1)
+          }}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>
