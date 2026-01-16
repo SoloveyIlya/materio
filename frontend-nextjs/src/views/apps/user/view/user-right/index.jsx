@@ -33,7 +33,22 @@ const UserRight = ({ tabContentList, userId, user }) => {
             </CustomTabList>
           </Grid>
           <Grid size={{ xs: 12 }}>
-            <TabPanel value={activeTab} className='p-0'>
+            <TabPanel 
+              value={activeTab} 
+              className='p-0'
+              sx={{ 
+                '&[aria-hidden="true"]': { 
+                  display: 'none !important',
+                  visibility: 'hidden !important'
+                },
+                '& > div': {
+                  '&[aria-hidden="true"]': {
+                    display: 'none !important',
+                    visibility: 'hidden !important'
+                  }
+                }
+              }}
+            >
               {tabContentList[activeTab]}
             </TabPanel>
           </Grid>

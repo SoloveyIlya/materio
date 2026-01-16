@@ -74,14 +74,19 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments, onDocumentsCha
       }
 
       if (editingDoc) {
-        // Используем PUT напрямую
-        await api.put(`/admin/required-documents/${editingDoc.id}`, formDataToSend, {
+        // Используем POST с методом spoofing для FormData
+        formDataToSend.append('_method', 'PUT')
+        await api.post(`/admin/required-documents/${editingDoc.id}`, formDataToSend, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         })
       } else {
-        await api.post('/admin/required-documents', formDataToSend)
+        await api.post('/admin/required-documents', formDataToSend, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
       }
 
       // Перезагружаем документы
@@ -225,14 +230,30 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments, onDocumentsCha
 
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth='sm' fullWidth>
         <DialogTitle>{editingDoc ? 'Edit Document' : 'Add Required Document'}</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label='Document Name'
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            sx={{ mt: 2 }}
-          />
+        <DialogContent sx={{ pt: 3 }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant='body2' sx={{ mb: 1, fontWeight: 500 }}>
+              Document Name
+            </Typography>
+            <input
+              type='text'
+              value={formData.name || ''}
+              onChange={(e) => {
+                setFormData(prev => ({ ...prev, name: e.target.value }))
+              }}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                fontSize: '16px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+              autoFocus
+              placeholder='Enter document name'
+            />
+          </Box>
           <Button
             variant='outlined'
             component='label'
