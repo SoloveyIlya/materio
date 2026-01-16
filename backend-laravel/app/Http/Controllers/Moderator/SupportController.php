@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Moderator;
 use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
+use App\Models\Message;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -80,6 +81,23 @@ class SupportController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        return response()->json($ticket->load(['assignedUser', 'attachments']));
+        // Загружаем сообщения тикета
+        $ticket->load(['assignedUser', 'attachments', 'messages.fromUser', 'messages.toUser']);
+
+        // Помечаем все непрочитанные сообщения от админа как прочитанные
+        $administratorId = $user->administrator_id;
+        if ($administratorId) {
+            Message::where('ticket_id', $ticket->id)
+                ->where('from_user_id', $administratorId)
+                ->where('to_user_id', $user->id)
+                ->where('is_read', false)
+                ->where('is_deleted', false)
+                ->update([
+                    'is_read' => true,
+                    'read_at' => now(),
+                ]);
+        }
+
+        return response()->json($ticket);
     }
 }

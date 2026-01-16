@@ -80,9 +80,10 @@ class DashboardController extends Controller
             
             $counts = [];
 
-            // Непрочитанные сообщения в чате от админа
+            // Непрочитанные сообщения в чате и тикетах от админа
             $administratorId = $user->administrator_id;
             if ($administratorId) {
+                // Непрочитанные сообщения в чате от админа
                 $unreadChatMessages = Message::where('domain_id', $user->domain_id)
                     ->where('type', 'message')
                     ->where('from_user_id', $administratorId)
@@ -91,16 +92,21 @@ class DashboardController extends Controller
                     ->where('is_deleted', false)
                     ->count();
                 $counts['chat'] = $unreadChatMessages;
+
+                // Непрочитанные сообщения от админа в тикетах
+                $unreadSupportMessages = Message::where('domain_id', $user->domain_id)
+                    ->where('type', 'support')
+                    ->where('from_user_id', $administratorId)
+                    ->where('to_user_id', $user->id)
+                    ->where('is_read', false)
+                    ->where('is_deleted', false)
+                    ->whereNotNull('ticket_id')
+                    ->count();
+                $counts['support'] = $unreadSupportMessages;
             } else {
                 $counts['chat'] = 0;
+                $counts['support'] = 0;
             }
-
-            // Новые тикеты в support (статус open или in_progress для тикетов модератора)
-            $newSupportTickets = Ticket::where('domain_id', $user->domain_id)
-                ->where('user_id', $user->id)
-                ->whereIn('status', ['open', 'in_progress'])
-                ->count();
-            $counts['support'] = $newSupportTickets;
 
             // Количество задач со статусом pending (ожидают выполнения) для модератора
             $pendingTasks = Task::where('domain_id', $user->domain_id)
