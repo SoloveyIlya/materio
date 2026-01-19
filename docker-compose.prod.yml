@@ -33,6 +33,7 @@ services:
       - /var/www/vendor
       - backend_cache:/var/www/bootstrap/cache
       - backend_storage:/var/www/storage
+      - ./deploy/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
     environment:
       - APP_NAME=Materio
       - APP_ENV=production
