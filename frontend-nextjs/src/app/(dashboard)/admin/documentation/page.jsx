@@ -184,13 +184,9 @@ export default function DocumentationPage() {
       if (editingPage) {
         // Use POST with method spoofing for FormData
         formDataToSend.append('_method', 'PUT')
-        await api.post(`/admin/documentation-pages/${editingPage.id}`, formDataToSend, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        await api.post(`/admin/documentation-pages/${editingPage.id}`, formDataToSend)
       } else {
-        await api.post('/admin/documentation-pages', formDataToSend, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        await api.post('/admin/documentation-pages', formDataToSend)
       }
       
       handleCloseDialog()
