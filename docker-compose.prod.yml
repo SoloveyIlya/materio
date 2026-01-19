@@ -55,12 +55,6 @@ services:
         condition: service_healthy
     networks:
       - prod_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/api/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
 
   frontend:
     build:
@@ -78,12 +72,6 @@ services:
         condition: service_healthy
     networks:
       - prod_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
 
   nginx:
     image: nginx:alpine
@@ -102,12 +90,6 @@ services:
         condition: service_healthy
     networks:
       - prod_network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 
 networks:
   prod_network:
