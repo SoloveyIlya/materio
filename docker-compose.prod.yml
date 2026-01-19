@@ -51,8 +51,7 @@ services:
       - SANCTUM_STATEFUL_DOMAINS=pickleflavor.info,www.pickleflavor.info
       - SESSION_DOMAIN=.pickleflavor.info
     depends_on:
-      mysql:
-        condition: service_healthy
+      - mysql
     networks:
       - prod_network
 
@@ -68,8 +67,7 @@ services:
       - NEXT_PUBLIC_API_URL=https://pickleflavor.info/api
       - WATCHPACK_POLLING=true
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
       - prod_network
 
@@ -84,10 +82,8 @@ services:
       - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
-      backend:
-        condition: service_healthy
-      frontend:
-        condition: service_healthy
+      - backend
+      - frontend
     networks:
       - prod_network
 
