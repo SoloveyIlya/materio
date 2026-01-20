@@ -293,25 +293,37 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
       return
     }
 
+    if (!selectedDocument?.id) {
+      showToast.error('Document not selected')
+      console.error('selectedDocument:', selectedDocument)
+      return
+    }
+
     try {
       setUploading(true)
+      console.log('Starting upload for document:', selectedDocument.id, 'File:', uploadFile.name)
+      
       const formData = new FormData()
       formData.append('file', uploadFile)
       formData.append('required_document_id', selectedDocument.id)
 
+      console.log('FormData keys:', Array.from(formData.keys()))
+      
       const response = await api.post('/moderator/user-documents', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       })
 
+      console.log('Upload response:', response.data)
       showToast.success('Document uploaded successfully')
       handleCloseUploadDialog()
       if (onDocumentUpload) {
-        onDocumentUpload()
+        await onDocumentUpload()
       }
     } catch (error) {
       console.error('Error uploading document:', error)
+      console.error('Error response:', error.response?.data)
       showToast.error('Error uploading document: ' + (error.response?.data?.message || error.message))
     } finally {
       setUploading(false)
