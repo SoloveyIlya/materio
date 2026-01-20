@@ -14,6 +14,8 @@ export const useMenuCounts = () => {
     tasks_by_admin: [],
   })
   const [loading, setLoading] = useState(true)
+  const [isPageVisible, setIsPageVisible] = useState(true)
+  const [refreshInterval, setRefreshInterval] = useState(3000)
 
   const fetchCounts = async () => {
     try {
@@ -51,13 +53,33 @@ export const useMenuCounts = () => {
   useEffect(() => {
     fetchCounts()
 
-    // Обновляем счетчики каждые 30 секунд
+    // Отслеживаем видимость вкладки (Visibility API)
+    const handleVisibilityChange = () => {
+      const isVisible = document.visibilityState === 'visible'
+      setIsPageVisible(isVisible)
+      // Если вкладка стала видна, сразу обновляем счетчики
+      if (isVisible) {
+        fetchCounts()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [user])
+
+  // Динамический интервал обновления в зависимости от видимости вкладки
+  useEffect(() => {
+    // 3 секунды когда вкладка видна, 30 секунд когда в фоне
+    const newInterval = isPageVisible ? 3000 : 30000
+    setRefreshInterval(newInterval)
+
     const interval = setInterval(() => {
       fetchCounts()
-    }, 30000)
+    }, newInterval)
 
     return () => clearInterval(interval)
-  }, [user])
+  }, [isPageVisible])
 
   // Оптимистичное обновление счетчика чата (для мгновенного обновления UI)
   const optimisticallyUpdateChatCount = (unreadCountToSubtract) => {

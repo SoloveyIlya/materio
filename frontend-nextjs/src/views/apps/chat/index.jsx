@@ -71,17 +71,33 @@ const ChatWrapper = () => {
     }
   }, [activeTab, messagesData, user])
 
-  // Auto-refresh messages every 3 seconds
+  // Auto-refresh messages with dynamic interval based on page visibility
   useEffect(() => {
     if (!user) return
 
+    const handleVisibilityChange = () => {
+      // Если вкладка стала видна, сразу загружаем сообщения
+      if (document.visibilityState === 'visible') {
+        loadMessages(true)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     const interval = setInterval(() => {
+      // Обновляем только если вкладка видна: 3 сек в фокусе, 30 сек в фоне
+      const refreshRate = document.visibilityState === 'visible' ? 3000 : 30000
+      
+      // Проверяем видимость еще раз перед загрузкой
       if (document.visibilityState === 'visible') {
         loadMessages(true) // silent = true
       }
-    }, 3000)
+    }, 3000) // Базовый интервал 3 сек (будет проверяться только если видна)
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [user, activeTab])
 
   // Update selectedChat when messagesData changes and automatically mark messages as read if chat is open
