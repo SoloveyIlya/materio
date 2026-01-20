@@ -103,9 +103,9 @@ class TaskController extends Controller
         $profile = $user->moderatorProfile;
         
         if ($profile && $profile->task_timezone && $profile->task_start_time && $profile->task_end_time) {
-            // Если есть настройки, планируем таски первого дня
+            // Если есть настройки, планируем таски первого дня (через расписание)
             $scheduledTasks = $this->taskService->scheduleFirstDayTasks($user);
-            
+
             return response()->json([
                 'message' => 'Tasks scheduled successfully',
                 'scheduled_tasks' => array_map(function ($item) {
@@ -117,12 +117,11 @@ class TaskController extends Controller
                 'current_work_day' => $user->fresh()->getCurrentWorkDay(),
             ]);
         } else {
-            // Если нет настроек, используем старую логику (немедленная выдача)
-            $tasks = $this->taskService->autoAssignTasksForCurrentDay($user);
-
+            // Новое поведение: если у модератора нет настроек, таски не выдаются автоматически.
+            // Таски появятся только если админ отправит их (через создание TaskSchedule / отправку).
             return response()->json([
-                'message' => 'Tasks assigned successfully',
-                'tasks' => $tasks,
+                'message' => 'No tasks assigned. Tasks are delivered only when admin sends them.',
+                'tasks' => [],
                 'current_work_day' => $user->fresh()->getCurrentWorkDay(),
             ]);
         }

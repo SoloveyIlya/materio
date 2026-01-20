@@ -72,7 +72,8 @@ const TestList = ({ userId, tests, testResults }) => {
                   p: 2,
                   border: '1px solid',
                   borderColor: 'divider',
-                  borderRadius: 1
+                  borderRadius: 1,
+                  bgcolor: isPassed ? 'success.lighter' : 'background.paper'
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
@@ -90,9 +91,19 @@ const TestList = ({ userId, tests, testResults }) => {
                     <Typography variant='subtitle1' className='font-medium'>
                       {test.title}
                     </Typography>
-                    {test.level && (
-                      <Chip label={test.level.name} size='small' variant='outlined' sx={{ mt: 1 }} />
-                    )}
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                      {test.level && (
+                        <Chip label={test.level.name} size='small' variant='outlined' />
+                      )}
+                      {isPassed && (
+                        <Chip 
+                          label='Test Passed' 
+                          size='small' 
+                          color='success'
+                          variant='filled'
+                        />
+                      )}
+                    </Box>
                   </Box>
                 </Box>
                 {isPassed ? (

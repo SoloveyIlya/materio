@@ -173,5 +173,33 @@ class TestController extends Controller
             'is_passed' => $isPassed,
         ], 201);
     }
+
+    /**
+     * Получить статус прохождения всех тестов
+     */
+    public function allTestsStatus(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Получаем все тесты для домена модератора
+        $allTests = Test::where('domain_id', $user->domain_id)
+            ->where('is_active', true)
+            ->get();
+
+        // Получаем результаты тестов пользователя
+        $userTestResults = TestResult::where('user_id', $user->id)
+            ->where('is_passed', true)
+            ->pluck('test_id')
+            ->toArray();
+
+        // Проверяем, пройдены ли все тесты
+        $allPassed = count($allTests) > 0 && count($userTestResults) === count($allTests);
+
+        return response()->json([
+            'all_tests_passed' => $allPassed,
+            'total_tests' => count($allTests),
+            'passed_tests' => count($userTestResults),
+        ]);
+    }
 }
 

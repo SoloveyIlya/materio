@@ -29,9 +29,10 @@ const AcademyCard = () => {
     try {
       setLoading(true)
       // Загружаем результаты тестов пользователя и все доступные тесты
-      const [userResponse, testsResponse] = await Promise.all([
+      const [userResponse, testsResponse, statusResponse] = await Promise.all([
         api.get('/auth/user'),
-        api.get('/moderator/tests')
+        api.get('/moderator/tests'),
+        api.get('/moderator/tests/status/all')
       ])
       const user = userResponse.data
       const allTests = testsResponse.data || []
@@ -41,7 +42,7 @@ const AcademyCard = () => {
 
       // Проверяем, прошёл ли пользователь все доступные тесты успешно
       const passedTests = testResults.filter(tr => tr.is_passed === true)
-      const allPassed = allTests.length > 0 && passedTests.length === allTests.length
+      const allPassed = statusResponse.data?.all_tests_passed || false
 
       setTestData({
         totalTests: allTests.length,

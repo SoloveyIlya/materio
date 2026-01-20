@@ -147,6 +147,7 @@ Route::prefix('moderator')->middleware(['auth:sanctum', 'role:moderator', 'activ
     Route::get('/tests', [ModeratorTestController::class, 'index']);
     Route::get('/tests/{test}', [ModeratorTestController::class, 'show']);
     Route::post('/tests/submit', [ModeratorTestController::class, 'submit']);
+    Route::get('/tests/status/all', [ModeratorTestController::class, 'allTestsStatus']);
 
     // Profile
     Route::get('/required-documents', [ProfileController::class, 'getRequiredDocuments']);

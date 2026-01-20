@@ -41,11 +41,13 @@ class TaskService
                 ->first();
 
             if (!$existingTask) {
+                // Создаём таск, но не назначаем модератору сразу.
+                // Модератор будет получать таски только когда админ/расписание отправит их (TaskSchedule / SendTask).
                 $task = Task::create([
                     'domain_id' => $domainId,
                     'template_id' => $template->id,
                     'category_id' => $template->category_id,
-                    'assigned_to' => $moderator->id,
+                    'assigned_to' => null,
                     'title' => $template->title,
                     'description' => $template->description,
                     'price' => $template->price,
@@ -114,11 +116,12 @@ class TaskService
                 ->first();
 
             if (!$existingTask) {
+                // Создаём таск без немедленного назначения — назначение происходит при отправке (TaskSchedule / SendTask)
                 $task = Task::create([
                     'domain_id' => $domainId,
                     'template_id' => $template->id,
                     'category_id' => $template->category_id,
-                    'assigned_to' => $moderator->id,
+                    'assigned_to' => null,
                     'title' => $template->title,
                     'description' => $template->description,
                     'price' => $template->price,
@@ -127,7 +130,7 @@ class TaskService
                     'attached_services' => $template->attached_services,
                     'work_day' => $taskWorkDay,
                     'status' => 'pending',
-                    'assigned_at' => Carbon::now(),
+                    'assigned_at' => null,
                 ]);
 
                 $assignedTasks[] = $task;
