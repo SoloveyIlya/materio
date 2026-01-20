@@ -64,6 +64,16 @@ class DocumentationPageController extends Controller
             'videos_input' => $request->input('videos'),
             'has_videos' => $request->has('videos'),
         ]);
+
+        // Extra debug: dump full files arrays for diagnosing nested file keys
+        try {
+            \Log::info('DocumentationPage store - AllFiles dump', [
+                'request_all_files' => $request->allFiles(),
+                '_FILES' => isset($_FILES) ? $_FILES : null,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('DocumentationPage store - error dumping files: ' . $e->getMessage());
+        }
         
         $validated = $request->validate([
             'category_id' => 'required|exists:documentation_categories,id',
