@@ -119,28 +119,100 @@ export default function TicketDetailPage() {
                   <Typography variant='h6' sx={{ mb: 2 }}>
                     Attachments
                   </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {ticket.attachments.map((attachment, index) => {
                       const fileUrl = attachment.file_path?.startsWith('http') 
                         ? attachment.file_path 
                         : `${API_URL}${attachment.file_path}`
-                      return (
-                        <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <i className='ri-file-line' style={{ fontSize: '20px' }} />
-                          <Typography variant='body2' sx={{ flex: 1 }}>
-                            {attachment.file_name}
-                          </Typography>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            href={fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Download
-                          </Button>
-                        </Box>
-                      )
+                      const isImage = attachment.file_type?.startsWith('image/') || 
+                                    /\.(jpg|jpeg|png|gif|webp)$/i.test(attachment.file_name)
+                      const isVideo = attachment.file_type?.startsWith('video/') || 
+                                    /\.(mp4|webm|mov|avi|ogg)$/i.test(attachment.file_name)
+                      
+                      if (isImage) {
+                        return (
+                          <Box key={index} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <Typography variant='body2' sx={{ fontWeight: 500 }}>
+                              {attachment.file_name}
+                            </Typography>
+                            <Box
+                              sx={{
+                                maxWidth: '100%',
+                                maxHeight: '300px',
+                                borderRadius: '4px',
+                                overflow: 'hidden',
+                                border: '1px solid',
+                                borderColor: 'divider'
+                              }}
+                            >
+                              <img
+                                src={fileUrl}
+                                alt={attachment.file_name}
+                                style={{
+                                  width: '100%',
+                                  height: 'auto',
+                                  objectFit: 'contain',
+                                  maxHeight: '300px'
+                                }}
+                              />
+                            </Box>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Download
+                            </Button>
+                          </Box>
+                        )
+                      } else if (isVideo) {
+                        return (
+                          <Box key={index} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <Typography variant='body2' sx={{ fontWeight: 500 }}>
+                              {attachment.file_name}
+                            </Typography>
+                            <video
+                              src={fileUrl}
+                              controls
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '300px',
+                                borderRadius: '4px',
+                                border: '1px solid #e0e0e0'
+                              }}
+                            />
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Download
+                            </Button>
+                          </Box>
+                        )
+                      } else {
+                        return (
+                          <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <i className='ri-file-line' style={{ fontSize: '20px' }} />
+                            <Typography variant='body2' sx={{ flex: 1 }}>
+                              {attachment.file_name}
+                            </Typography>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Download
+                            </Button>
+                          </Box>
+                        )
+                      }
                     })}
                   </Box>
                 </>
