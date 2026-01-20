@@ -334,42 +334,47 @@ const SupportDetails = ({
           </Card>
 
           {/* Messages */}
-          {messages.map((message) => (
-            <Card key={message.id} className='border'>
-              <CardContent className='flex is-full gap-4'>
-                <CustomAvatar 
-                  src={message.fromUser?.avatar} 
-                  size={38} 
-                  alt={message.fromUser?.name || message.fromUser?.email}
-                >
-                  {getInitials(message.fromUser?.name || message.fromUser?.email || 'U')}
-                </CustomAvatar>
-                <div className='flex items-center justify-between flex-wrap grow gap-x-4 gap-y-2'>
-                  <div className='flex flex-col'>
-                    <Typography color='text.primary'>
-                      {message.fromUser?.name || message.fromUser?.email || 'Unknown'}
+          {messages.map((message) => {
+            const sender = message.fromUser || {}
+            return (
+              <Card key={message.id} className='border'>
+                <CardContent className='flex is-full gap-4'>
+                  <CustomAvatar 
+                    src={sender?.avatar} 
+                    size={38} 
+                    alt={sender?.name || sender?.email || 'User'}
+                  >
+                    {getInitials(sender?.name || sender?.email || 'U')}
+                  </CustomAvatar>
+                  <div className='flex items-center justify-between flex-wrap grow gap-x-4 gap-y-2'>
+                    <div className='flex flex-col'>
+                      <Typography color='text.primary'>
+                        {sender?.name || sender?.email || 'Unknown User'}
+                      </Typography>
+                      {sender?.email && (
+                        <Typography variant='body2'>{sender?.email}</Typography>
+                      )}
+                    </div>
+                    <Typography color='text.disabled' variant='body2'>
+                      {new Intl.DateTimeFormat('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      }).format(new Date(message.created_at))}
                     </Typography>
-                    <Typography variant='body2'>{message.fromUser?.email}</Typography>
                   </div>
-                  <Typography color='text.disabled' variant='body2'>
-                    {new Intl.DateTimeFormat('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: true
-                    }).format(new Date(message.created_at))}
+                </CardContent>
+                <CardContent>
+                  <Typography className='text-textSecondary' style={{ whiteSpace: 'pre-wrap' }}>
+                    {message.body}
                   </Typography>
-                </div>
-              </CardContent>
-              <CardContent>
-                <Typography className='text-textSecondary' style={{ whiteSpace: 'pre-wrap' }}>
-                  {message.body}
-                </Typography>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            )
+          })}
 
           {/* Reply form */}
           <Card className='border'>

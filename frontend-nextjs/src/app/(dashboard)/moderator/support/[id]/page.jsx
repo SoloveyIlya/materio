@@ -223,31 +223,34 @@ export default function TicketDetailPage() {
           {/* Messages */}
           {ticket.messages && ticket.messages.length > 0 && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {ticket.messages.map((message) => (
-                <Card key={message.id}>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                      <Box>
-                        <Typography variant='subtitle1' fontWeight='medium'>
-                          {message.fromUser?.name || message.fromUser?.email || 'Unknown'}
-                        </Typography>
-                        {message.fromUser?.email && (
-                          <Typography variant='body2' color='text.secondary'>
-                            {message.fromUser.email}
+              {ticket.messages.map((message) => {
+                const sender = message.fromUser || {}
+                return (
+                  <Card key={message.id}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                        <Box>
+                          <Typography variant='subtitle1' fontWeight='medium'>
+                            {sender?.name || sender?.email || 'Unknown User'}
                           </Typography>
-                        )}
+                          {sender?.email && (
+                            <Typography variant='body2' color='text.secondary'>
+                              {sender.email}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Typography variant='body2' color='text.secondary'>
+                          {formatDate(message.created_at)}
+                        </Typography>
                       </Box>
-                      <Typography variant='body2' color='text.secondary'>
-                        {formatDate(message.created_at)}
+                      <Divider sx={{ my: 2 }} />
+                      <Typography variant='body1' sx={{ whiteSpace: 'pre-wrap' }}>
+                        {message.body}
                       </Typography>
-                    </Box>
-                    <Divider sx={{ my: 2 }} />
-                    <Typography variant='body1' sx={{ whiteSpace: 'pre-wrap' }}>
-                      {message.body}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </Box>
           )}
         </Grid>

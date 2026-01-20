@@ -75,10 +75,16 @@ class SupportController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $ticket->load(['user', 'assignedUser', 'attachments']);
-        $ticket->load(['messages' => function ($query) {
-            $query->where('is_deleted', false)->orderBy('created_at', 'asc');
-        }, 'messages.fromUser', 'messages.toUser']);
+        $ticket->load([
+            'user',
+            'assignedUser',
+            'attachments',
+            'messages' => function ($query) {
+                $query->where('is_deleted', false)->orderBy('created_at', 'asc');
+            },
+            'messages.fromUser',
+            'messages.toUser'
+        ]);
         
         return response()->json($ticket);
     }
