@@ -380,9 +380,9 @@ class UserController extends Controller
             return response()->json(['message' => 'User is not a moderator'], 400);
         }
 
-        // Находим категорию "Test" или создаем тестовую задачу
+        // Находим категорию "Test"
         $testCategory = \App\Models\TaskCategory::where('domain_id', $request->user()->domain_id)
-            ->where('slug', 'test')
+            ->where('name', 'Test')
             ->first();
 
         if (!$testCategory) {
