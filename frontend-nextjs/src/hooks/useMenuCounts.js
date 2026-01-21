@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/lib/api'
+import { subscribeToTaskAssignments } from '@/lib/websocket'
 
 export const useMenuCounts = () => {
   const { user } = useAuthStore()
@@ -80,6 +81,27 @@ export const useMenuCounts = () => {
 
     return () => clearInterval(interval)
   }, [isPageVisible])
+
+  // Subscribe to real-time task assignment events for moderators
+  useEffect(() => {
+    if (user && user.roles?.some(r => r.name === 'moderator')) {
+      const unsubscribe = subscribeToTaskAssignments(user.id, (data) => {
+        console.log('Task assigned event received:', data)
+        // Update the task count with the value from the broadcast event
+        if (data.pending_count !== undefined) {
+          setCounts(prevCounts => ({
+            ...prevCounts,
+            tasks: data.pending_count,
+          }))
+        } else {
+          // Fallback: refresh all counts if pending_count is not provided
+          fetchCounts()
+        }
+      })
+
+      return () => unsubscribe()
+    }
+  }, [user])
 
   // Оптимистичное обновление счетчика чата (для мгновенного обновления UI)
   const optimisticallyUpdateChatCount = (unreadCountToSubtract) => {

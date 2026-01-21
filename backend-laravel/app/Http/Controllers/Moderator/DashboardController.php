@@ -108,8 +108,10 @@ class DashboardController extends Controller
                 $counts['support'] = 0;
             }
 
-            // Количество задач со статусом pending (ожидают выполнения) для модератора
+            // Количество задач со статусом pending (ожидают выполнения) для ЭТОГО модератора
+            // Считаем только задачи, которые назначены именно этому модератору
             $pendingTasks = Task::where('domain_id', $user->domain_id)
+                ->where('assigned_to', $user->id)
                 ->where('status', 'pending')
                 ->count();
             $counts['tasks'] = $pendingTasks;

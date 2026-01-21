@@ -7,6 +7,7 @@ use App\Models\TaskSchedule;
 use App\Models\TaskTemplate;
 use App\Models\User;
 use App\Jobs\SendTask;
+use App\Events\TaskAssigned;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -220,6 +221,8 @@ class TaskService
                 // Если таск без назначения, назначаем его модератору
                 if (!$task->assigned_to) {
                     $task->update(['assigned_to' => $moderator->id]);
+                    // Broadcast event to notify moderator about the newly assigned task
+                    broadcast(new TaskAssigned($task))->toOthers();
                 }
                 $tasksToSchedule[] = $task;
             }

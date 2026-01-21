@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Task;
 use App\Models\TaskSchedule;
 use App\Models\User;
+use App\Events\TaskAssigned;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -58,6 +59,9 @@ class SendTask implements ShouldQueue
                     'sent_at' => now(),
                 ]);
             }
+
+            // Broadcast event to notify moderator about the new task
+            broadcast(new TaskAssigned($this->task))->toOthers();
 
             Log::info("Task {$this->task->id} sent to user {$this->user->id}");
         } catch (\Exception $e) {

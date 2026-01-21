@@ -77,3 +77,15 @@ export const subscribeToUserStatus = (domainId, callback) => {
     socket.off(`domain.${domainId}:user.status.changed`, callback)
   }
 }
+
+export const subscribeToTaskAssignments = (userId, callback) => {
+  const socket = getSocket()
+  
+  // Subscribe to task.assigned events on user's private channel
+  socket.on(`user.${userId}:task.assigned`, callback)
+
+  // Return unsubscribe function
+  return () => {
+    socket.off(`user.${userId}:task.assigned`, callback)
+  }
+}
