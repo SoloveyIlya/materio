@@ -81,7 +81,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
 
     let newBlocks = [...normalizedBlocks]
     if (currentIndex !== null) {
-      newBlocks.splice(currentIndex, 0, newBlock)
+      newBlocks.splice(currentIndex, 1, newBlock)
     } else {
       newBlocks.push(newBlock)
     }
@@ -103,7 +103,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
 
     let newBlocks = [...(contentBlocks || [])]
     if (currentIndex !== null) {
-      newBlocks.splice(currentIndex, 0, newBlock)
+      newBlocks.splice(currentIndex, 1, newBlock)
     } else {
       newBlocks.push(newBlock)
     }
