@@ -210,6 +210,24 @@ class AuthController extends Controller
         ]);
     }
 
+    public function markOffline(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        // Устанавливаем пользователя как офлайн при отключении WebSocket
+        if ($user) {
+            $user->is_online = false;
+            $user->save();
+            
+            // Broadcast user status change event
+            broadcast(new \App\Events\UserStatusChanged($user->id, $user->domain_id, false, $user->last_seen_at))->toOthers();
+        }
+        
+        return response()->json([
+            'message' => 'User marked as offline',
+        ]);
+    }
+
     public function user(Request $request): JsonResponse
     {
         $user = $request->user();

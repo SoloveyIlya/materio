@@ -46,6 +46,8 @@ import CustomAvatar from '@core/components/mui/Avatar'
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
 import api from '@/lib/api'
+import { subscribeToUserStatus } from '@/lib/websocket'
+import { useAuthStore } from '@/store/authStore'
 
 // Style Imports
 import tableStyles from '@core/styles/table.module.css'
@@ -117,11 +119,31 @@ const UserListTable = ({ tableData, activeTab, onSendTest, administrators, selec
 
   // Hooks
   const router = useRouter()
+  const { user: currentUser } = useAuthStore()
 
   useEffect(() => {
     setData(tableData || [])
     setFilteredData(tableData || [])
   }, [tableData])
+
+  // Subscribe to real-time user status changes
+  useEffect(() => {
+    if (currentUser?.domain_id) {
+      const unsubscribe = subscribeToUserStatus(currentUser.domain_id, (statusData) => {
+        console.log('User status changed:', statusData)
+        // Update the user's online status in the table
+        setData(prevData => 
+          prevData.map(user => 
+            user.id === statusData.user_id 
+              ? { ...user, is_online: statusData.is_online, last_seen_at: statusData.last_seen_at }
+              : user
+          )
+        )
+      })
+
+      return () => unsubscribe()
+    }
+  }, [currentUser?.domain_id])
 
   const getAvatar = params => {
     const { avatar, name, email } = params

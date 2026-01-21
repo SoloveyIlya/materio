@@ -1,6 +1,7 @@
 'use client'
 
 import io from 'socket.io-client'
+import api from '@/lib/api'
 
 let socket = null
 
@@ -31,6 +32,8 @@ export const initializeSocket = () => {
 
   socket.on('disconnect', (reason) => {
     console.log('WebSocket disconnected:', reason)
+    // Mark user as offline when WebSocket disconnects
+    markUserOffline()
   })
 
   socket.on('error', (error) => {
@@ -38,6 +41,16 @@ export const initializeSocket = () => {
   })
 
   return socket
+}
+
+// Mark user as offline on backend when WebSocket disconnects
+const markUserOffline = async () => {
+  try {
+    await api.post('/user/mark-offline')
+    console.log('User marked as offline')
+  } catch (error) {
+    console.error('Error marking user offline:', error)
+  }
 }
 
 export const getSocket = () => {

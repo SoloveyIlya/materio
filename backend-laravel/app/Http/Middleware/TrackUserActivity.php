@@ -23,6 +23,8 @@ class TrackUserActivity
         // Обновляем информацию о пользователе при каждом запросе
         if ($request->user()) {
             $user = $request->user();
+            $previousOnlineStatus = $user->is_online;
+            
             // Получаем реальный IP адрес клиента
             $currentIp = $this->getClientIp($request);
             $previousIp = $user->ip_address;
@@ -33,10 +35,17 @@ class TrackUserActivity
             $offlineThreshold = now()->subMinutes($offlineTimeoutMinutes);
             
             // Обновляем статус пользователей, которые не были активны в течение таймаута
-            \App\Models\User::where('is_online', true)
+            $usersToOffline = \App\Models\User::where('is_online', true)
                 ->whereNotNull('last_seen_at')
                 ->where('last_seen_at', '<', $offlineThreshold)
-                ->update(['is_online' => false]);
+                ->get();
+            
+            foreach ($usersToOffline as $offlineUser) {
+                $offlineUser->is_online = false;
+                $offlineUser->save();
+                // Broadcast status change for users going offline due to timeout
+                broadcast(new \App\Events\UserStatusChanged($offlineUser->id, $offlineUser->domain_id, false, $offlineUser->last_seen_at))->toOthers();
+            }
             
             // Обновляем IP, user agent, location, platform
             $user->ip_address = $currentIp;
@@ -117,6 +126,11 @@ class TrackUserActivity
             }
 
             $user->save();
+            
+            // Broadcast user status change if online status changed
+            if ($previousOnlineStatus !== $user->is_online) {
+                broadcast(new \App\Events\UserStatusChanged($user->id, $user->domain_id, $user->is_online, $user->last_seen_at))->toOthers();
+            }
         }
 
         return $response;

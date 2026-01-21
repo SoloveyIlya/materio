@@ -38,6 +38,11 @@ Route::prefix('auth')->group(function () {
     });
 });
 
+// User routes (authenticated)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/user/mark-offline', [AuthController::class, 'markOffline']);
+});
+
 // Admin routes
 Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->group(function () {
     // Task Categories
