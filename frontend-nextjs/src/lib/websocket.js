@@ -10,8 +10,7 @@ export const initializeSocket = () => {
     return socket
   }
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-  const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || apiUrl
+  const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'http://localhost:6001'
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
