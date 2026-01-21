@@ -8,8 +8,15 @@ if [ "$DB_CONNECTION" = "mysql" ]; then
     # Wait for MySQL to be ready (max 60 attempts = 2 minutes)
     max_attempts=60
     attempt=0
+    
+    # Используем DB_* переменные если они установлены, иначе MYSQL_* переменные, иначе defaults
+    _db_host=${DB_HOST:-${MYSQL_HOST:-mysql}}
+    _db_port=${DB_PORT:-${MYSQL_PORT:-3306}}
+    _db_name=${DB_DATABASE:-${MYSQL_DATABASE:-admin_db}}
+    _db_user=${DB_USERNAME:-${MYSQL_USER:-admin}}
+    _db_pass=${DB_PASSWORD:-${MYSQL_PASSWORD}}
 
-    until php -r "try { \$pdo = new PDO('mysql:host=mysql;port=3306;dbname=${MYSQL_DATABASE:-admin_db}', '${MYSQL_USER:-admin}', '${MYSQL_PASSWORD}'); echo 'OK'; exit(0); } catch (PDOException \$e) { exit(1); }" 2>/dev/null; do
+    until php -r "try { \$pdo = new PDO('mysql:host=${_db_host};port=${_db_port};dbname=${_db_name}', '${_db_user}', '${_db_pass}'); echo 'OK'; exit(0); } catch (PDOException \$e) { exit(1); }" 2>/dev/null; do
         attempt=$((attempt + 1))
         if [ $attempt -ge $max_attempts ]; then
             echo "Failed to connect to database after $max_attempts attempts"
@@ -33,11 +40,11 @@ APP_TIMEZONE=UTC
 APP_URL=${APP_URL}
 
 DB_CONNECTION=${DB_CONNECTION:-mysql}
-DB_HOST=mysql
-DB_PORT=3306
-DB_DATABASE=${MYSQL_DATABASE:-admin_db}
-DB_USERNAME=${MYSQL_USER:-admin}
-DB_PASSWORD=${MYSQL_PASSWORD}
+DB_HOST=${DB_HOST:-mysql}
+DB_PORT=${DB_PORT:-3306}
+DB_DATABASE=${DB_DATABASE:-${MYSQL_DATABASE:-admin_db}}
+DB_USERNAME=${DB_USERNAME:-${MYSQL_USER:-admin}}
+DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD}}
 
 CACHE_DRIVER=${CACHE_DRIVER:-file}
 SESSION_DRIVER=${SESSION_DRIVER:-file}
