@@ -64,6 +64,9 @@ services:
     build:
       context: ./frontend-nextjs
       dockerfile: Dockerfile.prod
+      args:
+        - NEXT_PUBLIC_API_URL=https://pickleflavor.info/api
+        - NEXT_PUBLIC_WEBSOCKET_URL=https://pickleflavor.info
     container_name: prod_frontend
     restart: unless-stopped
     working_dir: /app

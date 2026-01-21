@@ -2,6 +2,14 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# Получаем переменные окружения для build-time
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_WEBSOCKET_URL=http://localhost:6001
+
+# Устанавливаем их как переменные окружения для build
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_WEBSOCKET_URL=${NEXT_PUBLIC_WEBSOCKET_URL}
+
 COPY package.json ./
 RUN npm install --ignore-scripts
 

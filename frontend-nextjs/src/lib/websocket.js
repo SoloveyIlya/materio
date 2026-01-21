@@ -12,6 +12,10 @@ export const initializeSocket = () => {
 
   const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'http://localhost:6001'
 
+  // Логируем для отладки
+  console.log('WebSocket URL from env:', process.env.NEXT_PUBLIC_WEBSOCKET_URL)
+  console.log('WebSocket connecting to:', wsUrl)
+
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
   socket = io(wsUrl, {
