@@ -78,6 +78,10 @@ fi
 echo "Running migrations..."
 php artisan migrate --force
 
+# Regenerate optimized autoload files and clear caches
+echo "Regenerating autoload files..."
+composer dump-autoload --optimize --classmap-authoritative --no-scripts 2>/dev/null || true
+
 # Clear package discovery cache to remove dev dependencies
 echo "Clearing package discovery cache..."
 rm -f bootstrap/cache/packages.php bootstrap/cache/services.php || true

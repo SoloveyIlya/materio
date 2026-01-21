@@ -23,11 +23,27 @@ WORKDIR /var/www
 # Copy composer files first for better caching
 COPY composer.json composer.lock ./
 
-# Install dependencies (production only, no dev dependencies)
-RUN composer install --no-dev --no-scripts --no-autoloader --optimize-autoloader
+# Install dependencies (включаем dev зависимости для framework, но потом их отключим)
+RUN composer install --no-scripts --no-autoloader --optimize-autoloader
 
 # Copy application files
 COPY . /var/www
+
+# Отключаем auto-discovery для dev пакетов в production
+RUN php -r " \
+    if (file_exists('composer.json')) { \
+        \$json = json_decode(file_get_contents('composer.json'), true); \
+        if (!isset(\$json['extra'])) { \
+            \$json['extra'] = []; \
+        } \
+        \$json['extra']['laravel'] = [ \
+            'dont-discover' => [ \
+                'spatie/laravel-ignition' \
+            ] \
+        ]; \
+        file_put_contents('composer.json', json_encode(\$json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); \
+    } \
+"
 
 # Temporarily disable post-autoload-dump script to prevent dev package discovery
 # Create a temporary composer.json without the problematic script
