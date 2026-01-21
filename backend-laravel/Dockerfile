@@ -22,14 +22,11 @@ WORKDIR /var/www
 # Copy composer files first for better caching
 COPY composer.json ./
 
-# Install dependencies (including dev dependencies for development)
-RUN composer install --no-scripts --no-autoloader --ignore-platform-reqs
-
 # Copy application files
 COPY . /var/www
 
 # Complete composer install and generate autoload
-RUN composer dump-autoload --optimize
+RUN composer install --no-scripts --ignore-platform-reqs && composer dump-autoload --optimize --no-interaction
 
 # Create necessary directories
 RUN mkdir -p storage/framework/cache/data \
