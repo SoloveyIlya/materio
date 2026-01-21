@@ -55,12 +55,11 @@ const UserViewPage = () => {
       loadUser()
       loadAdministrators()
       
-      // Auto-refresh user data every 5 seconds to catch real-time updates from other users
-      const refreshInterval = setInterval(() => {
-        loadUser()
-      }, 5000)
-      
-      return () => clearInterval(refreshInterval)
+      // Закомментировано: auto-refresh может быть избыточным
+      // const refreshInterval = setInterval(() => {
+      //   loadUser()
+      // }, 30000)
+      // return () => clearInterval(refreshInterval)
     }
   }, [userId])
 
@@ -79,7 +78,15 @@ const UserViewPage = () => {
       await api.put(`/admin/users/${userId}`, {
         administrator_id: administratorId || null
       })
-      loadUser() // Перезагружаем данные пользователя
+      
+      // Обновляем только поле administrator без полной перезагрузки
+      const selectedAdmin = administrators.find(a => a.id === administratorId)
+      setUser(prev => ({
+        ...prev,
+        administrator_id: administratorId,
+        administrator: selectedAdmin || null
+      }))
+      
       setAssignDialogOpen(false)
       setSelectedAdminId('')
     } catch (error) {
@@ -104,10 +111,26 @@ const UserViewPage = () => {
       console.log('API Response:', response.data)
       
       if (response.data && response.data.user) {
-        setUser(response.data.user)
+        const userData = response.data.user
+        
+        // Преобразуем snake_case в camelCase для совместимости
+        if (userData.moderator_profile) {
+          userData.moderatorProfile = userData.moderator_profile
+        }
+        if (userData.admin_profile) {
+          userData.adminProfile = userData.admin_profile
+        }
+        if (userData.test_results) {
+          userData.testResults = userData.test_results
+        }
+        if (userData.user_documents) {
+          userData.userDocuments = userData.user_documents
+        }
+        
+        setUser(userData)
         setStats(response.data.stats)
         setTests(response.data.tests || [])
-        setTestResults(response.data.user?.testResults || [])
+        setTestResults(userData.testResults || [])
         setRequiredDocuments(response.data.required_documents || [])
       } else {
         console.error('User data not found in response:', response.data)
@@ -138,8 +161,12 @@ const UserViewPage = () => {
   }
 
   const handleUserUpdate = (updatedUser) => {
+    // Просто обновляем состояние, не вызываем loadUser() чтобы избежать бесконечного цикла
     setUser(updatedUser)
-    loadUser() // Перезагружаем данные пользователя
+    // Обновляем тесты если они есть
+    if (updatedUser.testResults) {
+      setTestResults(updatedUser.testResults)
+    }
   }
 
   const refreshUserData = async () => {
@@ -148,10 +175,26 @@ const UserViewPage = () => {
       
       const response = await api.get(`/admin/users/${userId}`)
       if (response.data && response.data.user) {
-        setUser(response.data.user)
+        const userData = response.data.user
+        
+        // Преобразуем snake_case в camelCase для совместимости
+        if (userData.moderator_profile) {
+          userData.moderatorProfile = userData.moderator_profile
+        }
+        if (userData.admin_profile) {
+          userData.adminProfile = userData.admin_profile
+        }
+        if (userData.test_results) {
+          userData.testResults = userData.test_results
+        }
+        if (userData.user_documents) {
+          userData.userDocuments = userData.user_documents
+        }
+        
+        setUser(userData)
         setStats(response.data.stats)
         setTests(response.data.tests || [])
-        setTestResults(response.data.user?.testResults || [])
+        setTestResults(userData.testResults || [])
         setRequiredDocuments(response.data.required_documents || [])
       }
     } catch (error) {
@@ -277,13 +320,13 @@ const UserViewPage = () => {
           </Card>
         </Grid>
         <Grid size={{ xs: 12 }}>
-          <TestList userId={userId} tests={tests} testResults={testResults} />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
           <WorkSchedule 
             moderatorProfile={user?.moderatorProfile} 
             adminProfile={user?.adminProfile}
           />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <TestList userId={userId} tests={tests} testResults={testResults} />
         </Grid>
         <Grid size={{ xs: 12 }}>
           <TaskList tasks={user?.tasks || []} userId={userId} />

@@ -15,7 +15,7 @@ import Box from '@mui/material/Box'
 import CustomAvatar from '@core/components/mui/Avatar'
 import ModeratorUserDetails from './ModeratorUserDetails'
 import UserPlan from '../user-left-overview/UserPlan'
-import WorkSchedule from '../user-right/WorkSchedule'
+import WorkScheduleManager from '@/components/WorkScheduleManager'
 
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
@@ -84,11 +84,26 @@ const ModeratorUserLeftOverview = ({ user, stats, onUserUpdate }) => {
           <ModeratorUserDetails user={user} stats={stats} onUserUpdate={onUserUpdate} />
         </CardContent>
       </Card>
+      <WorkScheduleManager 
+        userId={user?.id} 
+        userRole='moderator' 
+        workSchedule={user?.moderatorProfile?.work_schedule}
+        onUpdate={(updatedSchedule) => {
+          if (onUserUpdate && user?.moderatorProfile) {
+            onUserUpdate({
+              ...user,
+              moderatorProfile: {
+                ...user.moderatorProfile,
+                work_schedule: updatedSchedule
+              }
+            })
+          }
+        }}
+        canEdit={true}
+      />
       <UserPlan stats={stats} />
-      <WorkSchedule moderatorProfile={user?.moderatorProfile} />
     </div>
   )
 }
 
 export default ModeratorUserLeftOverview
-

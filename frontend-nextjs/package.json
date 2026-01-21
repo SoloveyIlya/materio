@@ -49,6 +49,8 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.6",
+    "@babel/eslint-parser": "^7.28.6",
     "@iconify/json": "2.2.408",
     "@iconify/tools": "4.1.4",
     "@iconify/utils": "3.0.2",

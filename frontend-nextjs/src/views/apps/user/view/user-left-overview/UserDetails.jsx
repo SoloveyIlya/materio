@@ -24,8 +24,6 @@ import { API_URL } from '@/lib/api'
 
 // Country from IP component - используем location из базы данных
 const CountryFromIP = ({ location, ipAddress }) => {
-  // Используем location из базы данных, если оно доступно
-  // Если location не определено, пытаемся получить через API (fallback)
   const [country, setCountry] = useState(location || '—')
 
   useEffect(() => {
@@ -61,6 +59,8 @@ const CountryFromIP = ({ location, ipAddress }) => {
             if (fallbackResponse.ok) {
               const data = await fallbackResponse.json()
               setCountry(data.country_name || '—')
+            } else {
+              setCountry('—')
             }
           } catch (fallbackError) {
             setCountry('—')
@@ -458,19 +458,6 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
                     })
                     
                     const formatted = formatter.format(date)
-                    
-                    // Отладочная информация (только в development)
-                    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-                      console.log('Last Activity formatting:', {
-                        original: user.last_seen_at,
-                        dateString,
-                        dateUTC: date.toISOString(),
-                        dateLocal: date.toString(),
-                        timezone,
-                        formatted,
-                        userTimezone: user.timezone
-                      })
-                    }
                     
                     return formatted
                   } catch (error) {
