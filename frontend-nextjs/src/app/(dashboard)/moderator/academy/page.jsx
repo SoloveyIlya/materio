@@ -14,6 +14,16 @@ export default function ModeratorAcademyPage() {
 
   useEffect(() => {
     loadTests()
+    
+    // Listen for page visibility changes to reload when returning to tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadTests()
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
   const loadTests = async () => {
