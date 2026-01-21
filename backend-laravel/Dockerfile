@@ -23,7 +23,7 @@ WORKDIR /var/www
 COPY composer.json composer.lock ./
 
 # Install dependencies (including dev dependencies for development)
-RUN composer install --no-scripts --no-autoloader
+RUN composer install --no-scripts --no-autoloader --ignore-platform-reqs
 
 # Copy application files
 COPY . /var/www
