@@ -24,13 +24,11 @@ services:
   backend:
     build:
       context: ./backend-laravel
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     container_name: prod_backend
     restart: unless-stopped
     working_dir: /var/www
     volumes:
-      - ./backend-laravel:/var/www
-      - /var/www/vendor
       - backend_cache:/var/www/bootstrap/cache
       - backend_storage:/var/www/storage
       - ./deploy/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
@@ -54,6 +52,7 @@ services:
       - BROADCAST_DRIVER=websocket
       - WEBSOCKET_HOST=0.0.0.0
       - WEBSOCKET_PORT=6001
+      - WEBSOCKET_SCHEME=https
       - ENABLE_WEBSOCKET=true
     depends_on:
       - mysql
