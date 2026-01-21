@@ -35,7 +35,7 @@ class MessageController extends Controller
                 ->whereHas('roles', function ($q) {
                     $q->where('name', 'admin');
                 })
-                ->with('roles')
+                ->with(['roles', 'adminProfile'])
                 ->get(['id', 'name', 'email', 'is_online', 'last_seen_at', 'avatar', 'timezone']);
 
             // Получаем всех модераторов для отображения
@@ -43,7 +43,7 @@ class MessageController extends Controller
                 ->whereHas('roles', function ($q) {
                     $q->where('name', 'moderator');
                 })
-                ->with('roles')
+                ->with(['roles', 'moderatorProfile'])
                 ->get(['id', 'name', 'email', 'is_online', 'last_seen_at', 'avatar', 'administrator_id', 'timezone', 'work_start_date', 'platform']);
 
             $tabs = [];
@@ -110,7 +110,9 @@ class MessageController extends Controller
                         })->count();
 
                         $adminChats[] = [
-                            'user' => $moderator,
+                            'user' => array_merge($moderator->toArray(), [
+                                'moderatorProfile' => $moderator->moderatorProfile,
+                            ]),
                             'messages' => $formattedMessages,
                             'unread_count' => $unreadCount,
                         ];
@@ -128,6 +130,7 @@ class MessageController extends Controller
                         'avatar' => $admin->avatar,
                         'timezone' => $admin->timezone,
                         'roles' => $admin->roles,
+                        'adminProfile' => $admin->adminProfile,
                     ],
                     'chats' => $adminChats,
                 ];
@@ -190,7 +193,9 @@ class MessageController extends Controller
                     })->count();
                     
                     $unassignedChats[] = [
-                        'user' => $moderator,
+                        'user' => array_merge($moderator->toArray(), [
+                            'moderatorProfile' => $moderator->moderatorProfile,
+                        ]),
                         'messages' => $formattedMessages,
                         'unread_count' => $unreadCount,
                     ];
@@ -235,7 +240,7 @@ class MessageController extends Controller
         $messages = $query->orderBy('created_at', 'asc')->get();
 
         // Получаем админа модератора
-        $admin = \App\Models\User::with('roles')->find($administratorId);
+        $admin = \App\Models\User::with(['roles', 'adminProfile'])->find($administratorId);
         
         if (!$admin) {
             return response()->json([]);
@@ -287,6 +292,7 @@ class MessageController extends Controller
                     'avatar' => $admin->avatar,
                     'timezone' => $admin->timezone,
                     'roles' => $admin->roles,
+                    'adminProfile' => $admin->adminProfile,
                 ],
                 'messages' => $formattedMessages,
                 'unread_count' => $unreadCount,
