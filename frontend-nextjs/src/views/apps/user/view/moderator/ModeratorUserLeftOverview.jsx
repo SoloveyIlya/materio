@@ -21,7 +21,7 @@ import WorkScheduleManager from '@/components/WorkScheduleManager'
 import { getInitials } from '@/utils/getInitials'
 import { API_URL } from '@/lib/api'
 
-const ModeratorUserLeftOverview = ({ user, stats, onUserUpdate }) => {
+const ModeratorUserLeftOverview = ({ user, stats, onUserUpdate, isAdminView = false }) => {
   if (!user) return null
 
   const primaryRole = user.roles?.[0]?.name || 'moderator'
@@ -81,7 +81,7 @@ const ModeratorUserLeftOverview = ({ user, stats, onUserUpdate }) => {
               </div>
             )}
           </div>
-          <ModeratorUserDetails user={user} stats={stats} onUserUpdate={onUserUpdate} />
+          <ModeratorUserDetails user={user} stats={stats} onUserUpdate={onUserUpdate} isAdminView={isAdminView} />
         </CardContent>
       </Card>
       <WorkScheduleManager 

@@ -13,6 +13,11 @@ import Button from '@mui/material/Button'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import TextField from '@mui/material/TextField'
 
 // Component Imports
 import CustomAvatar from '@core/components/mui/Avatar'
@@ -80,6 +85,8 @@ const CountryFromIP = ({ location, ipAddress }) => {
 const UserDetails = ({ user, stats, onUserUpdate }) => {
   const [uploading, setUploading] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
+  const [workStartDialogOpen, setWorkStartDialogOpen] = useState(false)
+  const [workStartDate, setWorkStartDate] = useState('')
   
   useEffect(() => {
     // Получаем текущего авторизованного пользователя
@@ -93,6 +100,29 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
     }
     fetchCurrentUser()
   }, [])
+  
+  const handleStartWork = async () => {
+    try {
+      const dateToSet = workStartDate || new Date().toISOString().split('T')[0]
+      await api.put(`/admin/users/${user.id}`, {
+        work_start_date: dateToSet
+      })
+      
+      if (onUserUpdate) {
+        onUserUpdate({
+          ...user,
+          work_start_date: dateToSet
+        })
+      }
+      
+      setWorkStartDialogOpen(false)
+      setWorkStartDate('')
+      alert('Work start date set successfully!')
+    } catch (error) {
+      console.error('Error setting work start date:', error)
+      alert('Error: ' + (error.response?.data?.message || error.message))
+    }
+  }
   
   if (!user) return null
 
@@ -148,7 +178,8 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
   }
 
   return (
-    <Card>
+    <>
+      <Card>
       <CardContent className='flex flex-col pbs-12 gap-6'>
         <div className='flex flex-col gap-6'>
           <div className='flex items-center justify-center flex-col gap-4'>
@@ -264,6 +295,16 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
                 Work Start Date:
               </Typography>
               <Typography>{user.work_start_date ? new Date(user.work_start_date).toLocaleDateString() : '—'}</Typography>
+              {!user.work_start_date && currentUser?.roles?.some(r => r.name === 'admin') && primaryRole === 'moderator' && (
+                <Button 
+                  size='small' 
+                  variant='outlined' 
+                  onClick={() => setWorkStartDialogOpen(true)}
+                  sx={{ ml: 1 }}
+                >
+                  Set Date
+                </Button>
+              )}
             </div>
             <div className='flex items-center flex-wrap gap-x-1.5'>
               <Typography className='font-medium' color='text.primary'>
@@ -480,6 +521,31 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
         </div>
       </CardContent>
     </Card>
+    
+    {/* Dialog for setting work start date */}
+    <Dialog open={workStartDialogOpen} onClose={() => setWorkStartDialogOpen(false)} maxWidth='xs' fullWidth>
+      <DialogTitle>Set Work Start Date</DialogTitle>
+      <DialogContent>
+        <Typography variant='body2' sx={{ mb: 3, mt: 2 }}>
+          Set the date when this moderator started working. This is required before sending tasks.
+        </Typography>
+        <TextField
+          fullWidth
+          type='date'
+          label='Work Start Date'
+          value={workStartDate || new Date().toISOString().split('T')[0]}
+          onChange={(e) => setWorkStartDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setWorkStartDialogOpen(false)}>Cancel</Button>
+        <Button onClick={handleStartWork} variant='contained'>
+          Confirm
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   )
 }
 
