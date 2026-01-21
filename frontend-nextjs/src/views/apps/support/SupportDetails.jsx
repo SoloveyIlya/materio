@@ -205,7 +205,7 @@ const SupportDetails = ({
               <div className='flex items-center justify-between flex-wrap grow gap-x-4 gap-y-2'>
                 <div className='flex flex-col'>
                   <Typography color='text.primary'>
-                    {initialMessage.from?.name || initialMessage.from?.email || 'Unknown'}
+                    {initialMessage.from?.name || initialMessage.from?.email || 'Main Support'}
                   </Typography>
                   <Typography variant='body2'>{initialMessage.from?.email}</Typography>
                 </div>
@@ -349,7 +349,7 @@ const SupportDetails = ({
                   <div className='flex items-center justify-between flex-wrap grow gap-x-4 gap-y-2'>
                     <div className='flex flex-col'>
                       <Typography color='text.primary'>
-                        {sender?.name || sender?.email || 'Unknown User'}
+                        {sender?.name || sender?.email || 'Main Support'}
                       </Typography>
                       {sender?.email && (
                         <Typography variant='body2'>{sender?.email}</Typography>

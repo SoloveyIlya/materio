@@ -231,7 +231,7 @@ export default function TicketDetailPage() {
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                         <Box>
                           <Typography variant='subtitle1' fontWeight='medium'>
-                            {sender?.name || sender?.email || 'Unknown User'}
+                            {sender?.name || sender?.email || 'Main Support'}
                           </Typography>
                           {sender?.email && (
                             <Typography variant='body2' color='text.secondary'>
