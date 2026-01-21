@@ -31,6 +31,8 @@ services:
     volumes:
       - backend_cache:/var/www/bootstrap/cache
       - backend_storage:/var/www/storage
+      - backend_socket:/var/run/php-fpm
+      - ./backend-laravel/resources:/var/www/resources
       - ./deploy/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
     expose:
       - "8000"
@@ -95,6 +97,7 @@ services:
       - "443:443"
     volumes:
       - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - backend_socket:/var/run/php-fpm
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
@@ -110,3 +113,4 @@ volumes:
   mysql_data:
   backend_cache:
   backend_storage:
+  backend_socket:
