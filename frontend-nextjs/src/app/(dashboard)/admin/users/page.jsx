@@ -69,10 +69,11 @@ export default function UsersPage() {
   const handleSendTasks = async (userId) => {
     try {
       await api.post(`/admin/users/${userId}/send-tasks`)
-      alert('Tasks scheduled successfully')
+      showToast.success('Tasks scheduled successfully')
       loadUsers()
     } catch (error) {
-      alert('Error scheduling tasks')
+      const errorMessage = error.response?.data?.message || error.message || 'Error scheduling tasks'
+      showToast.warning(errorMessage)
     }
   }
 
