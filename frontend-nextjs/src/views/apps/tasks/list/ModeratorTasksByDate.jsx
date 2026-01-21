@@ -262,8 +262,8 @@ const ModeratorTasksByDate = () => {
   }
 
   return (
-    <Box sx={{ px: 3, pb: 3 }}>
-      <Box sx={{ display: 'flex', gap: 2.5, overflowX: 'auto', pb: 2 }}>
+    <Box sx={{ px: 3, pb: 3, height: 'calc(100vh - 180px)' }}>
+      <Box sx={{ display: 'flex', gap: 2.5, overflowX: 'auto', pb: 2, height: '100%' }}>
         {tasksByWorkDay.map((dayGroup) => {
           const dayDate = getDateForDay(dayGroup.day)
           return (
@@ -275,7 +275,7 @@ const ModeratorTasksByDate = () => {
                 minWidth: '280px',
                 maxWidth: '320px',
                 width: '100%',
-                minHeight: '400px',
+                height: '100%',
                 border: '1px solid',
                 borderColor: 'divider',
                 borderRadius: 2,
@@ -306,7 +306,6 @@ const ModeratorTasksByDate = () => {
               <Box 
                 sx={{ 
                   flex: 1,
-                  maxHeight: 'calc(100vh - 300px)', 
                   overflowY: 'auto',
                   overflowX: 'hidden',
                   '&::-webkit-scrollbar': {
