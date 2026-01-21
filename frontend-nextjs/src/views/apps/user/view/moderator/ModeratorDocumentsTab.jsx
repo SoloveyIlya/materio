@@ -35,6 +35,7 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
   const [editing, setEditing] = useState(false)
   const [editFormData, setEditFormData] = useState({ name: '', file: null })
   const [documents, setDocuments] = useState(requiredDocuments || [])
+  const [userDocumentsLocal, setUserDocumentsLocal] = useState(userDocuments || [])
   const containerRef = useRef(null)
   const justUpdatedRef = useRef(null) // Отслеживаем только что обновленные документы
 
@@ -65,6 +66,11 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
       setDocuments(requiredDocuments || [])
     }
   }, [requiredDocuments])
+
+  // Обновляем userDocumentsLocal при изменении userDocuments (переданного как prop)
+  React.useEffect(() => {
+    setUserDocumentsLocal(userDocuments || [])
+  }, [userDocuments])
 
   // Агрессивно убираем aria-hidden с родительских элементов когда есть фокус или открыт диалог
   useEffect(() => {
@@ -163,7 +169,7 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
 
   // Создаем мапу загруженных документов пользователя
   const userDocsMap = {}
-  userDocuments.forEach(doc => {
+  userDocumentsLocal.forEach(doc => {
     userDocsMap[doc.required_document_id] = doc
   })
 
@@ -316,10 +322,21 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
       })
 
       console.log('Upload response:', response.data)
+      
+      // Immediately update the local userDocumentsLocal state with the response
+      setUserDocumentsLocal(prevDocs => {
+        const updatedDocs = prevDocs.filter(doc => doc.required_document_id !== selectedDocument.id)
+        return [...updatedDocs, response.data]
+      })
+      
       showToast.success('Document uploaded successfully')
       handleCloseUploadDialog()
+      
+      // Then refresh from parent after a short delay
       if (onDocumentUpload) {
-        await onDocumentUpload()
+        setTimeout(() => {
+          onDocumentUpload()
+        }, 500)
       }
     } catch (error) {
       console.error('Error uploading document:', error)

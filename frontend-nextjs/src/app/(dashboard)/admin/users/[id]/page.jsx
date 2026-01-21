@@ -54,6 +54,13 @@ const UserViewPage = () => {
     if (userId) {
       loadUser()
       loadAdministrators()
+      
+      // Auto-refresh user data every 5 seconds to catch real-time updates from other users
+      const refreshInterval = setInterval(() => {
+        loadUser()
+      }, 5000)
+      
+      return () => clearInterval(refreshInterval)
     }
   }, [userId])
 
