@@ -71,7 +71,6 @@ RUN mkdir -p storage/framework/cache/data \
     storage/framework/views \
     storage/logs \
     bootstrap/cache \
-    /var/run/php-fpm \
     resources/views
 
 # Set permissions
@@ -88,13 +87,11 @@ RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.save_comments=1" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.fast_shutdown=1" >> /usr/local/etc/php/conf.d/opcache.ini
 
-# PHP-FPM pool configuration - listen on Unix socket
+# PHP-FPM pool configuration - listen on TCP port
 RUN echo "[www]" > /usr/local/etc/php-fpm.d/www.conf \
     && echo "user = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
     && echo "group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen = /var/run/php-fpm/php-fpm.sock" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
+    && echo "listen = 0.0.0.0:9000" >> /usr/local/etc/php-fpm.d/www.conf \
     && echo "pm = dynamic" >> /usr/local/etc/php-fpm.d/www.conf \
     && echo "pm.max_children = 50" >> /usr/local/etc/php-fpm.d/www.conf \
     && echo "pm.start_servers = 5" >> /usr/local/etc/php-fpm.d/www.conf \
