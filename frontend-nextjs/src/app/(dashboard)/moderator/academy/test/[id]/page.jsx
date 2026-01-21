@@ -128,7 +128,7 @@ export default function ModeratorTestPage() {
       if (response.data.is_passed) {
         showToast.success(`Test passed! Score: ${response.data.score}/${response.data.total} (${response.data.percentage}%)`)
       } else {
-        showToast.warning(`Test completed. Score: ${response.data.score}/${response.data.total} (${response.data.percentage}%)`)
+        showToast.error(`Test failed. Score: ${response.data.score}/${response.data.total} (${response.data.percentage}%). All answers must be correct to pass.`)
       }
       
       // Redirect to results page or back to academy
