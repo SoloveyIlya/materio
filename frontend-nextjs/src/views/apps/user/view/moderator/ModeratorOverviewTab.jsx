@@ -29,7 +29,7 @@ const ModeratorOverviewTab = ({ user }) => {
         api.get('/auth/user')
       ])
       setTests(testsResponse.data || [])
-      setTestResults(userResponse.data?.testResults || [])
+      setTestResults(userResponse.data?.test_results || [])
     } catch (error) {
       console.error('Error loading tests:', error)
     }

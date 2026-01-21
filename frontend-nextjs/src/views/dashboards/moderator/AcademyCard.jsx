@@ -10,6 +10,17 @@ import CardContent from '@mui/material/CardContent'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import Skeleton from '@mui/material/Skeleton'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import List from '@mui/material/List'
+import ListItem from '@mui/material/ListItem'
+import ListItemText from '@mui/material/ListItemText'
+import ListItemIcon from '@mui/material/ListItemIcon'
+import Chip from '@mui/material/Chip'
+import TextField from '@mui/material/TextField'
+import Box from '@mui/material/Box'
+import Divider from '@mui/material/Divider'
 
 // Components Imports
 import CustomAvatar from '@core/components/mui/Avatar'
@@ -19,10 +30,22 @@ const AcademyCard = () => {
   const [testData, setTestData] = useState(null)
   const [allTestsPassed, setAllTestsPassed] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const router = useRouter()
 
   useEffect(() => {
     loadTestData()
+    
+    // Listen for page visibility changes to reload when returning to tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadTestData()
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
   const loadTestData = async () => {
@@ -37,8 +60,23 @@ const AcademyCard = () => {
       const user = userResponse.data
       const allTests = testsResponse.data || []
 
-      // Получаем результаты тестов пользователя
-      const testResults = user.testResults || []
+      // Получаем результаты тестов пользователя (API возвращает test_results в snake_case)
+      const testResults = user.test_results || []
+
+      // Создаем мапу результатов для быстрого доступа
+      const resultsMap = {}
+      testResults.forEach(result => {
+        if (result.test_id) {
+          resultsMap[result.test_id] = result
+        }
+      })
+
+      // Добавляем статус к каждому тесту
+      const testsWithStatus = allTests.map(test => ({
+        ...test,
+        isPassed: resultsMap[test.id]?.is_passed || false,
+        result: resultsMap[test.id]
+      }))
 
       // Проверяем, прошёл ли пользователь все доступные тесты успешно
       const passedTests = testResults.filter(tr => tr.is_passed === true)
@@ -47,7 +85,7 @@ const AcademyCard = () => {
       setTestData({
         totalTests: allTests.length,
         passedTests: passedTests.length,
-        tests: allTests
+        tests: testsWithStatus
       })
       setAllTestsPassed(allPassed)
     } catch (error) {
@@ -64,8 +102,21 @@ const AcademyCard = () => {
   }
 
   const handleStartClick = () => {
-    router.push('/moderator/academy')
+    // Перезагружаем данные перед открытием диалога
+    loadTestData()
+    setDialogOpen(true)
   }
+
+  const handleTestClick = (test) => {
+    if (!test.isPassed) {
+      router.push(`/moderator/academy/test/${test.id}`)
+    }
+  }
+
+  const filteredTests = testData?.tests?.filter(test => 
+    test.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    test.level?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || []
 
   const data = [
     { icon: 'ri-calendar-line', title: `${testData?.totalTests || 0} Tests`, value: 'Tests' },
@@ -149,9 +200,132 @@ const AcademyCard = () => {
           </Button>
         )}
       </CardContent>
+
+      {/* Modal Dialog with Test List */}
+      <Dialog 
+        open={dialogOpen} 
+        onClose={() => setDialogOpen(false)}
+        maxWidth='sm'
+        fullWidth
+      >
+        <DialogTitle>
+          Test List
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            placeholder='Search Task'
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{ mb: 2 }}
+            InputProps={{
+              startAdornment: (
+                <Box sx={{ mr: 1 }}>
+                  <i className='ri-search-line' />
+                </Box>
+              )
+            }}
+          />
+          
+          <Divider sx={{ mb: 2 }} />
+          
+          <Typography variant='subtitle2' sx={{ mb: 2 }}>
+            Test List
+          </Typography>
+          
+          <List sx={{ p: 0 }}>
+            {filteredTests.length === 0 ? (
+              <Typography variant='body2' color='text.secondary' sx={{ textAlign: 'center', py: 3 }}>
+                No tests found
+              </Typography>
+            ) : (
+              filteredTests.map((test, index) => (
+                <ListItem
+                  key={test.id}
+                  onClick={() => handleTestClick(test)}
+                  sx={{
+                    cursor: test.isPassed ? 'default' : 'pointer',
+                    bgcolor: 'background.paper',
+                    mb: 1,
+                    borderRadius: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    '&:hover': test.isPassed ? {} : {
+                      bgcolor: 'action.hover',
+                    },
+                  }}
+                >
+                  <Box sx={{ flex: 1 }}>
+                    <ListItemText
+                      primary={test.title}
+                      secondary={
+                        <Chip 
+                          label={test.level?.name || 'No level'} 
+                          size='small'
+                          variant='outlined'
+                          sx={{ mt: 0.5 }}
+                        />
+                      }
+                    />
+                  </Box>
+                  <ListItemIcon sx={{ minWidth: 'auto', ml: 2 }}>
+                    {test.isPassed ? (
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: '50%',
+                          bgcolor: 'success.main',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <i className='ri-check-line' style={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    ) : (
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: '50%',
+                          bgcolor: 'error.main',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <i className='ri-close-line' style={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    )}
+                  </ListItemIcon>
+                </ListItem>
+              ))
+            )}
+          </List>
+          
+          <Divider sx={{ my: 2 }} />
+          
+          <Typography variant='subtitle2' sx={{ mb: 1 }}>
+            Task List
+          </Typography>
+          
+          <TextField
+            fullWidth
+            placeholder='Search Task'
+            sx={{ mb: 2 }}
+            InputProps={{
+              startAdornment: (
+                <Box sx={{ mr: 1 }}>
+                  <i className='ri-search-line' />
+                </Box>
+              )
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
 
 export default AcademyCard
-
