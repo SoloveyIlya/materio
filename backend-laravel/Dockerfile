@@ -20,7 +20,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www
 
 # Copy composer files first for better caching
-COPY composer.json composer.lock ./
+COPY composer.json ./
 
 # Install dependencies (including dev dependencies for development)
 RUN composer install --no-scripts --no-autoloader --ignore-platform-reqs
