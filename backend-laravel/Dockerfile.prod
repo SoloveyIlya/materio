@@ -71,7 +71,8 @@ RUN mkdir -p storage/framework/cache/data \
     storage/framework/views \
     storage/logs \
     bootstrap/cache \
-    /var/run/php-fpm
+    /var/run/php-fpm \
+    resources/views
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www \
