@@ -77,7 +77,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
     Route::get('/users', [UserController::class, 'index']);
     Route::get('/users/{id}', [UserController::class, 'show']);
     Route::put('/users/{id}', [UserController::class, 'update']);
-    Route::post('/users/{id}/send-test-task', [UserController::class, 'sendTestTask']);
+    Route::post('/users/{id}/send-tasks', [UserController::class, 'sendTasks']);
 
     // Moderators (алиас для users с фильтром)
     Route::get('/moderators', [UserController::class, 'index']);

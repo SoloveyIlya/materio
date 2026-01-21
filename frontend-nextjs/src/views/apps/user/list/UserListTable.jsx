@@ -107,7 +107,7 @@ const userStatusObj = {
 // Column Definitions
 const columnHelper = createColumnHelper()
 
-const UserListTable = ({ tableData, activeTab, onSendTest, administrators, selectedAdministrator, onAdministratorChange, onAssignAdministrator }) => {
+const UserListTable = ({ tableData, activeTab, onSendTasks, administrators, selectedAdministrator, onAdministratorChange, onAssignAdministrator }) => {
   // States
   const [rowSelection, setRowSelection] = useState({})
   const [data, setData] = useState(tableData || [])
@@ -311,11 +311,11 @@ const UserListTable = ({ tableData, activeTab, onSendTest, administrators, selec
                     <i className='ri-pushpin-line text-textSecondary' />
                   </IconButton>
                 )}
-                {onSendTest && activeTab === 0 && (
+                {onSendTasks && activeTab === 0 && (
                   <IconButton
-                    onClick={() => onSendTest(user.id)}
+                    onClick={() => onSendTasks(user.id)}
                     color='primary'
-                    title='Send test task'
+                    title='Send tasks'
                   >
                     <i className='ri-send-plane-line text-textSecondary' />
                   </IconButton>
@@ -330,7 +330,7 @@ const UserListTable = ({ tableData, activeTab, onSendTest, administrators, selec
       return baseColumns
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, filteredData, activeTab, router, onSendTest, onAssignAdministrator]
+    [data, filteredData, activeTab, router, onSendTasks, onAssignAdministrator]
   )
 
   const table = useReactTable({

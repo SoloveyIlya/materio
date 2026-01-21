@@ -66,13 +66,13 @@ export default function UsersPage() {
     }
   }
 
-  const handleSendTest = async (userId) => {
+  const handleSendTasks = async (userId) => {
     try {
-      await api.post(`/admin/users/${userId}/send-test-task`)
-      alert('Test task sent')
+      await api.post(`/admin/users/${userId}/send-tasks`)
+      alert('Tasks scheduled successfully')
       loadUsers()
     } catch (error) {
-      alert('Error sending test task')
+      alert('Error scheduling tasks')
     }
   }
 
@@ -140,7 +140,7 @@ export default function UsersPage() {
           <UserListTable
             tableData={users}
             activeTab={activeTab}
-            onSendTest={handleSendTest}
+            onSendTasks={handleSendTasks}
             administrators={administrators}
             selectedAdministrator={filterAdministrator}
             onAdministratorChange={setFilterAdministrator}

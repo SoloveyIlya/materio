@@ -77,19 +77,23 @@ class UserTest extends TestCase
             ->assertJsonCount(3);
     }
 
-    public function test_admin_can_send_test_task_to_moderator(): void
+    public function test_admin_can_send_tasks_to_moderator(): void
     {
         $moderatorRole = Role::firstOrCreate(['name' => 'moderator']);
         $moderator = User::factory()->create(['domain_id' => $this->domain->id]);
         $moderator->roles()->attach($moderatorRole);
+        
+        // Set work_start_date so moderator can receive tasks
+        $moderator->update(['work_start_date' => now()->toDateString()]);
 
         $response = $this->withHeader('Authorization', 'Bearer ' . $this->getAdminToken())
-            ->postJson("/api/admin/users/{$moderator->id}/send-test-task");
+            ->postJson("/api/admin/users/{$moderator->id}/send-tasks");
 
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'message',
-                'task',
+                'scheduled_count',
+                'work_day',
             ]);
     }
 }

@@ -363,7 +363,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function sendTestTask(Request $request, $id)
+    public function sendTasks(Request $request, $id)
     {
         $user = User::withTrashed()->find($id);
         
@@ -380,29 +380,41 @@ class UserController extends Controller
             return response()->json(['message' => 'User is not a moderator'], 400);
         }
 
-        // Находим категорию "Test"
-        $testCategory = \App\Models\TaskCategory::where('domain_id', $request->user()->domain_id)
-            ->where('name', 'Test')
-            ->first();
-
-        if (!$testCategory) {
-            return response()->json(['message' => 'Test category not found'], 404);
+        // Проверяем, что модератор начал работу
+        if (!$user->work_start_date) {
+            return response()->json(['message' => 'Moderator has not started work yet'], 400);
         }
 
-        $task = \App\Models\Task::create([
-            'domain_id' => $request->user()->domain_id,
-            'category_id' => $testCategory->id,
-            'assigned_to' => $user->id,
-            'title' => 'Test Task',
-            'description' => 'This is a test task created by administrator',
-            'status' => 'pending',
-            'assigned_at' => now(),
-        ]);
+        try {
+            $taskService = new \App\Services\TaskService();
+            $currentWorkDay = $user->getCurrentWorkDay();
+            
+            if (!$currentWorkDay) {
+                return response()->json(['message' => 'Unable to determine current work day'], 400);
+            }
 
-        return response()->json([
-            'message' => 'Test task sent',
-            'task' => $task,
-        ]);
+            // Планируем таски для текущего дня и следующего дня
+            $scheduledTasks = [];
+            
+            // Таски на сегодняшний день
+            $todayTasks = $taskService->scheduleTasksForModerator($user, $currentWorkDay);
+            $scheduledTasks = array_merge($scheduledTasks, $todayTasks);
+            
+            // Таски на следующий день
+            $nextDayTasks = $taskService->scheduleTasksForModerator($user, $currentWorkDay + 1);
+            $scheduledTasks = array_merge($scheduledTasks, $nextDayTasks);
+
+            return response()->json([
+                'message' => 'Tasks scheduled successfully',
+                'scheduled_count' => count($scheduledTasks),
+                'work_day' => $currentWorkDay,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error scheduling tasks: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Error scheduling tasks: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

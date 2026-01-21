@@ -304,7 +304,6 @@ class TaskController extends Controller
                 'template_id' => 'nullable|exists:task_templates,id',
                 'category_ids' => 'required|array|min:1',
                 'category_ids.*' => 'exists:task_categories,id',
-                'assigned_to' => 'nullable|exists:users,id',
                 'title' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'price' => 'required|numeric|min:0|max:99999999.99',
@@ -453,9 +452,15 @@ class TaskController extends Controller
                 'work_day_type' => isset($data['work_day']) ? gettype($data['work_day']) : 'not set',
             ]);
 
+            // Никогда не устанавливаем assigned_to и assigned_at при создании таска
+            // Таски будут отправлены модератору только когда админ нажмет "Send Tasks"
+            // через метод sendTasks, который использует TaskService::scheduleTasksForModerator
+            unset($data['assigned_to']);
+            
             $task = Task::create([
                 'domain_id' => $user->domain_id,
-                'assigned_at' => isset($data['assigned_to']) && $data['assigned_to'] ? now() : null,
+                'assigned_to' => null, // Таск не назначен до отправки
+                'assigned_at' => null, // Дата назначения устанавливается при отправке
                 ...$data,
             ]);
 
