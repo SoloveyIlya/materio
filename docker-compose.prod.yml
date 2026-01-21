@@ -32,6 +32,10 @@ services:
       - backend_cache:/var/www/bootstrap/cache
       - backend_storage:/var/www/storage
       - ./deploy/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
+    expose:
+      - "8000"
+      - "9000"
+      - "6001"
     environment:
       - APP_NAME=Materio
       - APP_ENV=production
@@ -87,7 +91,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
