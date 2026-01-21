@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Message;
 use App\Models\Task;
+use App\Events\MessageSent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -495,6 +496,9 @@ class MessageController extends Controller
                 ->setTimezone($user->timezone ?? 'UTC')
                 ->format('Y-m-d H:i:s');
         }
+
+        // Транслируем событие отправки сообщения
+        broadcast(new MessageSent($message))->toOthers();
 
         return response()->json($message, 201);
     }

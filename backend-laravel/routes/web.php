@@ -6,3 +6,5 @@ Route::get('/', function () {
     return ['message' => 'Admin Backend API'];
 });
 
+Broadcast::routes(['middleware' => ['auth:sanctum']]);
+

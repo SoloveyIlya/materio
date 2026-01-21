@@ -93,11 +93,18 @@ if [ "$DB_CONNECTION" = "sqlite" ]; then
     echo "SQLite database verified at: $DB_PATH"
 fi
 
-# Note: Migrations should be run manually with:
-# docker-compose exec backend php artisan migrate:fresh --seed
-# Or just: docker-compose exec backend php artisan migrate
-echo "Skipping automatic migrations (run manually if needed)"
-echo "To run migrations: docker-compose exec backend php artisan migrate"
+# Run migrations if AUTO_MIGRATE is true
+if [ "${AUTO_MIGRATE:-false}" = "true" ]; then
+    echo "Running migrations..."
+    php artisan migrate --force
+    echo "Migrations completed!"
+fi
+
+echo "Application started. Available commands:"
+echo "  - API Server: php artisan serve --host=0.0.0.0 --port=8000"
+echo "  - WebSocket: php artisan websockets:serve"
+echo ""
+echo "To run migrations manually: php artisan migrate"
 
 # Create storage symlink if it doesn't exist
 if [ ! -L /var/www/public/storage ] && [ ! -d /var/www/public/storage ]; then

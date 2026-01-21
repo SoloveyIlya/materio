@@ -51,6 +51,10 @@ services:
       - QUEUE_CONNECTION=sync
       - SANCTUM_STATEFUL_DOMAINS=pickleflavor.info,www.pickleflavor.info
       - SESSION_DOMAIN=.pickleflavor.info
+      - BROADCAST_DRIVER=websocket
+      - WEBSOCKET_HOST=0.0.0.0
+      - WEBSOCKET_PORT=6001
+      - ENABLE_WEBSOCKET=true
     depends_on:
       - mysql
     networks:

@@ -71,32 +71,34 @@ const ChatWrapper = () => {
     }
   }, [activeTab, messagesData, user])
 
-  // Auto-refresh messages with dynamic interval based on page visibility
+  // Auto-refresh messages with WebSocket
   useEffect(() => {
     if (!user) return
 
-    const handleVisibilityChange = () => {
-      // Если вкладка стала видна, сразу загружаем сообщения
-      if (document.visibilityState === 'visible') {
-        loadMessages(true)
-      }
+    // Import WebSocket utilities
+    const initSocket = async () => {
+      const { initializeSocket, subscribeToMessages } = await import('@/lib/websocket')
+      const socket = initializeSocket()
+      
+      // Подписываемся на новые сообщения
+      const unsubscribe = subscribeToMessages(user.domain_id, user.id, (data) => {
+        loadMessages(true) // silent = true
+      })
+
+      return unsubscribe
     }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    const interval = setInterval(() => {
-      // Обновляем только если вкладка видна: 3 сек в фокусе, 30 сек в фоне
-      const refreshRate = document.visibilityState === 'visible' ? 3000 : 30000
-      
-      // Проверяем видимость еще раз перед загрузкой
-      if (document.visibilityState === 'visible') {
-        loadMessages(true) // silent = true
-      }
-    }, 3000) // Базовый интервал 3 сек (будет проверяться только если видна)
+    let unsubscribe = null
+    initSocket().then(unsub => {
+      unsubscribe = unsub
+    }).catch(err => {
+      console.error('Failed to initialize WebSocket:', err)
+    })
 
     return () => {
-      clearInterval(interval)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (unsubscribe) {
+        unsubscribe()
+      }
     }
   }, [user, activeTab])
 

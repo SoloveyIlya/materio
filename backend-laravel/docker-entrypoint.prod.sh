@@ -84,6 +84,15 @@ php artisan config:cache || true
 php artisan route:cache || true
 php artisan view:cache || true
 
-echo "Production setup complete! Starting server..."
+echo "Production setup complete!"
 
+# Start WebSocket server in background if ENABLE_WEBSOCKET is true
+if [ "${ENABLE_WEBSOCKET:-true}" = "true" ]; then
+    echo "Starting WebSocket server..."
+    php artisan websockets:serve --host=0.0.0.0 --port=6001 &
+    WEBSOCKET_PID=$!
+    echo "WebSocket server started with PID: $WEBSOCKET_PID"
+fi
+
+echo "Starting PHP-FPM..."
 exec "$@"

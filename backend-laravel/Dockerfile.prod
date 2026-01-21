@@ -88,7 +88,7 @@ RUN echo "[www]" > /usr/local/etc/php-fpm.d/www.conf \
 COPY docker-entrypoint.prod.sh /usr/local/bin/docker-entrypoint.prod.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.prod.sh
 
-EXPOSE 9000
+EXPOSE 9000 6001
 
 ENTRYPOINT ["docker-entrypoint.prod.sh"]
 CMD ["php-fpm"]

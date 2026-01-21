@@ -29,6 +29,7 @@ import {
 import api from '@/lib/api'
 import { API_URL } from '@/lib/api'
 import { playNotificationSoundIfVisible } from '@/utils/soundNotification'
+import { initializeSocket, subscribeToMessages, disconnectSocket } from '@/lib/websocket'
 
 export default function MessagesPage() {
   const [activeTab, setActiveTab] = useState(0) // 0 = message, 1 = support
@@ -53,19 +54,34 @@ export default function MessagesPage() {
     }
   }, [activeTab, user])
 
-  // Автоматическое обновление сообщений каждые 3 секунды (polling)
+  // Автоматическое обновление сообщений через WebSocket
   useEffect(() => {
     if (!user) return
 
-    const interval = setInterval(() => {
-      // Обновляем только если страница видна (не в фоне)
-      if (document.visibilityState === 'visible') {
-        loadMessages(true) // silent = true, чтобы не показывать loading
-      }
-    }, 3000) // Каждые 3 секунды
+    // Инициализируем WebSocket соединение
+    const socket = initializeSocket()
+    
+    // Подписываемся на новые сообщения
+    const unsubscribe = subscribeToMessages(user.domain_id, user.id, (data) => {
+      // Обновляем сообщения при получении нового события
+      loadMessages(true) // silent = true
+      
+      // Воспроизводим звук уведомления
+      playNotificationSoundIfVisible()
+    })
 
-    return () => clearInterval(interval)
-  }, [user, activeTab])
+    return () => {
+      unsubscribe()
+    }
+  }, [user])
+
+  // Очищаем соединение при отключении от страницы
+  useEffect(() => {
+    return () => {
+      // Можно оставить соединение открытым или отключить
+      // disconnectSocket()
+    }
+  }, [])
 
   // Проверяем URL параметры для привязки к таску
   useEffect(() => {

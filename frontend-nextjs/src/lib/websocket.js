@@ -1,0 +1,79 @@
+'use client'
+
+import io from 'socket.io-client'
+
+let socket = null
+
+export const initializeSocket = () => {
+  if (socket && socket.connected) {
+    return socket
+  }
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || apiUrl
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+
+  socket = io(wsUrl, {
+    auth: {
+      token: token,
+    },
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 5,
+  })
+
+  socket.on('connect', () => {
+    console.log('WebSocket connected:', socket.id)
+  })
+
+  socket.on('disconnect', (reason) => {
+    console.log('WebSocket disconnected:', reason)
+  })
+
+  socket.on('error', (error) => {
+    console.error('WebSocket error:', error)
+  })
+
+  return socket
+}
+
+export const getSocket = () => {
+  if (!socket) {
+    return initializeSocket()
+  }
+  return socket
+}
+
+export const disconnectSocket = () => {
+  if (socket) {
+    socket.disconnect()
+    socket = null
+  }
+}
+
+export const subscribeToMessages = (domainId, userId, callback) => {
+  const socket = getSocket()
+  
+  // Подписываемся на события для домена и пользователя
+  socket.on(`domain.${domainId}:message.sent`, callback)
+  socket.on(`user.${userId}:message.sent`, callback)
+
+  // Возвращаем функцию для отписки
+  return () => {
+    socket.off(`domain.${domainId}:message.sent`, callback)
+    socket.off(`user.${userId}:message.sent`, callback)
+  }
+}
+
+export const subscribeToUserStatus = (domainId, callback) => {
+  const socket = getSocket()
+  
+  socket.on(`domain.${domainId}:user.status.changed`, callback)
+
+  return () => {
+    socket.off(`domain.${domainId}:user.status.changed`, callback)
+  }
+}
