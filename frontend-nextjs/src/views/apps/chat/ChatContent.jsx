@@ -124,6 +124,7 @@ const ChatContent = props => {
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [currentSearchIndex, setCurrentSearchIndex] = useState(-1)
+  const [previousMessageCount, setPreviousMessageCount] = useState(0)
 
   // Refs
   const scrollRef = useRef(null)
@@ -312,12 +313,19 @@ const ChatContent = props => {
     }
   }, [isBelowLgScreen])
 
-  // Scroll to bottom on new message
+  // Scroll to bottom only on new message (not when search is active)
   useEffect(() => {
     if (selectedChat?.messages && selectedChat.messages.length) {
-      setTimeout(scrollToBottom, 100)
+      const currentMessageCount = selectedChat.messages.length
+      
+      // Only scroll to bottom if search dialog is closed and no search results are displayed
+      if (!searchDialogOpen && searchResults.length === 0 && currentMessageCount > previousMessageCount) {
+        setTimeout(scrollToBottom, 100)
+      }
+      
+      setPreviousMessageCount(currentMessageCount)
     }
-  }, [selectedChat])
+  }, [selectedChat?.messages?.length, searchDialogOpen, searchResults.length, previousMessageCount])
 
   // Close user profile right drawer if backdrop is closed
   useEffect(() => {
@@ -654,6 +662,7 @@ const ChatContent = props => {
     setSearchTerm('')
     setSearchResults([])
     setCurrentSearchIndex(-1)
+    setPreviousMessageCount(0)
   }, [selectedChat?.user?.id])
 
   // Renders the user avatar with badge and user information
