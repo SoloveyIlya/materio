@@ -11,13 +11,18 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_WEBSOCKET_URL=${NEXT_PUBLIC_WEBSOCKET_URL}
 
 COPY package.json ./
-RUN npm install --ignore-scripts
+RUN npm install --ignore-scripts --production=false
 
 COPY . .
 
+# Устанавливаем переменные окружения для оптимизации build
+ENV NODE_OPTIONS=--max_old_space_size=4096
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
 # теперь src уже есть — можно безопасно выполнить postinstall-логику
 RUN npm run build:icons
-RUN NODE_OPTIONS=--max_old_space_size=2048 npm run build
+RUN npm run build
 
 # --- run stage ---
 FROM node:20-alpine AS runner

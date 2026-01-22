@@ -88,6 +88,12 @@ services:
       - backend
     networks:
       - prod_network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
 
   nginx:
     image: nginx:alpine
