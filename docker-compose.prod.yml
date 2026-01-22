@@ -34,7 +34,7 @@ services:
       - ./backend-laravel/resources:/var/www/resources
       - ./deploy/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
     ports:
-      - "9000:9000"
+      - "8000:8000"
       - "6001:6001"
     environment:
       - APP_NAME=Materio
