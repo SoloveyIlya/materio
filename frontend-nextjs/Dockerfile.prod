@@ -16,7 +16,7 @@ RUN npm install --ignore-scripts --production=false
 COPY . .
 
 # Устанавливаем переменные окружения для оптимизации build
-ENV NODE_OPTIONS=--max_old_space_size=4096
+ENV NODE_OPTIONS=--max-old-space-size=1024
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
