@@ -380,9 +380,9 @@ class UserController extends Controller
             return response()->json(['message' => 'User is not a moderator'], 400);
         }
 
-        // Проверяем, что модератор начал работу
+        // Если модератор еще не начал работу, автоматически устанавливаем сегодняшнюю дату
         if (!$user->work_start_date) {
-            return response()->json(['message' => 'Moderator has not started work yet'], 400);
+            $user->update(['work_start_date' => now()->toDateString()]);
         }
 
         try {
