@@ -131,9 +131,10 @@ export default function ModeratorTestPage() {
         showToast.error(`Test failed. Score: ${response.data.score}/${response.data.total} (${response.data.percentage}%). All answers must be correct to pass.`)
       }
       
-      // Redirect to results page or back to academy
+      // Redirect to results page or back to academy with refresh
       setTimeout(() => {
-        router.push('/moderator/academy')
+        // Используем window.location для принудительной перезагрузки страницы
+        window.location.href = '/moderator/academy'
       }, 3000)
     } catch (error) {
       console.error('Error submitting test:', error)

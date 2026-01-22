@@ -63,11 +63,86 @@ export default function MessagesPage() {
     
     // Подписываемся на новые сообщения
     const unsubscribe = subscribeToMessages(user.domain_id, user.id, (data) => {
-      // Обновляем сообщения при получении нового события
-      loadMessages(true) // silent = true
+      console.log('New message received via WebSocket:', data)
       
-      // Воспроизводим звук уведомления
-      playNotificationSoundIfVisible()
+      // Оптимизированное добавление сообщения напрямую в состояние
+      setMessagesData(prevData => {
+        if (!prevData) return prevData
+        
+        const newMessage = data
+        
+        // Для админов - обновляем tabs структуру
+        if (user?.roles?.some(r => r.name === 'admin') && prevData.tabs) {
+          return {
+            ...prevData,
+            tabs: prevData.tabs.map(tab => {
+              // Проверяем, относится ли сообщение к этому табу админа
+              const isForThisTab = newMessage.to_user_id === tab.admin.id || newMessage.from_user_id === tab.admin.id
+              
+              if (!isForThisTab) return tab
+              
+              return {
+                ...tab,
+                chats: tab.chats.map(chat => {
+                  // Находим чат с собеседником (другим пользователем, не админом)
+                  const chatUserId = chat.user.id
+                  const otherUserId = newMessage.from_user_id === tab.admin.id ? newMessage.to_user_id : newMessage.from_user_id
+                  
+                  if (chatUserId !== otherUserId) return chat
+                  
+                  // Проверяем, что сообщение еще не добавлено
+                  const messageExists = chat.messages.some(m => m.id === newMessage.id)
+                  if (messageExists) return chat
+                  
+                  // Увеличиваем unread_count только если сообщение не от текущего админа
+                  const isFromCurrentAdmin = newMessage.from_user_id === user.id
+                  const newUnreadCount = isFromCurrentAdmin ? chat.unread_count : (chat.unread_count || 0) + 1
+                  
+                  return {
+                    ...chat,
+                    messages: [...chat.messages, newMessage],
+                    unread_count: newUnreadCount,
+                    last_message: newMessage
+                  }
+                })
+              }
+            })
+          }
+        }
+        
+        // Для модераторов - обновляем массив чатов напрямую
+        if (Array.isArray(prevData)) {
+          return prevData.map(chat => {
+            // Находим чат с собеседником
+            const chatUserId = chat.user.id
+            const otherUserId = newMessage.from_user_id === user.id ? newMessage.to_user_id : newMessage.from_user_id
+            
+            if (chatUserId !== otherUserId) return chat
+            
+            // Проверяем, что сообщение еще не добавлено
+            const messageExists = chat.messages.some(m => m.id === newMessage.id)
+            if (messageExists) return chat
+            
+            // Увеличиваем unread_count только если сообщение не от текущего пользователя
+            const isFromCurrentUser = newMessage.from_user_id === user.id
+            const newUnreadCount = isFromCurrentUser ? chat.unread_count : (chat.unread_count || 0) + 1
+            
+            return {
+              ...chat,
+              messages: [...chat.messages, newMessage],
+              unread_count: newUnreadCount,
+              last_message: newMessage
+            }
+          })
+        }
+        
+        return prevData
+      })
+      
+      // Воспроизводим звук для новых непрочитанных сообщений (не от текущего пользователя)
+      if (data.from_user_id !== user.id) {
+        playNotificationSoundIfVisible()
+      }
     })
 
     return () => {

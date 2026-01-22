@@ -70,6 +70,6 @@ class MessageSent implements ShouldBroadcast
 
     public function broadcastAs(): string
     {
-        return 'message.sent';
+        return 'MessageSent'; // Изменено с 'message.sent' для совместимости с frontend
     }
 }

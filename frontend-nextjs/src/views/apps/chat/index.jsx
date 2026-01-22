@@ -75,32 +75,48 @@ const ChatWrapper = () => {
   useEffect(() => {
     if (!user) return
 
+    let unsubscribe = null
+    let isSubscribed = false
+
     // Import WebSocket utilities
     const initSocket = async () => {
+      if (isSubscribed) return null
+      
       const { initializeSocket, subscribeToMessages } = await import('@/lib/websocket')
       const socket = initializeSocket()
       
+      isSubscribed = true
+      
       // Подписываемся на новые сообщения
-      const unsubscribe = subscribeToMessages(user.domain_id, user.id, (data) => {
-        loadMessages(true) // silent = true
+      unsubscribe = subscribeToMessages(user.domain_id, user.id, (data) => {
+        // Обновляем список сообщений (перезагружаем с сервера для корректного отображения)
+        loadMessages(true) // silent = true, обновляем весь список
+        
+        // Воспроизводим звук для новых непрочитанных сообщений (не от текущего пользователя)
+        if (data.from_user_id !== user.id) {
+          playNotificationSoundIfVisible()
+          
+          // Оптимистично увеличиваем счетчик непрочитанных на +1
+          optimisticallyUpdateChatCount(1)
+        }
       })
 
       return unsubscribe
     }
 
-    let unsubscribe = null
     initSocket().then(unsub => {
-      unsubscribe = unsub
+      if (unsub) unsubscribe = unsub
     }).catch(err => {
       console.error('Failed to initialize WebSocket:', err)
     })
 
     return () => {
+      isSubscribed = false
       if (unsubscribe) {
         unsubscribe()
       }
     }
-  }, [user, activeTab])
+  }, [user])
 
   // Update selectedChat when messagesData changes and automatically mark messages as read if chat is open
   useEffect(() => {
@@ -179,14 +195,11 @@ const ChatWrapper = () => {
               // Отмечаем, что мы пометили этот чат как прочитанный
               markedAsReadRef.current.add(chatKey)
               
-              // Оптимистично обновляем счетчик в меню сразу (для мгновенного обновления UI)
+              // Оптимистично уменьшаем счетчик в меню сразу (для мгновенного обновления UI)
               const unreadCount = updatedChat.unread_count || 0
               if (unreadCount > 0) {
-                optimisticallyUpdateChatCount(unreadCount)
+                optimisticallyUpdateChatCount(-unreadCount)
               }
-              
-              // Обновляем счетчики в меню (для синхронизации с сервером)
-              refreshCounts()
               
               // Небольшая задержка перед обновлением сообщений, чтобы избежать лишних вызовов
               setTimeout(() => {
@@ -748,10 +761,10 @@ const ChatWrapper = () => {
         // Очищаем отслеживание для предыдущего чата и устанавливаем для нового
         markedAsReadRef.current.clear()
         
-        // Оптимистично обновляем счетчик в меню сразу (для мгновенного обновления UI)
+        // Оптимистично уменьшаем счетчик в меню сразу (для мгновенного обновления UI)
         const unreadCount = chat.unread_count || 0
         if (unreadCount > 0) {
-          optimisticallyUpdateChatCount(unreadCount)
+          optimisticallyUpdateChatCount(-unreadCount)
         }
         
         // Определяем from_user_id (от кого) и to_user_id (кому) для пометки сообщений

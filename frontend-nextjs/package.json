@@ -32,7 +32,9 @@
     "axios": "^1.6.2",
     "classnames": "2.5.1",
     "cmdk": "1.1.1",
+    "laravel-echo": "^2.3.0",
     "next": "14.0.4",
+    "pusher-js": "^8.4.0",
     "react": "^18.2.0",
     "react-apexcharts": "1.4.1",
     "react-colorful": "5.6.1",
@@ -49,6 +51,8 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.6",
+    "@babel/eslint-parser": "^7.28.6",
     "@iconify/json": "2.2.408",
     "@iconify/tools": "4.1.4",
     "@iconify/utils": "3.0.2",

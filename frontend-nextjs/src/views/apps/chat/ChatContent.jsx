@@ -125,6 +125,7 @@ const ChatContent = props => {
   const [searchResults, setSearchResults] = useState([])
   const [currentSearchIndex, setCurrentSearchIndex] = useState(-1)
   const [previousMessageCount, setPreviousMessageCount] = useState(0)
+  const [isSearchActive, setIsSearchActive] = useState(false)
 
   // Refs
   const scrollRef = useRef(null)
@@ -318,14 +319,14 @@ const ChatContent = props => {
     if (selectedChat?.messages && selectedChat.messages.length) {
       const currentMessageCount = selectedChat.messages.length
       
-      // Only scroll to bottom if search dialog is closed and no search results are displayed
-      if (!searchDialogOpen && searchResults.length === 0 && currentMessageCount > previousMessageCount) {
+      // Only scroll to bottom if search is not active and message count actually increased
+      if (!isSearchActive && !searchDialogOpen && currentMessageCount > previousMessageCount) {
         setTimeout(scrollToBottom, 100)
       }
       
       setPreviousMessageCount(currentMessageCount)
     }
-  }, [selectedChat?.messages?.length, searchDialogOpen, searchResults.length, previousMessageCount])
+  }, [selectedChat?.messages?.length, isSearchActive, searchDialogOpen, previousMessageCount])
 
   // Close user profile right drawer if backdrop is closed
   useEffect(() => {
@@ -553,8 +554,11 @@ const ChatContent = props => {
     if (!value.trim()) {
       setSearchResults([])
       setCurrentSearchIndex(-1)
+      setIsSearchActive(false)
       return
     }
+
+    setIsSearchActive(true)
 
     if (!selectedChat?.messages) {
       setSearchResults([])
@@ -663,6 +667,7 @@ const ChatContent = props => {
     setSearchResults([])
     setCurrentSearchIndex(-1)
     setPreviousMessageCount(0)
+    setIsSearchActive(false)
   }, [selectedChat?.user?.id])
 
   // Renders the user avatar with badge and user information
@@ -1212,6 +1217,7 @@ const ChatContent = props => {
           setSearchTerm('')
           setSearchResults([])
           setCurrentSearchIndex(-1)
+          setIsSearchActive(false)
         }}
         maxWidth="sm"
         fullWidth
@@ -1280,6 +1286,7 @@ const ChatContent = props => {
                       setSearchTerm('')
                       setSearchResults([])
                       setCurrentSearchIndex(-1)
+                      setIsSearchActive(false)
                     }}
                   >
                     <i className='ri-close-line' />
@@ -1305,6 +1312,7 @@ const ChatContent = props => {
             setSearchTerm('')
             setSearchResults([])
             setCurrentSearchIndex(-1)
+            setIsSearchActive(false)
           }}>
             Close
           </Button>

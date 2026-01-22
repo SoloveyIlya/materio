@@ -148,8 +148,9 @@ class ProfileController extends Controller
             'work_schedule' => 'nullable|array',
             'work_schedule.*.day' => 'required|string|in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
             'work_schedule.*.enabled' => 'required|boolean',
-            'work_schedule.*.start_time' => 'nullable|string|regex:/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/',
-            'work_schedule.*.end_time' => 'nullable|string|regex:/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/',
+            'work_schedule.*.start_time' => 'nullable|string|date_format:H:i',
+            'work_schedule.*.end_time' => 'nullable|string|date_format:H:i',
+            'work_schedule.*.break_hours' => 'nullable|numeric|min:0|max:24',
         ]);
 
         $profile = $user->adminProfile;
@@ -178,4 +179,3 @@ class ProfileController extends Controller
         ]);
     }
 }
-

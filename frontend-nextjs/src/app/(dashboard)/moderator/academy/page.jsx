@@ -1,57 +1,58 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Box, Grid } from '@mui/material'
-import { useRouter } from 'next/navigation'
-import api from '@/lib/api'
-import TestHeader from '@/components/tests/TestHeader'
-import Tests from '@/components/tests/Tests'
+import { useState, useEffect } from "react";
+import { Box, Grid } from "@mui/material";
+import { useRouter } from "next/navigation";
+import api from "@/lib/api";
+import TestHeader from "@/components/tests/TestHeader";
+import Tests from "@/components/tests/Tests";
 
 export default function ModeratorAcademyPage() {
-  const [tests, setTests] = useState([])
-  const [testResults, setTestResults] = useState([])
-  const router = useRouter()
+  const [tests, setTests] = useState([]);
+  const [testResults, setTestResults] = useState([]);
+  const router = useRouter();
 
   useEffect(() => {
-    loadTests()
-    
+    loadTests();
+
     // Listen for page visibility changes to reload when returning to tab
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadTests()
+      if (document.visibilityState === "visible") {
+        loadTests();
       }
-    }
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [])
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
   const loadTests = async () => {
     try {
       // Загружаем тесты и результаты тестов пользователя
       const [testsResponse, userResponse] = await Promise.all([
-        api.get('/moderator/tests'),
-        api.get('/auth/user')
-      ])
-      setTests(testsResponse.data || [])
-      setTestResults(userResponse.data?.testResults || [])
+        api.get("/moderator/tests"),
+        api.get("/auth/user"),
+      ]);
+      setTests(testsResponse.data || []);
+      setTestResults(userResponse.data?.test_results || []);
     } catch (error) {
-      console.error('Error loading tests:', error)
-      setTests([])
-      setTestResults([])
+      console.error("Error loading tests:", error);
+      setTests([]);
+      setTestResults([]);
     }
-  }
+  };
 
   const handleStartTest = (test) => {
     // Переходим на страницу прохождения теста
-    router.push(`/moderator/academy/test/${test.id}`)
-  }
+    router.push(`/moderator/academy/test/${test.id}`);
+  };
 
   return (
     <Box sx={{ p: 3 }}>
       <Grid container spacing={6}>
         <Grid size={{ xs: 12 }}>
-          <TestHeader 
+          <TestHeader
             onAddTest={null}
             onManageLevels={null}
             showButtons={false}
@@ -60,8 +61,8 @@ export default function ModeratorAcademyPage() {
           />
         </Grid>
         <Grid size={{ xs: 12 }}>
-          <Tests 
-            testData={tests} 
+          <Tests
+            testData={tests}
             onEditTest={null}
             onStartTest={handleStartTest}
             readOnly={true}
@@ -70,6 +71,5 @@ export default function ModeratorAcademyPage() {
         </Grid>
       </Grid>
     </Box>
-  )
+  );
 }
-

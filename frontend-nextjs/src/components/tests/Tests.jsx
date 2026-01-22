@@ -79,8 +79,15 @@ const Tests = ({ testData, onEditTest, onStartTest, readOnly = false, testResult
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <Typography variant='body2'>{item.duration_minutes} min</Typography>
                         {readOnly && onStartTest ? (
-                          // Показываем кнопку Start только если тест не пройден
-                          !resultsMap[item.id]?.is_passed && (
+                          // Показываем либо галочку для пройденных тестов, либо кнопку Start
+                          resultsMap[item.id]?.is_passed ? (
+                            <Chip
+                              icon={<i className='ri-check-line' />}
+                              label='Passed'
+                              color='success'
+                              size='small'
+                            />
+                          ) : (
                             <Button
                               variant='contained'
                               size='small'
@@ -164,4 +171,3 @@ const Tests = ({ testData, onEditTest, onStartTest, readOnly = false, testResult
 }
 
 export default Tests
-

@@ -8,9 +8,42 @@ import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
 import Divider from '@mui/material/Divider'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import TextField from '@mui/material/TextField'
+import api from '@/lib/api'
 
-const ModeratorUserDetails = ({ user, stats, onUserUpdate }) => {
+const ModeratorUserDetails = ({ user, stats, onUserUpdate, isAdminView = false }) => {
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [workStartDate, setWorkStartDate] = useState('')
+  
   if (!user) return null
+  
+  const handleStartWork = async () => {
+    try {
+      const dateToSet = workStartDate || new Date().toISOString().split('T')[0]
+      await api.put(`/admin/users/${user.id}`, {
+        work_start_date: dateToSet
+      })
+      
+      if (onUserUpdate) {
+        onUserUpdate({
+          ...user,
+          work_start_date: dateToSet
+        })
+      }
+      
+      setDialogOpen(false)
+      setWorkStartDate('')
+      alert('Work start date set successfully!')
+    } catch (error) {
+      console.error('Error setting work start date:', error)
+      alert('Error: ' + (error.response?.data?.message || error.message))
+    }
+  }
 
   return (
     <div>
@@ -45,6 +78,16 @@ const ModeratorUserDetails = ({ user, stats, onUserUpdate }) => {
             Work Start Date:
           </Typography>
           <Typography>{user.work_start_date ? new Date(user.work_start_date).toLocaleDateString() : '—'}</Typography>
+          {!user.work_start_date && isAdminView && (
+            <Button 
+              size='small' 
+              variant='outlined' 
+              onClick={() => setDialogOpen(true)}
+              sx={{ ml: 1 }}
+            >
+              Set Date
+            </Button>
+          )}
         </div>
         {user.moderatorProfile && (
           <>
@@ -171,44 +214,40 @@ const ModeratorUserDetails = ({ user, stats, onUserUpdate }) => {
                 if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateString)) {
                   dateString = dateString.replace(' ', 'T') + 'Z'
                 }
-                
-                const date = new Date(dateString)
-                if (isNaN(date.getTime())) {
-                  return '—'
-                }
-                
-                const timezone = user.timezone || 'UTC'
-                // Используем Intl.DateTimeFormat для конвертации UTC времени в указанный timezone
-                const formatter = new Intl.DateTimeFormat('en-GB', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false,
-                  timeZone: timezone
-                })
-                return formatter.format(date)
-              } catch (error) {
-                console.error('Error formatting date:', error)
-                return new Date(user.last_seen_at).toLocaleString('en-GB', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false
-                })
+                return new Date(dateString).toLocaleString()
+              } catch (e) {
+                return '—'
               }
             })()}
           </Typography>
         </div>
       </div>
+      
+      {/* Dialog for setting work start date */}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth='xs' fullWidth>
+        <DialogTitle>Set Work Start Date</DialogTitle>
+        <DialogContent>
+          <Typography variant='body2' sx={{ mb: 3 }}>
+            Set the date when this moderator started working. This is required before sending tasks.
+          </Typography>
+          <TextField
+            fullWidth
+            type='date'
+            label='Work Start Date'
+            value={workStartDate || new Date().toISOString().split('T')[0]}
+            onChange={(e) => setWorkStartDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleStartWork} variant='contained'>
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   )
 }
 
 export default ModeratorUserDetails
-

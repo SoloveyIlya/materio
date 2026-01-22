@@ -36,12 +36,5 @@ return [
         'null' => [
             'driver' => 'null',
         ],
-
-        'websocket' => [
-            'driver' => 'websocket',
-            'host' => env('WEBSOCKET_HOST', 'localhost'),
-            'port' => env('WEBSOCKET_PORT', 6001),
-            'scheme' => env('WEBSOCKET_SCHEME', 'http'),
-        ],
     ],
 ];

@@ -14,13 +14,20 @@ use Illuminate\Support\Facades\Broadcast;
 */
 
 Broadcast::channel('domain.{domainId}', function ($user, $domainId) {
-    return (int)$user->domain_id === (int)$domainId;
+    // Разрешаем доступ к каналу домена для всех аутентифицированных пользователей
+    return $user ? ['id' => $user->id, 'name' => $user->name] : false;
 });
 
 Broadcast::channel('user.{userId}', function ($user, $userId) {
-    return (int)$user->id === (int)$userId;
+    // Разрешаем доступ только к собственному каналу пользователя
+    return $user && (int) $user->id === (int) $userId 
+        ? ['id' => $user->id, 'name' => $user->name] 
+        : false;
 });
 
 Broadcast::channel('admin.{adminId}', function ($user, $adminId) {
-    return (int)$user->id === (int)$adminId && $user->isAdmin();
+    // Разрешаем доступ только к собственному каналу администратора
+    return $user && (int) $user->id === (int) $adminId 
+        ? ['id' => $user->id, 'name' => $user->name] 
+        : false;
 });

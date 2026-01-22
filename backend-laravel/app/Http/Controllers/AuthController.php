@@ -252,10 +252,9 @@ class AuthController extends Controller
                 'minimum_minutes_between_tasks' => 5
             ]);
             // Перезагружаем пользователя с новым профилем
-            $user = $user->fresh(['moderatorProfile']);
+            $user->load('moderatorProfile');
         }
         
         return response()->json($user);
     }
 }
-

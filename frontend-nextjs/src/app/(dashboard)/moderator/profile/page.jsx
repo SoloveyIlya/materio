@@ -34,6 +34,24 @@ const ModeratorProfilePage = () => {
       }
       const response = await api.get('/auth/user')
       const userData = response.data
+      
+      // Преобразуем snake_case в camelCase для совместимости
+      if (userData.moderator_profile) {
+        userData.moderatorProfile = userData.moderator_profile
+      }
+      if (userData.admin_profile) {
+        userData.adminProfile = userData.admin_profile
+      }
+      if (userData.test_results) {
+        userData.testResults = userData.test_results
+      }
+      if (userData.user_documents) {
+        userData.userDocuments = userData.user_documents
+      }
+      
+      console.log('Loaded user data:', userData)
+      console.log('Moderator profile:', userData?.moderatorProfile)
+      console.log('Moderator profile work_schedule:', userData?.moderatorProfile?.work_schedule)
       setUser(userData)
 
       // Загружаем статистику для модератора
@@ -64,8 +82,9 @@ const ModeratorProfilePage = () => {
   }
 
   const handleUserUpdate = (updatedUser) => {
+    // Обновляем состояние пользователя без дополнительной загрузки
+    // чтобы избежать перезаписи только что сохраненных данных
     setUser(updatedUser)
-    loadUser()
   }
 
   if (loading) {
@@ -105,4 +124,3 @@ const ModeratorProfilePage = () => {
 }
 
 export default ModeratorProfilePage
-

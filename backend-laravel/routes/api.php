@@ -26,6 +26,7 @@ use App\Http\Controllers\Moderator\TestController as ModeratorTestController;
 use App\Http\Controllers\Moderator\ToolController as ModeratorToolController;
 use App\Http\Controllers\Moderator\TrainingController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
 
 // Public routes
 Route::prefix('auth')->group(function () {
@@ -178,6 +179,49 @@ Route::prefix('messages')->middleware(['auth:sanctum', 'activity'])->group(funct
     Route::post('/{message}/read', [MessageController::class, 'markAsRead']);
     Route::post('/mark-chat-read', [MessageController::class, 'markChatAsRead']);
 });
+
+// Test broadcasting without middleware
+Route::post('/broadcasting/test', function (\Illuminate\Http\Request $request) {
+    return response()->json([
+        'success' => true,
+        'channel_name' => $request->input('channel_name'),
+        'socket_id' => $request->input('socket_id'),
+        'has_token' => $request->bearerToken() ? true : false,
+        'token_value' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20).'...' : null,
+        'user' => $request->user() ? $request->user()->id : null
+    ]);
+});
+
+// Test with middleware
+Route::post('/broadcasting/test-auth', function (\Illuminate\Http\Request $request) {
+    return response()->json([
+        'success' => true,
+        'user_id' => $request->user()->id,
+        'user_name' => $request->user()->name,
+    ]);
+})->middleware('auth:sanctum');
+
+// Broadcasting authentication - парсим form data и передаем Laravel broadcaster
+Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
+    // Загружаем каналы broadcasting один раз
+    static $channelsLoaded = false;
+    if (!$channelsLoaded) {
+        require base_path('routes/channels.php');
+        $channelsLoaded = true;
+    }
+    
+    // Преобразуем form data в параметры запроса, если они не были распарсены
+    if (empty($request->all()) && $request->getContent()) {
+        parse_str($request->getContent(), $parsed);
+        if (!empty($parsed)) {
+            $request->merge($parsed);
+        }
+    }
+    
+    // Используем стандартную авторизацию Laravel Broadcasting
+    $broadcaster = app(\Illuminate\Contracts\Broadcasting\Broadcaster::class);
+    return $broadcaster->auth($request);
+})->middleware('auth:sanctum');
 
 // Telegram routes
 Route::prefix('telegram')->group(function () {
