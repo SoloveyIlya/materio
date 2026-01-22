@@ -45,7 +45,6 @@ export const initializeSocket = () => {
     encrypted: useTLS,
     disableStats: true,
     enabledTransports: ['ws', 'wss'],
-    wsPath: '/app',
     authEndpoint: `${apiUrl}/api/broadcasting/auth`,
     auth: {
       headers: {
