@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 
 /**
@@ -9,27 +9,53 @@ import { useAuthStore } from '@/store/authStore'
  */
 export default function WebSocketProvider({ children }) {
   const { user } = useAuthStore()
+  const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
-    if (!user) return
+    // Проверяем есть ли токен в localStorage (user может еще не загруженься из store)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    
+    console.log('[WebSocketProvider] Инициализация:', {
+      user: user?.id,
+      token: token ? 'присутствует' : 'отсутствует',
+      isInitialized,
+    })
+
+    if (!token && !user) {
+      console.log('[WebSocketProvider] Пропуск: нет токена и юзера')
+      return
+    }
+
+    if (isInitialized) {
+      console.log('[WebSocketProvider] Уже инициализировано')
+      return
+    }
 
     // Инициализируем WebSocket при загрузке приложения
     const initWebSocket = async () => {
       try {
+        console.log('[WebSocketProvider] Импортируем websocket.js...')
         const { initializeSocket } = await import('@/lib/websocket')
+        
+        console.log('[WebSocketProvider] Инициализируем Echo...')
         const socket = initializeSocket()
         
         if (socket) {
-          console.log('[App] WebSocket инициализирован глобально')
-          // Socket теперь доступен через window.Echo
+          console.log('[WebSocketProvider] ✅ Echo инициализирован глобально')
+          console.log('[WebSocketProvider] window.Echo:', window.Echo ? 'доступен' : 'NOT доступен')
+          setIsInitialized(true)
+        } else {
+          console.error('[WebSocketProvider] ❌ initializeSocket вернул null')
         }
       } catch (error) {
-        console.error('[App] Ошибка инициализации WebSocket:', error)
+        console.error('[WebSocketProvider] ❌ Ошибка инициализации WebSocket:', error)
       }
     }
 
-    initWebSocket()
-  }, [user])
+    // Инициализируем с небольшой задержкой для гарантии загрузки store
+    const timeout = setTimeout(initWebSocket, 100)
+    return () => clearTimeout(timeout)
+  }, [user, isInitialized])
 
   return children
 }

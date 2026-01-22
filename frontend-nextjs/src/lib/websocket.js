@@ -13,6 +13,7 @@ let echo = null
 
 export const initializeSocket = () => {
   if (echo) {
+    console.log('[WS] Echo уже инициализирован, возвращаем существующий')
     return echo
   }
 
@@ -20,13 +21,23 @@ export const initializeSocket = () => {
   const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'http://localhost:6001'
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
+  console.log('[WS] Начало инициализации Echo', {
+    apiUrl,
+    wsUrl,
+    token: token ? '✓ есть' : '✗ нет',
+  })
+
+  if (!token) {
+    console.warn('[WS] ⚠️ Токен не найден в localStorage!')
+  }
+
   // Парсим WebSocket URL
   const wsUrlObj = new URL(wsUrl)
   const wsHost = wsUrlObj.hostname
   const wsPort = wsUrlObj.port || (wsUrlObj.protocol === 'https:' ? 443 : 80)
   const useTLS = wsUrlObj.protocol === 'https:'
 
-  console.log('[WS] Инициализация с параметрами:', {
+  console.log('[WS] Параметры подключения:', {
     wsHost,
     wsPort,
     useTLS,
@@ -34,50 +45,66 @@ export const initializeSocket = () => {
     authEndpoint: `${apiUrl}/api/broadcasting/auth`,
   })
 
-  echo = new Echo({
-    broadcaster: 'pusher',
-    key: 'local',
-    cluster: 'mt1',
-    wsHost: wsHost,
-    wsPort: wsPort,
-    wssPort: wsPort,
-    forceTLS: useTLS,
-    encrypted: useTLS,
-    disableStats: true,
-    enabledTransports: ['ws', 'wss'],
-    authEndpoint: `${apiUrl}/api/broadcasting/auth`,
-    auth: {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : '',
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+  try {
+    echo = new Echo({
+      broadcaster: 'pusher',
+      key: 'local',
+      cluster: 'mt1',
+      wsHost: wsHost,
+      wsPort: wsPort,
+      wssPort: wsPort,
+      forceTLS: useTLS,
+      encrypted: useTLS,
+      disableStats: true,
+      enabledTransports: ['ws', 'wss'],
+      authEndpoint: `${apiUrl}/api/broadcasting/auth`,
+      auth: {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : '',
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
       },
-    },
-  })
+    })
 
-  // Логирование событий подключения
-  echo.connector.pusher.connection.bind('state_change', (states) => {
-    console.log('[WS] State change:', states.previous, '→', states.current)
-  })
+    console.log('[WS] ✅ Echo объект создан')
 
-  echo.connector.pusher.connection.bind('error', (err) => {
-    console.error('[WS] Connection error:', err)
-  })
+    // Логирование событий подключения
+    echo.connector.pusher.connection.bind('state_change', (states) => {
+      console.log('[WS] State change:', states.previous, '→', states.current)
+    })
 
-  echo.connector.pusher.connection.bind('connected', () => {
-    console.log('[WS] Connected успешно!')
-  })
+    echo.connector.pusher.connection.bind('error', (err) => {
+      console.error('[WS] ❌ Connection error:', err)
+    })
 
-  // Логирование всех событий (ДИАГНОСТИКА)
-  echo.connector.pusher.bind_global((event, data) => {
-    console.log('[WS EVENT]', event, data)
-  })
+    echo.connector.pusher.connection.bind('connected', () => {
+      console.log('[WS] ✅ Connected успешно!')
+    })
 
-  // События подключения
-  echo.connector.pusher.connection.bind('disconnected', () => {
-    console.log('[WS] Disconnected')
-    markUserOffline()
-  })
+    // Логирование всех событий (ДИАГНОСТИКА)
+    echo.connector.pusher.bind_global((event, data) => {
+      console.log('[WS EVENT]', event, data)
+    })
+
+    // События подключения
+    echo.connector.pusher.connection.bind('disconnected', () => {
+      console.log('[WS] Disconnected')
+      markUserOffline()
+    })
+
+    // Делаем Echo доступным глобально
+    if (typeof window !== 'undefined') {
+      window.Echo = echo
+      console.log('[WS] ✅ window.Echo установлен глобально')
+    }
+
+    return echo
+  } catch (error) {
+    console.error('[WS] ❌ Ошибка при создании Echo:', error)
+    throw error
+  }
+}
 
   return echo
 }
