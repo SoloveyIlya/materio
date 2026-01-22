@@ -108,20 +108,17 @@ export const disconnectSocket = () => {
 export const subscribeToMessages = (domainId, userId, callback) => {
   const echoInstance = getSocket()
   
-  // Подписываемся только на приватный канал пользователя
-  // Domain канал может дублировать события, поэтому используем только user channel
   const userChannelName = `user.${userId}`
-  const privateUserChannelName = `private-${userChannelName}`
   
-  console.log('[WS] Подписка на сообщения:', { userChannelName, privateUserChannelName })
+  console.log('[WS] Подписка на сообщения:', { userChannelName })
   
-  // Получаем или создаем канал
+  // Подписываемся на приватный канал через Echo
   const userChannel = echoInstance.private(userChannelName)
   
   // Set для отслеживания уже обработанных сообщений (дедупликация)
   const processedMessageIds = new Set()
   
-  // Используем напрямую Pusher bind для надежности
+  // Обработчик сообщений
   const handleUserMessage = (data) => {
     console.log('[WS] Получено сообщение:', data)
     
@@ -144,22 +141,13 @@ export const subscribeToMessages = (domainId, userId, callback) => {
     callback(data)
   }
   
-  // Bind события через Pusher напрямую
-  const pusherUserChannel = echoInstance.connector.pusher.channel(privateUserChannelName)
-  
-  if (pusherUserChannel) {
-    console.log('[WS] Канал найден, привязываем MessageSent')
-    pusherUserChannel.bind('MessageSent', handleUserMessage)
-  } else {
-    console.warn('[WS] Канал не найден:', privateUserChannelName)
-  }
+  // Слушаем событие MessageSent через Echo
+  userChannel.listen('MessageSent', handleUserMessage)
 
   // Возвращаем функцию для отписки
   return () => {
     console.log('[WS] Отписка от сообщений:', userChannelName)
-    if (pusherUserChannel) {
-      pusherUserChannel.unbind('MessageSent', handleUserMessage)
-    }
+    echoInstance.leave(userChannelName)
     processedMessageIds.clear()
   }
 }
