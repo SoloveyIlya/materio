@@ -57,9 +57,9 @@ services:
       - SANCTUM_STATEFUL_DOMAINS=pickleflavor.info,www.pickleflavor.info
       - SESSION_DOMAIN=.pickleflavor.info
       - BROADCAST_DRIVER=websocket
-      - WEBSOCKET_HOST=0.0.0.0
+      - WEBSOCKET_HOST=127.0.0.1
       - WEBSOCKET_PORT=6001
-      - WEBSOCKET_SCHEME=https
+      - WEBSOCKET_SCHEME=http
       - ENABLE_WEBSOCKET=true
       - PUSHER_APP_ID=materio
       - PUSHER_APP_KEY=abcdefghijklmnopqrstuvwxyz
