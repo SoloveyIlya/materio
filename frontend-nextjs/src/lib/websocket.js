@@ -106,9 +106,6 @@ export const initializeSocket = () => {
   }
 }
 
-  return echo
-}
-
 // Mark user as offline on backend when WebSocket disconnects
 const markUserOffline = async () => {
   try {
