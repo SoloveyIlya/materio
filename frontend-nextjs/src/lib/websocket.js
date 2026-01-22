@@ -26,6 +26,14 @@ export const initializeSocket = () => {
   const wsPort = wsUrlObj.port || (wsUrlObj.protocol === 'https:' ? 443 : 80)
   const useTLS = wsUrlObj.protocol === 'https:'
 
+  console.log('[WS] Инициализация с параметрами:', {
+    wsHost,
+    wsPort,
+    useTLS,
+    wsPath: '/app',
+    authEndpoint: `${apiUrl}/api/broadcasting/auth`,
+  })
+
   echo = new Echo({
     broadcaster: 'pusher',
     key: 'local',
@@ -48,8 +56,27 @@ export const initializeSocket = () => {
     },
   })
 
+  // Логирование событий подключения
+  echo.connector.pusher.connection.bind('state_change', (states) => {
+    console.log('[WS] State change:', states.previous, '→', states.current)
+  })
+
+  echo.connector.pusher.connection.bind('error', (err) => {
+    console.error('[WS] Connection error:', err)
+  })
+
+  echo.connector.pusher.connection.bind('connected', () => {
+    console.log('[WS] Connected успешно!')
+  })
+
+  // Логирование всех событий (ДИАГНОСТИКА)
+  echo.connector.pusher.bind_global((event, data) => {
+    console.log('[WS EVENT]', event, data)
+  })
+
   // События подключения
   echo.connector.pusher.connection.bind('disconnected', () => {
+    console.log('[WS] Disconnected')
     markUserOffline()
   })
 
@@ -87,6 +114,8 @@ export const subscribeToMessages = (domainId, userId, callback) => {
   const userChannelName = `user.${userId}`
   const privateUserChannelName = `private-${userChannelName}`
   
+  console.log('[WS] Подписка на сообщения:', { userChannelName, privateUserChannelName })
+  
   // Получаем или создаем канал
   const userChannel = echoInstance.private(userChannelName)
   
@@ -95,8 +124,11 @@ export const subscribeToMessages = (domainId, userId, callback) => {
   
   // Используем напрямую Pusher bind для надежности
   const handleUserMessage = (data) => {
+    console.log('[WS] Получено сообщение:', data)
+    
     // Проверяем, не обработали ли мы уже это сообщение
     if (data.id && processedMessageIds.has(data.id)) {
+      console.log('[WS] Дубликат сообщения:', data.id)
       return
     }
     
@@ -117,11 +149,15 @@ export const subscribeToMessages = (domainId, userId, callback) => {
   const pusherUserChannel = echoInstance.connector.pusher.channel(privateUserChannelName)
   
   if (pusherUserChannel) {
+    console.log('[WS] Канал найден, привязываем MessageSent')
     pusherUserChannel.bind('MessageSent', handleUserMessage)
+  } else {
+    console.warn('[WS] Канал не найден:', privateUserChannelName)
   }
 
   // Возвращаем функцию для отписки
   return () => {
+    console.log('[WS] Отписка от сообщений:', userChannelName)
     if (pusherUserChannel) {
       pusherUserChannel.unbind('MessageSent', handleUserMessage)
     }
