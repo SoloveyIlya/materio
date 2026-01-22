@@ -24,7 +24,7 @@ services:
   backend:
     build:
       context: ./backend-laravel
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile
     container_name: prod_backend
     restart: unless-stopped
     working_dir: /var/www
