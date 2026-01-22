@@ -87,17 +87,54 @@ const ChatWrapper = () => {
       
       isSubscribed = true
       
+      // Функция для локального обновления счетчика в чате без перезагрузки всех сообщений
+      const updateChatCounterLocally = (toUserId) => {
+        setMessagesData(prevData => {
+          if (!prevData) return prevData
+          
+          // Для админов
+          if (user?.roles?.some(r => r.name === 'admin') && prevData?.tabs) {
+            return {
+              ...prevData,
+              tabs: prevData.tabs.map((tab, tabIndex) => ({
+                ...tab,
+                chats: tab.chats.map(chat => 
+                  (chat.user.id === toUserId)
+                    ? { ...chat, unread_count: (chat.unread_count || 0) + 1 }
+                    : chat
+                )
+              }))
+            }
+          }
+          // Для модераторов
+          else if (Array.isArray(prevData)) {
+            return prevData.map(chat =>
+              (chat.user.id === toUserId)
+                ? { ...chat, unread_count: (chat.unread_count || 0) + 1 }
+                : chat
+            )
+          }
+          
+          return prevData
+        })
+      }
+      
       // Подписываемся на новые сообщения
       unsubscribe = subscribeToMessages(user.domain_id, user.id, (data) => {
-        // Обновляем список сообщений (перезагружаем с сервера для корректного отображения)
-        loadMessages(true) // silent = true, обновляем весь список
-        
         // Воспроизводим звук для новых непрочитанных сообщений (не от текущего пользователя)
         if (data.from_user_id !== user.id) {
           playNotificationSoundIfVisible()
           
-          // Оптимистично увеличиваем счетчик непрочитанных на +1
+          // Локально обновляем счетчик в списке чатов
+          updateChatCounterLocally(data.from_user_id)
+          
+          // Оптимистично увеличиваем счетчик непрочитанных на +1 в меню
           optimisticallyUpdateChatCount(1)
+        }
+        
+        // Если текущий чат открыт, перезагружаем сообщения для отображения новых
+        if (selectedChat?.user.id === data.from_user_id) {
+          loadMessages(true) // silent = true
         }
       })
 
@@ -116,7 +153,7 @@ const ChatWrapper = () => {
         unsubscribe()
       }
     }
-  }, [user])
+  }, [user, selectedChat])
 
   // Update selectedChat when messagesData changes and automatically mark messages as read if chat is open
   useEffect(() => {

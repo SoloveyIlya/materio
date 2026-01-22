@@ -504,7 +504,14 @@ class MessageController extends Controller
         }
 
         // Транслируем событие отправки сообщения
+        \Log::info('Broadcasting MessageSent event', [
+            'message_id' => $message->id,
+            'from_user_id' => $message->from_user_id,
+            'to_user_id' => $message->to_user_id,
+            'domain_id' => $message->domain_id,
+        ]);
         broadcast(new MessageSent($message))->toOthers();
+        \Log::info('Message broadcast complete');
 
         return response()->json($message, 201);
     }

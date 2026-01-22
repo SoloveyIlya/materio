@@ -109,18 +109,16 @@ export const subscribeToMessages = (domainId, userId, callback) => {
   const echoInstance = getSocket()
   
   const userChannelName = `user.${userId}`
+  const domainChannelName = `domain.${domainId}`
   
-  console.log('[WS] Подписка на сообщения:', { userChannelName })
-  
-  // Подписываемся на приватный канал через Echo
-  const userChannel = echoInstance.private(userChannelName)
+  console.log('[WS] Подписка на сообщения:', { userChannelName, domainChannelName })
   
   // Set для отслеживания уже обработанных сообщений (дедупликация)
   const processedMessageIds = new Set()
   
   // Обработчик сообщений
   const handleUserMessage = (data) => {
-    console.log('[WS] Получено сообщение:', data)
+    console.log('[WS] Получено сообщение на user канале:', data)
     
     // Проверяем, не обработали ли мы уже это сообщение
     if (data.id && processedMessageIds.has(data.id)) {
@@ -140,14 +138,48 @@ export const subscribeToMessages = (domainId, userId, callback) => {
     
     callback(data)
   }
+
+  const handleDomainMessage = (data) => {
+    console.log('[WS] Получено сообщение на domain канале:', data)
+    
+    // Проверяем, не обработали ли мы уже это сообщение
+    if (data.id && processedMessageIds.has(data.id)) {
+      console.log('[WS] Дубликат сообщения (domain):', data.id)
+      return
+    }
+    
+    if (data.id) {
+      processedMessageIds.add(data.id)
+      setTimeout(() => {
+        processedMessageIds.delete(data.id)
+      }, 10000)
+    }
+    
+    callback(data)
+  }
   
-  // Слушаем событие MessageSent через Echo
+  // Подписываемся на user канал
+  const userChannel = echoInstance.private(userChannelName)
   userChannel.listen('MessageSent', handleUserMessage)
+  console.log('[WS] Подписаны на user канал', userChannelName)
+  
+  // Подписываемся и на domain канал (на случай если события там)
+  const domainChannel = echoInstance.private(domainChannelName)
+  domainChannel.listen('MessageSent', handleDomainMessage)
+  console.log('[WS] Подписаны на domain канал', domainChannelName)
+  
+  // Логируем ВСЕ события для диагностики
+  echoInstance.connector.pusher.bind_global((eventName, data) => {
+    if (eventName.includes('message') || eventName.includes('Message') || eventName === 'MessageSent') {
+      console.log('[WS] ГЛОБАЛЬНОЕ СОБЫТИЕ:', eventName, data)
+    }
+  })
 
   // Возвращаем функцию для отписки
   return () => {
-    console.log('[WS] Отписка от сообщений:', userChannelName)
+    console.log('[WS] Отписка от сообщений:', userChannelName, domainChannelName)
     echoInstance.leave(userChannelName)
+    echoInstance.leave(domainChannelName)
     processedMessageIds.clear()
   }
 }
