@@ -17,7 +17,7 @@ COPY . .
 
 # теперь src уже есть — можно безопасно выполнить postinstall-логику
 RUN npm run build:icons
-RUN npm run build
+RUN NODE_OPTIONS=--max_old_space_size=2048 npm run build
 
 # --- run stage ---
 FROM node:20-alpine AS runner
