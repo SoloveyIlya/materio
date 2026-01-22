@@ -62,7 +62,7 @@ services:
       - WEBSOCKET_SCHEME=http
       - ENABLE_WEBSOCKET=true
       - PUSHER_APP_ID=materio
-      - PUSHER_APP_KEY=abcdefghijklmnopqrstuvwxyz
+      - PUSHER_APP_KEY=local
       - PUSHER_APP_SECRET=abcdefghijklmnopqrstuvwxyz123456
     depends_on:
       - mysql
