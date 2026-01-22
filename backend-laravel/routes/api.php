@@ -218,9 +218,22 @@ Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
         }
     }
     
+    \Log::info('Broadcasting auth request', [
+        'user_id' => auth()->id(),
+        'channel' => $request->input('channel_name'),
+        'socket_id' => $request->input('socket_id'),
+    ]);
+    
     // Используем стандартную авторизацию Laravel Broadcasting
     $broadcaster = app(\Illuminate\Contracts\Broadcasting\Broadcaster::class);
-    return $broadcaster->auth($request);
+    $response = $broadcaster->auth($request);
+    
+    \Log::info('Broadcasting auth response', [
+        'channel' => $request->input('channel_name'),
+        'success' => !empty($response),
+    ]);
+    
+    return $response;
 })->middleware('auth:sanctum');
 
 // Telegram routes
