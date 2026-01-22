@@ -24,7 +24,9 @@ class RouteServiceProvider extends ServiceProvider
 
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
+            
+            // Загружаем broadcasting каналы (отключено временно для отладки)
+            // require base_path('routes/channels.php');
         });
     }
 }
-

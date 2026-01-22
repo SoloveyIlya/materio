@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Устанавливаем зависимости
-RUN npm ci --ignore-scripts
+RUN npm install --ignore-scripts
 
 # Копируем исходный код
 COPY . .
