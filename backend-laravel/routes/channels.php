@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Broadcast;
 |
 */
 
+// Broadcasting auth route
+Broadcast::routes(['middleware' => ['auth:sanctum']]);
+
 Broadcast::channel('domain.{domainId}', function ($user, $domainId) {
     // Разрешаем доступ к каналу домена для всех аутентифицированных пользователей
     return $user ? ['id' => $user->id, 'name' => $user->name] : false;
