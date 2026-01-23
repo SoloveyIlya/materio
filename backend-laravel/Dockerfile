@@ -25,6 +25,12 @@ COPY composer.json ./
 # Copy application files
 COPY . /var/www
 
+# Copy custom PHP configuration for file uploads (after all files are copied)
+RUN echo "upload_max_filesize=100M" > /usr/local/etc/php/conf.d/uploads.ini && \
+    echo "post_max_size=110M" >> /usr/local/etc/php/conf.d/uploads.ini && \
+    echo "max_file_uploads=20" >> /usr/local/etc/php/conf.d/uploads.ini && \
+    echo "memory_limit=512M" >> /usr/local/etc/php/conf.d/uploads.ini
+
 # Complete composer install and generate autoload
 RUN composer install --no-scripts --ignore-platform-reqs && composer dump-autoload --optimize --no-interaction
 
