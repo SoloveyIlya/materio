@@ -1,7 +1,7 @@
 'use client'
 
 // React Imports
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import * as React from 'react'
 
 // MUI Imports
@@ -167,11 +167,15 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
     }
   }, [uploadDialogOpen, editDialogOpen])
 
-  // Создаем мапу загруженных документов пользователя
-  const userDocsMap = {}
-  userDocumentsLocal.forEach(doc => {
-    userDocsMap[doc.required_document_id] = doc
-  })
+  // Создаем мапу загруженных документов пользователя с использованием useMemo
+  const userDocsMap = useMemo(() => {
+    const map = {}
+    userDocumentsLocal.forEach(doc => {
+      map[doc.required_document_id] = doc
+    })
+    console.log('userDocsMap updated:', map)
+    return map
+  }, [userDocumentsLocal])
 
   const handleDownload = async (doc) => {
     try {
@@ -200,6 +204,16 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
     } catch (error) {
       console.error('Error downloading document:', error)
       showToast.error('Error downloading document')
+    }
+  }
+
+  const handleCheckDocument = (userDoc) => {
+    if (userDoc && userDoc.file_path) {
+      // Если путь относительный, добавляем базовый URL API
+      const filePath = userDoc.file_path.startsWith('http') 
+        ? userDoc.file_path 
+        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${userDoc.file_path}`
+      window.open(filePath, '_blank')
     }
   }
 
@@ -249,13 +263,9 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
     try {
       setEditing(true)
       
+      // 1. Обновляем название Required Document
       const formData = new FormData()
       formData.append('name', documentName)
-      
-      if (editFormData.file) {
-        formData.append('file', editFormData.file)
-      }
-
       formData.append('_method', 'PUT')
       
       const response = await api.post(
@@ -269,6 +279,19 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
       )
 
       const updatedDoc = response.data
+      
+      // 2. Если прикреплен новый файл, загружаем его как User Document
+      if (editFormData.file) {
+        const userDocFormData = new FormData()
+        userDocFormData.append('file', editFormData.file)
+        userDocFormData.append('required_document_id', selectedDocument.id)
+
+        await api.post('/moderator/user-documents', userDocFormData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+      }
       
       // Обновляем локальное состояние
       setDocuments(prevDocs => 
@@ -326,7 +349,9 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
       // Immediately update the local userDocumentsLocal state with the response
       setUserDocumentsLocal(prevDocs => {
         const updatedDocs = prevDocs.filter(doc => doc.required_document_id !== selectedDocument.id)
-        return [...updatedDocs, response.data]
+        const newDocs = [...updatedDocs, response.data]
+        console.log('Updated userDocumentsLocal:', newDocs)
+        return newDocs
       })
       
       showToast.success('Document uploaded successfully')
@@ -376,8 +401,8 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
                     alignItems: 'stretch'
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mb: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', p: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
                       <Typography variant='subtitle1'>{doc.name}</Typography>
                       {isUploaded ? (
                         <Box
@@ -414,38 +439,50 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
                       )}
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                      {doc.file_path && (
+                      {isUploaded && userDoc?.file_path && (
+                        <Button
+                          size='small'
+                          variant='outlined'
+                          onClick={() => handleCheckDocument(userDoc)}
+                        >
+                          Check
+                        </Button>
+                      )}
+                      {isUploaded && userDoc?.file_path && (
                         <Button
                           size='small'
                           variant='outlined'
                           startIcon={<i className='ri-download-line' />}
-                          onClick={() => handleDownload(doc)}
+                          onClick={() => handleDownload(userDoc)}
                         >
                           Download
                         </Button>
                       )}
-                      <Button
-                        size='small'
-                        variant='contained'
-                        startIcon={<i className='ri-upload-line' />}
-                        onClick={() => handleOpenUploadDialog(doc)}
-                      >
-                        Upload
-                      </Button>
+                      {!isUploaded && (
+                        <Button
+                          size='small'
+                          variant='contained'
+                          startIcon={<i className='ri-upload-line' />}
+                          onClick={() => handleOpenUploadDialog(doc)}
+                        >
+                          Upload
+                        </Button>
+                      )}
                       <IconButton 
                         edge='end' 
                         size='small'
                         onClick={() => handleOpenEditDialog(doc)}
-                        sx={{ ml: 1 }}
                       >
                         <i className='ri-edit-line' />
                       </IconButton>
                     </Box>
                   </Box>
                   {isUploaded && userDoc?.file_path && (
-                    <Typography variant='caption' color='text.secondary'>
-                      Uploaded: {userDoc.created_at ? new Date(userDoc.created_at).toLocaleDateString() : '—'}
-                    </Typography>
+                    <Box sx={{ px: 2, pb: 2 }}>
+                      <Typography variant='caption' color='text.secondary'>
+                        Uploaded: {userDoc.created_at ? new Date(userDoc.created_at).toLocaleDateString() : '—'}
+                      </Typography>
+                    </Box>
                   )}
                 </ListItem>
               )
@@ -569,4 +606,3 @@ const ModeratorDocumentsTab = ({ requiredDocuments, userDocuments, onDocumentUpl
 }
 
 export default ModeratorDocumentsTab
-

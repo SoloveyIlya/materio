@@ -1,7 +1,7 @@
 'use client'
 
 // React Imports
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -37,11 +37,14 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments, onDocumentsCha
     setUserDocs(userDocuments || [])
   }, [userDocuments])
 
-  // Создаем мапу загруженных документов пользователя
-  const userDocsMap = {}
-  userDocs.forEach(doc => {
-    userDocsMap[doc.required_document_id] = doc
-  })
+  // Создаем мапу загруженных документов пользователя с использованием useMemo
+  const userDocsMap = useMemo(() => {
+    const map = {}
+    userDocs.forEach(doc => {
+      map[doc.required_document_id] = doc
+    })
+    return map
+  }, [userDocs])
 
   const handleOpenDialog = (doc = null) => {
     if (doc) {
@@ -73,6 +76,8 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments, onDocumentsCha
         formDataToSend.append('file', formData.file)
       }
 
+      let createdDocId = null
+
       if (editingDoc) {
         // Используем POST с методом spoofing для FormData
         formDataToSend.append('_method', 'PUT')
@@ -81,12 +86,33 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments, onDocumentsCha
             'Content-Type': 'multipart/form-data',
           },
         })
+        createdDocId = editingDoc.id
       } else {
-        await api.post('/admin/required-documents', formDataToSend, {
+        const createResponse = await api.post('/admin/required-documents', formDataToSend, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         })
+        createdDocId = createResponse.data?.id
+      }
+
+      // Если был прикреплен файл и есть userId, автоматически загружаем его как документ пользователя
+      if (formData.file && userId && createdDocId) {
+        try {
+          const userDocFormData = new FormData()
+          userDocFormData.append('file', formData.file)
+          userDocFormData.append('required_document_id', createdDocId)
+          userDocFormData.append('user_id', userId)
+
+          await api.post('/admin/user-documents', userDocFormData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          })
+        } catch (uploadError) {
+          console.error('Error uploading file for user:', uploadError)
+          // Не показываем ошибку, так как основной документ создан
+        }
       }
 
       // Перезагружаем документы
@@ -144,6 +170,8 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments, onDocumentsCha
     }
   }
 
+
+
   return (
     <Card>
       <CardHeader 
@@ -164,57 +192,55 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments, onDocumentsCha
               <ListItem key={doc.id} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, mb: 1 }}>
                 <ListItemText
                   primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <Typography variant='subtitle1'>{doc.name}</Typography>
-                        {isUploaded ? (
-                          <Box
-                            sx={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: 24,
-                              height: 24,
-                              borderRadius: '50%',
-                              bgcolor: 'success.main',
-                              color: 'success.contrastText',
-                              flexShrink: 0
-                            }}
-                          >
-                            <i className='ri-check-line' style={{ fontSize: '16px' }} />
-                          </Box>
-                        ) : (
-                          <Box
-                            sx={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: 24,
-                              height: 24,
-                              borderRadius: '50%',
-                              bgcolor: 'error.main',
-                              color: 'error.contrastText',
-                              flexShrink: 0
-                            }}
-                          >
-                            <i className='ri-close-line' style={{ fontSize: '16px' }} />
-                          </Box>
-                        )}
-                      </Box>
-                      {isUploaded && (
-                        <Button
-                          size='small'
-                          variant='outlined'
-                          onClick={() => handleCheckDocument(doc)}
-                          sx={{ ml: 2 }}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 5, pr: isUploaded ? 12 : 8 }}>
+                      <Typography variant='subtitle1'>{doc.name}</Typography>
+                      {isUploaded ? (
+                        <Box
+                          sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 24,
+                            height: 24,
+                            borderRadius: '50%',
+                            bgcolor: 'success.main',
+                            color: 'success.contrastText',
+                            flexShrink: 0
+                          }}
                         >
-                          Check
-                        </Button>
+                          <i className='ri-check-line' style={{ fontSize: '16px' }} />
+                        </Box>
+                      ) : (
+                        <Box
+                          sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 24,
+                            height: 24,
+                            borderRadius: '50%',
+                            bgcolor: 'error.main',
+                            color: 'error.contrastText',
+                            flexShrink: 0
+                          }}
+                        >
+                          <i className='ri-close-line' style={{ fontSize: '16px' }} />
+                        </Box>
                       )}
                     </Box>
                   }
                 />
                 <ListItemSecondaryAction>
+                  {isUploaded && (
+                    <Button
+                      size='small'
+                      variant='outlined'
+                      onClick={() => handleCheckDocument(doc)}
+                      sx={{ mr: 1 }}
+                    >
+                      Check
+                    </Button>
+                  )}
                   <IconButton edge='end' onClick={() => handleOpenDialog(doc)} sx={{ mr: 1 }}>
                     <i className='ri-edit-line' />
                   </IconButton>
@@ -282,4 +308,3 @@ const DocumentsTab = ({ userId, requiredDocuments, userDocuments, onDocumentsCha
 }
 
 export default DocumentsTab
-
