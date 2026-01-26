@@ -38,7 +38,7 @@ php artisan config:clear
 php artisan cache:clear
 
 # Запуск сервера
-exec "$@"
+
 DB_PORT=${DB_PORT:-3306}
 DB_DATABASE=${DB_DATABASE_VAL}
 DB_USERNAME=${DB_USERNAME_VAL}
