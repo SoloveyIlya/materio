@@ -199,17 +199,26 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
                               <Typography variant='subtitle2' sx={{ mb: 1 }}>
                                 Image
                               </Typography>
-                              {block.url && (
+                              {(block.url || block.file) && (
                                 <Box sx={{ mb: 1 }}>
-                                  <img src={block.url} alt='Preview' style={{ maxWidth: '100%', maxHeight: 200 }} />
+                                  <img 
+                                    src={block.file ? URL.createObjectURL(block.file) : block.url} 
+                                    alt='Preview' 
+                                    style={{ maxWidth: '100%', maxHeight: 200 }} 
+                                  />
                                 </Box>
+                              )}
+                              {block.file && (
+                                <Typography variant='caption' color='text.secondary' sx={{ mb: 1, display: 'block' }}>
+                                  New file: {block.file.name}
+                                </Typography>
                               )}
                               <Button size='small' onClick={() => {
                                 setCurrentIndex(index)
                                 setTempImage({ file: block.file, url: block.url || '' })
                                 setImageDialogOpen(true)
                               }}>
-                                {block.url ? 'Change Image' : 'Add Image'}
+                                {(block.url || block.file) ? 'Change Image' : 'Add Image'}
                               </Button>
                             </Box>
                           )}
@@ -218,7 +227,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
                               <Typography variant='subtitle2' sx={{ mb: 1 }}>
                                 Video ({block.videoType})
                               </Typography>
-                              {block.url && (
+                              {(block.url || block.file) && (
                                 <Box sx={{ mb: 1 }}>
                                   {block.videoType === 'embed' ? (
                                     <Typography variant='body2' color='text.secondary'>
@@ -226,7 +235,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
                                     </Typography>
                                   ) : (
                                     <Typography variant='body2' color='text.secondary'>
-                                      Local video file
+                                      {block.file ? `New file: ${block.file.name}` : 'Local video file'}
                                     </Typography>
                                   )}
                                 </Box>
@@ -236,7 +245,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
                                 setTempVideo({ type: block.videoType || 'embed', url: block.url || '', file: block.file })
                                 setVideoDialogOpen(true)
                               }}>
-                                {block.url ? 'Change Video' : 'Add Video'}
+                                {(block.url || block.file) ? 'Change Video' : 'Add Video'}
                               </Button>
                             </Box>
                           )}
@@ -282,7 +291,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
             fullWidth
             label='Image URL'
             value={tempImage.url}
-            onChange={(e) => setTempImage({ ...tempImage, url: e.target.value })}
+            onChange={(e) => setTempImage({ url: e.target.value, file: null })}
             sx={{ mt: 2 }}
             placeholder='Or upload a file below'
           />
@@ -298,7 +307,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
               type='file'
               accept='image/*'
               hidden
-              onChange={(e) => setTempImage({ ...tempImage, file: e.target.files[0] })}
+              onChange={(e) => setTempImage({ file: e.target.files[0], url: '' })}
             />
           </Button>
           {tempImage.file && (
@@ -335,7 +344,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
               fullWidth
               label='Video URL'
               value={tempVideo.url}
-              onChange={(e) => setTempVideo({ ...tempVideo, url: e.target.value })}
+              onChange={(e) => setTempVideo({ type: 'embed', url: e.target.value, file: null })}
               sx={{ mt: 2 }}
               placeholder='https://youtube.com/watch?v=...'
             />
@@ -353,7 +362,7 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
                   type='file'
                   accept='video/*'
                   hidden
-                  onChange={(e) => setTempVideo({ ...tempVideo, file: e.target.files[0] })}
+                  onChange={(e) => setTempVideo({ type: 'local', file: e.target.files[0], url: '' })}
                 />
               </Button>
               {tempVideo.file && (
@@ -403,4 +412,3 @@ const ContentEditor = ({ contentBlocks, onChange, tools = [] }) => {
 }
 
 export default ContentEditor
-

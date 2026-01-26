@@ -187,4 +187,104 @@ class TimezoneService
 
         return null;
     }
+
+    /**
+     * Определяет полную локацию (город, регион, страна) по IP адресу
+     * 
+     * @param string|null $ip
+     * @return string|null
+     */
+    public function getLocationByIp(?string $ip): ?string
+    {
+        // Если IP не передан или это localhost/приватный IP, возвращаем null
+        if (!$ip || 
+            $ip === '127.0.0.1' || 
+            $ip === '::1' || 
+            !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return null;
+        }
+
+        // Кешируем результат на 24 часа
+        $cacheKey = "location_ip_{$ip}";
+        
+        return Cache::remember($cacheKey, now()->addHours(24), function () use ($ip) {
+            try {
+                // Используем ip-api.com с расширенными полями
+                $response = Http::timeout(3)->get("http://ip-api.com/json/{$ip}", [
+                    'fields' => 'city,regionName,country,status,message'
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    
+                    if (isset($data['status']) && $data['status'] === 'success') {
+                        $parts = [];
+                        
+                        // Добавляем город, если есть
+                        if (!empty($data['city'])) {
+                            $parts[] = $data['city'];
+                        }
+                        
+                        // Добавляем регион, если есть и отличается от города
+                        if (!empty($data['regionName']) && $data['regionName'] !== ($data['city'] ?? '')) {
+                            $parts[] = $data['regionName'];
+                        }
+                        
+                        // Добавляем страну
+                        if (!empty($data['country'])) {
+                            $parts[] = $data['country'];
+                        }
+                        
+                        // Возвращаем полную локацию
+                        return !empty($parts) ? implode(', ', $parts) : null;
+                    }
+                }
+
+                // Fallback: пробуем другой сервис (ipapi.co)
+                return $this->getLocationByIpFallback($ip);
+            } catch (\Exception $e) {
+                Log::warning("Failed to get location for IP {$ip}: " . $e->getMessage());
+                return null;
+            }
+        });
+    }
+
+    /**
+     * Резервный метод определения локации через ipapi.co
+     * 
+     * @param string $ip
+     * @return string|null
+     */
+    protected function getLocationByIpFallback(string $ip): ?string
+    {
+        try {
+            $response = Http::timeout(3)->get("https://ipapi.co/{$ip}/json/");
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $parts = [];
+                
+                // Добавляем город
+                if (!empty($data['city'])) {
+                    $parts[] = $data['city'];
+                }
+                
+                // Добавляем регион
+                if (!empty($data['region']) && $data['region'] !== ($data['city'] ?? '')) {
+                    $parts[] = $data['region'];
+                }
+                
+                // Добавляем страну
+                if (!empty($data['country_name'])) {
+                    $parts[] = $data['country_name'];
+                }
+                
+                return !empty($parts) ? implode(', ', $parts) : null;
+            }
+        } catch (\Exception $e) {
+            Log::warning("Fallback location service failed for IP {$ip}: " . $e->getMessage());
+        }
+
+        return null;
+    }
 }

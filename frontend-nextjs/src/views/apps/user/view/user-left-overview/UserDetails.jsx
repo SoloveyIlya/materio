@@ -27,19 +27,30 @@ import { getInitials } from '@/utils/getInitials'
 import api from '@/lib/api'
 import { API_URL } from '@/lib/api'
 
-// Country from IP component - используем location из базы данных
+// Location from IP component - используем location из базы данных (город, регион, страна)
 const CountryFromIP = ({ location, ipAddress }) => {
-  const [country, setCountry] = useState(location || '—')
+  const [country, setCountry] = useState(() => {
+    // Проверяем, что location не null, не undefined и не пустая строка
+    if (location && location !== 'null' && location !== 'undefined') {
+      return location
+    }
+    return '—'
+  })
 
   useEffect(() => {
-    // Если location из БД доступно, используем его
-    if (location) {
+    // Если location из БД доступно и валидно, используем его
+    if (location && location !== 'null' && location !== 'undefined') {
       setCountry(location)
       return
     }
 
     // Fallback: если location не определено, пытаемся получить через API
-    if (!ipAddress) {
+    // Но только если это не локальный/приватный IP
+    if (!ipAddress || 
+        ipAddress === '127.0.0.1' || 
+        ipAddress.startsWith('172.') || 
+        ipAddress.startsWith('192.168.') || 
+        ipAddress.startsWith('10.')) {
       setCountry('—')
       return
     }
@@ -334,7 +345,7 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
             </div>
             <div className='flex items-center flex-wrap gap-x-1.5'>
               <Typography className='font-medium' color='text.primary'>
-                Country (from IP):
+                Location (from IP):
               </Typography>
               <CountryFromIP location={user.location} ipAddress={user.ip_address} />
             </div>

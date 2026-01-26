@@ -115,7 +115,7 @@ class DocumentationPageController extends Controller
             }
         }
         
-        // Валидируем каждое видео
+        // *** STORE METHOD *** Валидируем каждое видео
         foreach ($videos as $index => $video) {
             if (is_array($video) && isset($video['type'])) {
                 if ($video['type'] === 'embed') {
@@ -127,42 +127,68 @@ class DocumentationPageController extends Controller
                     $hasFile = false;
                     $videoFile = null;
                     
+                    // Подробное логирование для отладки
+                    \Log::info("STORE: Processing local video at index {$index}", [
+                        'video_data' => $video,
+                        'all_files_keys' => array_keys($request->allFiles()),
+                        '_FILES_keys' => isset($_FILES) ? array_keys($_FILES) : [],
+                        '_FILES_videos' => isset($_FILES['videos']) ? $_FILES['videos'] : null,
+                    ]);
+                    
                     // Пробуем получить файл разными способами
                     // Способ 1: стандартный путь с точкой
                     if ($request->hasFile("videos.{$index}.file")) {
                         $videoFile = $request->file("videos.{$index}.file");
+                        \Log::info("STORE: Found video file using videos.{$index}.file");
                     }
                     // Способ 2: путь с квадратными скобками
                     elseif ($request->hasFile("videos[{$index}][file]")) {
                         $videoFile = $request->file("videos[{$index}][file]");
+                        \Log::info("STORE: Found video file using videos[{$index}][file]");
                     }
                     // Способ 3: прямой доступ через массив запроса
                     elseif (isset($_FILES["videos"]["name"][$index]["file"])) {
                         // Используем прямой доступ к $_FILES
                         if (isset($_FILES["videos"]["tmp_name"][$index]["file"]) && is_uploaded_file($_FILES["videos"]["tmp_name"][$index]["file"])) {
                             $videoFile = $request->file("videos.{$index}.file");
+                            \Log::info("STORE: Found video file using direct _FILES access");
                         }
                     }
                     // Способ 4: проверяем все файлы в запросе
                     else {
                         $allFiles = $request->allFiles();
+                        \Log::info("STORE: Searching through all files", [
+                            'all_files_keys' => array_keys($allFiles),
+                            'target_index' => $index
+                        ]);
+                        
                         foreach ($allFiles as $key => $file) {
+                            \Log::info("STORE: Checking file key: {$key}");
+                            
                             // Проверяем паттерн videos[число][file]
                             if (preg_match('/^videos\[(\d+)\]\[file\]$/', $key, $matches)) {
                                 $fileIndex = (int)$matches[1];
+                                \Log::info("STORE: Matched pattern videos[number][file]", [
+                                    'key' => $key,
+                                    'fileIndex' => $fileIndex,
+                                    'targetIndex' => $index
+                                ]);
                                 if ($fileIndex === $index) {
                                     $videoFile = $file;
+                                    \Log::info("STORE: Found video file using pattern match: {$key}");
                                     break;
                                 }
                             }
                             // Проверяем паттерн videos.число.file
                             elseif ($key === "videos.{$index}.file") {
                                 $videoFile = $file;
+                                \Log::info("STORE: Found video file using exact match: {$key}");
                                 break;
                             }
                             // Проверяем все варианты ключей
                             elseif (preg_match('/videos.*' . $index . '.*file/i', $key)) {
                                 $videoFile = $file;
+                                \Log::info("STORE: Found video file using regex match: {$key}");
                                 break;
                             }
                         }

@@ -65,6 +65,9 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->
     // Required Documents
     Route::apiResource('required-documents', RequiredDocumentController::class);
     Route::post('/required-documents/{requiredDocument}', [RequiredDocumentController::class, 'update']); // Для поддержки FormData с _method: 'PUT'
+    
+    // User Documents (admin uploads document for user)
+    Route::post('/user-documents', [RequiredDocumentController::class, 'uploadForUser']);
 
     // Tools
     Route::apiResource('tools', ToolController::class);

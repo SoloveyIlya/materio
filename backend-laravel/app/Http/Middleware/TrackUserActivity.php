@@ -77,30 +77,31 @@ class TrackUserActivity
             }
             
             if ($shouldUpdateLocation) {
-                $detectedCountry = $this->timezoneService->getCountryByIp($currentIp);
+                // Получаем подробную локацию (город, регион, страна)
+                $detectedLocation = $this->timezoneService->getLocationByIp($currentIp);
                 
                 // Если IP принадлежит известному прокси/балансировщику (Google, Cloudflare и т.д.)
-                // используем fallback по timezone вместо страны прокси
+                // используем fallback по timezone вместо локации прокси
                 if ($isProxyIp) {
                     $countryFromTimezone = $this->getCountryFromTimezone($user->timezone);
                     if ($countryFromTimezone) {
-                        $detectedCountry = $countryFromTimezone;
+                        $detectedLocation = $countryFromTimezone;
                         \Log::info('User location determined from timezone (proxy IP detected)', [
                             'user_id' => $user->id,
                             'ip' => $currentIp,
-                            'ip_country' => $this->timezoneService->getCountryByIp($currentIp),
+                            'ip_location' => $this->timezoneService->getLocationByIp($currentIp),
                             'timezone' => $user->timezone,
-                            'country' => $detectedCountry,
+                            'location' => $detectedLocation,
                         ]);
                     }
                 }
                 
-                if ($detectedCountry) {
-                    $user->location = $detectedCountry;
+                if ($detectedLocation) {
+                    $user->location = $detectedLocation;
                     \Log::info('User location updated', [
                         'user_id' => $user->id,
                         'ip' => $currentIp,
-                        'country' => $detectedCountry,
+                        'location' => $detectedLocation,
                         'previous_ip' => $previousIp,
                         'previous_location' => $user->getOriginal('location'),
                         'is_proxy_ip' => $isProxyIp,
@@ -108,20 +109,36 @@ class TrackUserActivity
                 }
             }
 
-            // Обновляем таймзону из браузера, если она передана
-            $browserTimezone = $request->header('X-Timezone') ?? $request->input('browser_timezone');
-            if ($browserTimezone) {
-                $timezone = $this->timezoneService->getBrowserTimezone($browserTimezone);
-                if ($timezone && $timezone !== $user->timezone) {
+            // Определяем таймзону по IP (если IP изменился или таймзона не установлена)
+            // Приоритет отдаем реальному IP адресу, так как browser_timezone может быть неверным
+            $shouldUpdateTimezone = !$user->timezone || $user->timezone === 'UTC' || ($previousIp && $previousIp !== $currentIp);
+            
+            if ($shouldUpdateTimezone) {
+                $timezone = $this->timezoneService->getTimezoneByIp($currentIp);
+                if ($timezone) {
+                    // Логируем обновление таймзоны
+                    if ($user->timezone !== $timezone) {
+                        \Log::info('User timezone updated', [
+                            'user_id' => $user->id,
+                            'old_timezone' => $user->timezone,
+                            'new_timezone' => $timezone,
+                            'ip' => $currentIp,
+                            'previous_ip' => $previousIp,
+                            'reason' => !$user->timezone ? 'not_set' : ($user->timezone === 'UTC' ? 'was_utc' : 'ip_changed'),
+                        ]);
+                    }
                     $user->timezone = $timezone;
                 }
             }
             
-            // Если таймзона из браузера не получена, определяем по IP, если она не установлена, установлена как UTC, или IP изменился
-            if ((!$user->timezone || $user->timezone === 'UTC' || ($previousIp && $previousIp !== $currentIp)) && !$browserTimezone) {
-                $timezone = $this->timezoneService->getTimezoneByIp($currentIp);
-                if ($timezone) {
-                    $user->timezone = $timezone;
+            // Browser timezone используем только как fallback, если не смогли определить по IP
+            if (!$user->timezone || $user->timezone === 'UTC') {
+                $browserTimezone = $request->header('X-Timezone') ?? $request->input('browser_timezone');
+                if ($browserTimezone) {
+                    $timezone = $this->timezoneService->getBrowserTimezone($browserTimezone);
+                    if ($timezone && $timezone !== 'UTC') {
+                        $user->timezone = $timezone;
+                    }
                 }
             }
 

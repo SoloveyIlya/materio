@@ -176,4 +176,44 @@ class RequiredDocumentController extends Controller
 
         return response()->json(null, 204);
     }
+
+    public function uploadForUser(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'required_document_id' => 'required|exists:required_documents,id',
+            'file' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,odt,ods,odp,jpg,jpeg,png|max:10240',
+        ]);
+
+        // Проверяем, что required_document принадлежит домену админа
+        $requiredDocument = RequiredDocument::findOrFail($validated['required_document_id']);
+        if ($requiredDocument->domain_id !== $request->user()->domain_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // Проверяем, что пользователь принадлежит домену админа
+        $user = \App\Models\User::findOrFail($validated['user_id']);
+        if ($user->domain_id !== $request->user()->domain_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // Загружаем файл
+        $file = $request->file('file');
+        $path = $file->store('user-documents', 'public');
+        $filePath = Storage::url($path);
+
+        // Создаем или обновляем документ пользователя
+        $userDocument = \App\Models\UserDocument::updateOrCreate(
+            [
+                'user_id' => $validated['user_id'],
+                'required_document_id' => $validated['required_document_id'],
+            ],
+            [
+                'file_path' => $filePath,
+                'file_name' => $file->getClientOriginalName(),
+            ]
+        );
+
+        return response()->json($userDocument, 201);
+    }
 }
