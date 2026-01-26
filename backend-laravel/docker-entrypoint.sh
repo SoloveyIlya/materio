@@ -50,8 +50,7 @@ QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
 
 SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-localhost:3000,127.0.0.1:3000}
 SESSION_DOMAIN=${SESSION_DOMAIN:-localhost}
-EOF
-fi
+
 
 # Generate key if not exists or is empty
 if [ ! -f /var/www/.env ] || ! grep -q "APP_KEY=base64:" /var/www/.env 2>/dev/null || [ -z "$(grep 'APP_KEY=base64:' /var/www/.env 2>/dev/null | grep -v '^#' | cut -d'=' -f2 | tr -d ' ')" ]; then
