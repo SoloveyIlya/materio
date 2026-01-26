@@ -21,6 +21,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: prod_redis
+    restart: unless-stopped
+    networks:
+      - prod_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend-laravel
@@ -35,11 +47,10 @@ services:
       - ./deploy/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
     ports:
       - "8000:8000"
-      - "6001:6001"
     environment:
       - APP_NAME=Materio
       - APP_ENV=production
-      - APP_DEBUG=true
+      - APP_DEBUG=false
       - APP_URL=https://pickleflavor.info
       - APP_KEY=base64:abcdefghijklmnopqrstuvwxyz1234567890ABCD=
       - DB_CONNECTION=mysql
@@ -48,26 +59,68 @@ services:
       - DB_DATABASE=admin_db
       - DB_USERNAME=admin
       - DB_PASSWORD=root
-      - MYSQL_DATABASE=admin_db
-      - MYSQL_USER=admin
-      - MYSQL_PASSWORD=root
-      - CACHE_DRIVER=file
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_DRIVER=redis
       - SESSION_DRIVER=cookie
-      - QUEUE_CONNECTION=sync
-      - SANCTUM_STATEFUL_DOMAINS=pickleflavor.info,www.pickleflavor.info
-      - SESSION_DOMAIN=.pickleflavor.info
-      - BROADCAST_DRIVER=websocket
-      - WEBSOCKET_HOST=127.0.0.1
-      - WEBSOCKET_PORT=6001
-      - WEBSOCKET_SCHEME=http
-      - ENABLE_WEBSOCKET=true
+      - QUEUE_CONNECTION=redis
+      - BROADCAST_DRIVER=pusher
       - PUSHER_APP_ID=materio
       - PUSHER_APP_KEY=local
       - PUSHER_APP_SECRET=abcdefghijklmnopqrstuvwxyz123456
+      - PUSHER_HOST=websocket
+      - PUSHER_PORT=6001
+      - PUSHER_SCHEME=http
+      - SANCTUM_STATEFUL_DOMAINS=pickleflavor.info,www.pickleflavor.info
+      - SESSION_DOMAIN=.pickleflavor.info
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - prod_network
+    command: php artisan serve --host=0.0.0.0 --port=8000
+
+  websocket:
+    build:
+      context: ./backend-laravel
+      dockerfile: Dockerfile
+    container_name: prod_websocket
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - backend_cache:/var/www/bootstrap/cache
+      - backend_storage:/var/www/storage
+    environment:
+      - APP_ENV=production
+      - APP_KEY=base64:abcdefghijklmnopqrstuvwxyz1234567890ABCD=
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=admin_db
+      - DB_USERNAME=admin
+      - DB_PASSWORD=root
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - BROADCAST_DRIVER=pusher
+      - PUSHER_APP_ID=materio
+      - PUSHER_APP_KEY=local
+      - PUSHER_APP_SECRET=abcdefghijklmnopqrstuvwxyz123456
+      - PUSHER_HOST=0.0.0.0
+      - PUSHER_PORT=6001
+      - PUSHER_SCHEME=http
+      - LARAVEL_WEBSOCKETS_PORT=6001
+      - LARAVEL_WEBSOCKETS_SSL_LOCAL_CERT=null
+      - LARAVEL_WEBSOCKETS_SSL_LOCAL_PK=null
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - prod_network
+    command: php artisan websockets:serve --host=0.0.0.0 --port=6001
 
   frontend:
     build:
@@ -75,15 +128,18 @@ services:
       dockerfile: Dockerfile.prod
       args:
         - NEXT_PUBLIC_API_URL=https://pickleflavor.info/api
-        - NEXT_PUBLIC_WEBSOCKET_URL=https://pickleflavor.info
+        - NEXT_PUBLIC_WEBSOCKET_URL=wss://pickleflavor.info
+        - NEXT_PUBLIC_PUSHER_APP_KEY=local
+        - NEXT_PUBLIC_PUSHER_APP_CLUSTER=mt1
     container_name: prod_frontend
     restart: unless-stopped
     working_dir: /app
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=https://pickleflavor.info/api
-      - NEXT_PUBLIC_WEBSOCKET_URL=https://pickleflavor.info
-      - WATCHPACK_POLLING=true
+      - NEXT_PUBLIC_WEBSOCKET_URL=wss://pickleflavor.info
+      - NEXT_PUBLIC_PUSHER_APP_KEY=local
+      - NEXT_PUBLIC_PUSHER_APP_CLUSTER=mt1
     depends_on:
       - backend
     networks:
@@ -108,6 +164,7 @@ services:
     depends_on:
       - backend
       - frontend
+      - websocket
     networks:
       - prod_network
 
