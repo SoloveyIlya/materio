@@ -100,24 +100,7 @@ php artisan view:cache 2>/dev/null || true
 
 echo "Production setup complete!"
 
-# Start WebSocket server in background if ENABLE_WEBSOCKET is true
-if [ "${ENABLE_WEBSOCKET:-true}" = "true" ]; then
-    echo "Starting WebSocket server..."
-    php artisan websockets:serve --host=0.0.0.0 --port=6001 > /var/www/storage/logs/websockets.log 2>&1 &
-    WEBSOCKET_PID=$!
-    echo "WebSocket server started with PID: $WEBSOCKET_PID"
-    
-    # Give WebSocket server a moment to start
-    sleep 2
-    
-    # Check if WebSocket process is still running
-    if ! kill -0 $WEBSOCKET_PID 2>/dev/null; then
-        echo "WARNING: WebSocket server failed to start. Check logs at /var/www/storage/logs/websockets.log"
-        cat /var/www/storage/logs/websockets.log || true
-    else
-        echo "WebSocket server is running"
-    fi
-fi
+
 
 echo "Starting PHP-FPM..."
 exec "$@"
