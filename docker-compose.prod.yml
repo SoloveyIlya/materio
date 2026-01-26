@@ -50,7 +50,7 @@ services:
     environment:
       - APP_NAME=Materio
       - APP_ENV=production
-      - APP_DEBUG=false
+      - APP_DEBUG=true
       - APP_URL=https://pickleflavor.info
       - APP_KEY=base64:abcdefghijklmnopqrstuvwxyz1234567890ABCD=
       - DB_CONNECTION=mysql
