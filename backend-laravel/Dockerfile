@@ -10,9 +10,22 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     libzip-dev \
+    # Добавляем пакеты для сборки PECL расширений
+    autoconf \
+    g++ \
+    make \
+    pkg-config \
     && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
+    # Устанавливаем Redis через PECL
+    && pecl install redis \
+    # Включаем расширение Redis
+    && docker-php-ext-enable redis \
+    # Устанавливаем pcov для покрытия тестов (опционально)
+    && pecl install pcov \
+    && docker-php-ext-enable pcov \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Остальная часть Dockerfile остается без изменений...
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
