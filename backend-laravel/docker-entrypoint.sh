@@ -1,63 +1,44 @@
-#!/bin/sh
-# Don't exit on error - we handle errors explicitly
-# set -e
+#!/bin/bash
 
-DB_CONNECTION=${DB_CONNECTION:-mysql}
+# Ожидание Redis
+echo "⏳ Ожидание запуска Redis..."
+for i in {1..30}; do
+    if timeout 2 bash -c "cat < /dev/null > /dev/tcp/redis/6379" 2>/dev/null; then
+        echo "✅ Redis готов!"
+        break
+    fi
+    echo "⏱️  Попытка $i/30 - Redis еще не готов..."
+    sleep 2
+    if [ $i -eq 30 ]; then
+        echo "❌ Redis не запустился за 60 секунд"
+        exit 1
+    fi
+done
 
-if [ "$DB_CONNECTION" = "mysql" ]; then
-    DB_HOST=${DB_HOST:-mysql}
-    DB_PORT=${DB_PORT:-3306}
-    DB_DATABASE=${DB_DATABASE:-${MYSQL_DATABASE:-admin_db}}
-    DB_USERNAME=${DB_USERNAME:-${MYSQL_USER:-admin}}
-    DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD:-root}}
-    echo "Waiting for MySQL database connection..."
-    # Wait for MySQL to be ready (max 60 attempts = 2 minutes)
-    max_attempts=60
-    attempt=0
+# Ожидание MySQL
+echo "⏳ Ожидание запуска MySQL..."
+for i in {1..30}; do
+    if timeout 2 bash -c "cat < /dev/null > /dev/tcp/mysql/3306" 2>/dev/null; then
+        echo "✅ MySQL готов!"
+        break
+    fi
+    echo "⏱️  Попытка $i/30 - MySQL еще не готов..."
+    sleep 2
+    if [ $i -eq 30 ]; then
+        echo "❌ MySQL не запустился за 60 секунд"
+        exit 1
+    fi
+done
 
-    until php -r "try { \$pdo = new PDO('mysql:host=${DB_HOST};port=${DB_PORT};dbname=${DB_DATABASE}', '${DB_USERNAME}', '${DB_PASSWORD}'); echo 'OK'; exit(0); } catch (PDOException \$e) { exit(1); }" 2>/dev/null; do
-        attempt=$((attempt + 1))
-        if [ $attempt -ge $max_attempts ]; then
-            echo "Failed to connect to database after $max_attempts attempts"
-            exit 1
-        fi
-        echo "Waiting for database... ($attempt/$max_attempts)"
-        sleep 2
-    done
-    echo "MySQL database is ready!"
-else
-    echo "Using SQLite database..."
-    # Create database.sqlite file if using SQLite
-    mkdir -p /var/www/database
-    touch /var/www/database/database.sqlite
-    chmod 664 /var/www/database/database.sqlite
-    echo "SQLite database file created/verified"
-fi
+# Запуск миграций (опционально)
+# php artisan migrate --force
 
-# Set DB variables based on connection type
-if [ "$DB_CONNECTION" = "mysql" ]; then
-    DB_DATABASE_VAL=${DB_DATABASE:-${MYSQL_DATABASE:-admin_db}}
-    DB_USERNAME_VAL=${DB_USERNAME:-${MYSQL_USER:-admin}}
-    DB_PASSWORD_VAL=${DB_PASSWORD:-${MYSQL_PASSWORD:-root}}
-else
-    DB_DATABASE_VAL=${DB_DATABASE:-/var/www/database/database.sqlite}
-    DB_USERNAME_VAL=""
-    DB_PASSWORD_VAL=""
-fi
+# Очистка кэша
+php artisan config:clear
+php artisan cache:clear
 
-# Create .env file from environment variables if it doesn't exist
-if [ ! -f /var/www/.env ]; then
-    echo "Creating .env file from environment variables..."
-    cat > /var/www/.env <<EOF
-APP_NAME=${APP_NAME:-AdminBackend}
-APP_ENV=${APP_ENV:-local}
-APP_KEY=
-APP_DEBUG=${APP_DEBUG:-true}
-APP_TIMEZONE=UTC
-APP_URL=${APP_URL:-http://localhost:8000}
-
-DB_CONNECTION=${DB_CONNECTION:-mysql}
-DB_HOST=${DB_HOST:-mysql}
+# Запуск сервера
+exec "$@"
 DB_PORT=${DB_PORT:-3306}
 DB_DATABASE=${DB_DATABASE_VAL}
 DB_USERNAME=${DB_USERNAME_VAL}
