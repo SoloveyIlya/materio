@@ -45,6 +45,7 @@ services:
       - backend_storage:/var/www/storage
       - ./backend-laravel/resources:/var/www/resources
       - ./deploy/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
+      - ./backend-laravel/.env:/var/www/.env
     ports:
       - "8000:8000"
     environment:
@@ -103,6 +104,7 @@ services:
     volumes:
       - backend_cache:/var/www/bootstrap/cache
       - backend_storage:/var/www/storage
+      - ./backend-laravel/.env:/var/www/.env
     environment:
       - APP_ENV=production
       - APP_KEY=base64:abcdefghijklmnopqrstuvwxyz1234567890ABCD=
