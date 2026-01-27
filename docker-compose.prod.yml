@@ -102,7 +102,7 @@ services:
     restart: unless-stopped
     working_dir: /var/www
     volumes:
-      - backend_cache:/var/www/bootstrap/cache
+      - websocket_cache:/var/www/bootstrap/cache
       - backend_storage:/var/www/storage
       - ./deploy/websocket.env:/var/www/.env:ro
 
@@ -203,3 +203,4 @@ volumes:
   mysql_data:
   backend_cache:
   backend_storage:
+  websocket_cache:
