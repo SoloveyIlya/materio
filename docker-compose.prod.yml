@@ -104,6 +104,7 @@ services:
     volumes:
       - backend_cache:/var/www/bootstrap/cache
       - backend_storage:/var/www/storage
+      - ./deploy/websocket.env:/var/www/.env:ro
 
     environment:
       - APP_ENV=production
