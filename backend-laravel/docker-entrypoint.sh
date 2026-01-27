@@ -53,10 +53,9 @@ SESSION_DOMAIN=${SESSION_DOMAIN:-localhost}
 
 
 
-# Явно создаём .env, если его нет
-if [ ! -f /var/www/.env ]; then
-    echo "Создаём .env с переменными окружения..."
-    cat > /var/www/.env <<EOF
+# ВСЕГДА пересоздаём .env
+echo "Создаём .env с переменными окружения..."
+cat > /var/www/.env <<EOF
 APP_NAME=${APP_NAME:-Materio}
 APP_ENV=${APP_ENV:-production}
 APP_KEY=
@@ -91,7 +90,6 @@ PUSHER_SCHEME=${PUSHER_SCHEME:-http}
 SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-pickleflavor.info,www.pickleflavor.info}
 SESSION_DOMAIN=${SESSION_DOMAIN:-.pickleflavor.info}
 EOF
-fi
 
 # Генерируем ключ, если он не установлен
 if ! grep -q "APP_KEY=base64:" /var/www/.env 2>/dev/null || [ -z "$(grep 'APP_KEY=base64:' /var/www/.env 2>/dev/null | grep -v '^#' | cut -d'=' -f2 | tr -d ' ')" ]; then
