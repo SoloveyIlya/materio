@@ -83,7 +83,7 @@ if [ "${AUTO_MIGRATE:-false}" = "true" ]; then
 fi
 
 echo "Application started. Available commands:"
-echo "  - API Server: php artisan serve --host=0.0.0.0 --port=8000"
+
 
 echo ""
 echo "To run migrations manually: php artisan migrate"
