@@ -1,33 +1,34 @@
+
+#!/bin/bash
 # Генерация .env файла, если он отсутствует
 if [ ! -f /var/www/.env ]; then
-    echo "Создаю .env из переменных окружения..."
+    echo "Создаю .env с жёстко прописанными параметрами..."
     cat <<EOF > /var/www/.env
-APP_NAME=${APP_NAME}
-APP_ENV=${APP_ENV}
-APP_KEY=${APP_KEY}
-APP_DEBUG=${APP_DEBUG}
-APP_URL=${APP_URL}
+APP_NAME=Materio
+APP_ENV=production
+APP_KEY=base64:abcdefghijklmnopqrstuvwxyz1234567890ABCD=
+APP_DEBUG=true
+APP_URL=https://pickleflavor.info
 
-DB_CONNECTION=${DB_CONNECTION}
-DB_HOST=${DB_HOST}
-DB_PORT=${DB_PORT}
-DB_DATABASE=${DB_DATABASE}
-DB_USERNAME=${DB_USERNAME}
-DB_PASSWORD=${DB_PASSWORD}
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=admin_db
+DB_USERNAME=admin
+DB_PASSWORD=root
 
-REDIS_HOST=${REDIS_HOST}
-REDIS_PASSWORD=${REDIS_PASSWORD}
-REDIS_PORT=${REDIS_PORT}
+REDIS_HOST=redis
+REDIS_PASSWORD=null
+REDIS_PORT=6379
 
-CACHE_DRIVER=${CACHE_DRIVER}
-SESSION_DRIVER=${SESSION_DRIVER}
-QUEUE_CONNECTION=${QUEUE_CONNECTION}
+CACHE_DRIVER=redis
+SESSION_DRIVER=cookie
+QUEUE_CONNECTION=redis
 
-SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS}
-SESSION_DOMAIN=${SESSION_DOMAIN}
+SANCTUM_STATEFUL_DOMAINS=pickleflavor.info,www.pickleflavor.info
+SESSION_DOMAIN=.pickleflavor.info
 EOF
 fi
-#!/bin/bash
 
 # Ожидание Redis
 echo "⏳ Ожидание запуска Redis..."
