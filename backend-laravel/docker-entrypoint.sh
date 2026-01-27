@@ -54,8 +54,6 @@ SESSION_DOMAIN=${SESSION_DOMAIN:-localhost}
 
 
 
-# Генерируем ключ, если он не установлен
-
 # Ensure database exists before migrations (for SQLite)
 if [ "$DB_CONNECTION" = "sqlite" ]; then
     DB_PATH="/var/www/database/database.sqlite"
