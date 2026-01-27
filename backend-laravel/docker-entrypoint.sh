@@ -55,16 +55,6 @@ SESSION_DOMAIN=${SESSION_DOMAIN:-localhost}
 
 
 # Генерируем ключ, если он не установлен
-if ! grep -q "APP_KEY=base64:" /var/www/.env 2>/dev/null || [ -z "$(grep 'APP_KEY=base64:' /var/www/.env 2>/dev/null | grep -v '^#' | cut -d'=' -f2 | tr -d ' ')" ]; then
-    echo "Generating application key..."
-    php artisan key:generate --force || echo "Warning: Could not generate APP_KEY"
-fi
-
-# Also check if APP_KEY is set in environment and update .env
-if [ -n "$APP_KEY" ] && [ -f /var/www/.env ]; then
-    echo "Updating APP_KEY from environment variable..."
-    sed -i "s|APP_KEY=.*|APP_KEY=${APP_KEY}|" /var/www/.env || echo "Warning: Could not update APP_KEY in .env"
-fi
 
 # Ensure database exists before migrations (for SQLite)
 if [ "$DB_CONNECTION" = "sqlite" ]; then
