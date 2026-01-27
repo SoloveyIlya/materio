@@ -53,43 +53,6 @@ SESSION_DOMAIN=${SESSION_DOMAIN:-localhost}
 
 
 
-# ВСЕГДА пересоздаём .env
-echo "Создаём .env с переменными окружения..."
-cat > /var/www/.env <<EOF
-APP_NAME=${APP_NAME:-Materio}
-APP_ENV=${APP_ENV:-production}
-APP_KEY=
-APP_DEBUG=${APP_DEBUG:-true}
-APP_URL=${APP_URL:-http://localhost:8000}
-
-DB_CONNECTION=${DB_CONNECTION:-mysql}
-DB_HOST=${DB_HOST:-mysql}
-DB_PORT=${DB_PORT:-3306}
-DB_DATABASE=${DB_DATABASE:-admin_db}
-DB_USERNAME=${DB_USERNAME:-admin}
-DB_PASSWORD=${DB_PASSWORD:-root}
-
-REDIS_CLIENT=${REDIS_CLIENT:-phpredis}
-REDIS_HOST=${REDIS_HOST:-redis}
-REDIS_PORT=${REDIS_PORT:-6379}
-REDIS_PASSWORD=${REDIS_PASSWORD:-null}
-REDIS_DB=${REDIS_DB:-0}
-REDIS_CACHE_DB=${REDIS_CACHE_DB:-1}
-
-QUEUE_CONNECTION=${QUEUE_CONNECTION:-redis}
-REDIS_QUEUE=${REDIS_QUEUE:-default}
-CACHE_DRIVER=${CACHE_DRIVER:-redis}
-SESSION_DRIVER=${SESSION_DRIVER:-cookie}
-BROADCAST_DRIVER=${BROADCAST_DRIVER:-pusher}
-PUSHER_APP_ID=${PUSHER_APP_ID:-materio}
-PUSHER_APP_KEY=${PUSHER_APP_KEY:-local}
-PUSHER_APP_SECRET=${PUSHER_APP_SECRET:-abcdefghijklmnopqrstuvwxyz123456}
-PUSHER_HOST=${PUSHER_HOST:-websocket}
-PUSHER_PORT=${PUSHER_PORT:-6001}
-PUSHER_SCHEME=${PUSHER_SCHEME:-http}
-SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-pickleflavor.info,www.pickleflavor.info}
-SESSION_DOMAIN=${SESSION_DOMAIN:-.pickleflavor.info}
-EOF
 
 # Генерируем ключ, если он не установлен
 if ! grep -q "APP_KEY=base64:" /var/www/.env 2>/dev/null || [ -z "$(grep 'APP_KEY=base64:' /var/www/.env 2>/dev/null | grep -v '^#' | cut -d'=' -f2 | tr -d ' ')" ]; then
