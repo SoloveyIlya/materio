@@ -75,8 +75,10 @@ if [ -z "$APP_KEY" ] || ! grep -q "APP_KEY=base64:" /var/www/.env 2>/dev/null; t
 fi
 
 # Run migrations
-echo "Running migrations..."
-php artisan migrate --force
+if [ "${AUTO_MIGRATE:-false}" = "true" ]; then
+    echo "Running migrations..."
+    php artisan migrate --force
+fi
 
 # Regenerate optimized autoload files and clear caches
 echo "Regenerating autoload files..."
@@ -87,20 +89,27 @@ echo "Clearing package discovery cache..."
 rm -f bootstrap/cache/packages.php bootstrap/cache/services.php || true
 
 # Optimize Laravel for production
-echo "Optimizing Laravel for production..."
-php artisan config:clear || true
-php artisan route:clear || true
-php artisan view:clear || true
-php artisan config:cache || true
-php artisan route:cache || true
+if [ "${AUTO_OPTIMIZE:-false}" = "true" ]; then
+    echo "Optimizing Laravel for production..."
+    php artisan config:clear || true
+    php artisan route:clear || true
+    php artisan view:clear || true
+    php artisan cache:clear || true
+    php artisan config:cache || true
+    php artisan route:cache || true
+fi
 
 # Try to cache views, but don't fail if resources/views doesn't exist
 # (this is an API-only application)
-php artisan view:cache 2>/dev/null || true
+if [ "${AUTO_OPTIMIZE:-false}" = "true" ]; then
+    php artisan view:cache 2>/dev/null || true
+fi
 
 echo "Production setup complete!"
 
+# Start websocket server in background (nginx will proxy ws connections to this port)
+echo "Starting Laravel WebSockets server on ${WEBSOCKET_HOST:-0.0.0.0}:${WEBSOCKET_PORT:-6001}..."
+php artisan websockets:serve --host="${WEBSOCKET_HOST:-0.0.0.0}" --port="${WEBSOCKET_PORT:-6001}" &
 
-
-echo "Starting PHP-FPM..."
+echo "Starting main process..."
 exec "$@"
