@@ -9,15 +9,23 @@ if [ "$DB_CONNECTION" = "mysql" ]; then
     max_attempts=60
     attempt=0
     
-    # Используем DB_* переменные если они установлены, иначе MYSQL_* переменные, иначе defaults
-    _db_host=${DB_HOST:-${MYSQL_HOST:-mysql}}
-    _db_port=${DB_PORT:-${MYSQL_PORT:-3306}}
-    _db_name=${DB_DATABASE:-${MYSQL_DATABASE:-admin_db}}
-    _db_user=${DB_USERNAME:-${MYSQL_USER:-admin}}
-    _db_pass=${DB_PASSWORD:-${MYSQL_PASSWORD}}
+    # Статичные значения из docker-compose.prod.yml
+    _db_host="mysql"
+    _db_port="3306"
+    _db_name="admin_db"
+    _db_user="admin"
+    _db_pass="root"
+    _root_pass="root"
 
     # 1) Ждём доступности MySQL СЕРВЕРА (без выбора конкретной БД)
-    until php -r "try { new PDO('mysql:host=${_db_host};port=${_db_port}', '${_db_user}', '${_db_pass}', [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]); echo 'OK'; exit(0); } catch (PDOException \$e) { exit(1); }" 2>/dev/null; do
+    until php -r "
+    try { 
+        \$pdo = new PDO('mysql:host=${_db_host};port=${_db_port}', '${_db_user}', '${_db_pass}', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]); 
+        echo 'OK'; 
+        exit(0); 
+    } catch (PDOException \$e) { 
+        exit(1); 
+    }" 2>/dev/null; do
         attempt=$((attempt + 1))
         if [ $attempt -ge $max_attempts ]; then
             echo "Failed to connect to database after $max_attempts attempts"
@@ -27,29 +35,28 @@ if [ "$DB_CONNECTION" = "mysql" ]; then
         sleep 2
     done
 
-    # 2) Гарантируем, что БД существует (для случая, когда volume уже был и MYSQL_DATABASE не отработал)
+    # 2) Гарантируем, что БД существует
     echo "Ensuring database '${_db_name}' exists..."
     php -r "
+    \$dbName = '${_db_name}';
+    
+    // Пробуем с обычным пользователем
     try {
         \$pdo = new PDO('mysql:host=${_db_host};port=${_db_port}', '${_db_user}', '${_db_pass}');
-        \$dbName = '${_db_name}';
-        \$pdo->exec('CREATE DATABASE IF NOT EXISTS `' . \$dbName . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-        echo 'OK';
+        \$pdo->exec('CREATE DATABASE IF NOT EXISTS ' . \$dbName . ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+        echo 'Database created/verified successfully';
         exit(0);
     } catch (PDOException \$e) {
-        exit(1);
-    }" 2>/dev/null \
-    || php -r "
-    try {
-        \$rootPass = getenv('MYSQL_ROOT_PASSWORD') ?: '';
-        \$pdo = new PDO('mysql:host=${_db_host};port=${_db_port}', 'root', \$rootPass);
-        \$dbName = '${_db_name}';
-        \$pdo->exec('CREATE DATABASE IF NOT EXISTS `' . \$dbName . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-        echo 'OK';
-        exit(0);
-    } catch (PDOException \$e) {
-        fwrite(STDERR, \$e->getMessage());
-        exit(1);
+        // Пробуем с root пользователем
+        try {
+            \$pdo = new PDO('mysql:host=${_db_host};port=${_db_port}', 'root', '${_root_pass}');
+            \$pdo->exec('CREATE DATABASE IF NOT EXISTS ' . \$dbName . ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+            echo 'Database created/verified successfully (using root)';
+            exit(0);
+        } catch (PDOException \$e2) {
+            echo 'Error: ' . \$e2->getMessage();
+            exit(1);
+        }
     }"
 
     echo "MySQL server is ready!"
@@ -59,39 +66,51 @@ fi
 if [ ! -f /var/www/.env ]; then
     echo "Creating .env file from environment variables..."
     cat > /var/www/.env <<EOF
-APP_NAME=${APP_NAME:-AdminBackend}
+APP_NAME=Materio
 APP_ENV=production
-APP_KEY=${APP_KEY}
-APP_DEBUG=${APP_DEBUG:-false}
+APP_KEY=base64:bW9aK2w4aE5tU0J1V3ZkN0NnZ0h4MmJtU2xqR0x2cUQ=
+APP_DEBUG=false
 APP_TIMEZONE=UTC
-APP_URL=${APP_URL}
+APP_URL=https://pickleflavor.info
 
-DB_CONNECTION=${DB_CONNECTION:-mysql}
-DB_HOST=${DB_HOST:-mysql}
-DB_PORT=${DB_PORT:-3306}
-DB_DATABASE=${DB_DATABASE:-${MYSQL_DATABASE:-admin_db}}
-DB_USERNAME=${DB_USERNAME:-${MYSQL_USER:-admin}}
-DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD}}
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=admin_db
+DB_USERNAME=admin
+DB_PASSWORD=root
 
-CACHE_DRIVER=${CACHE_DRIVER:-file}
-SESSION_DRIVER=${SESSION_DRIVER:-file}
-QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
+CACHE_DRIVER=redis
+SESSION_DRIVER=cookie
+QUEUE_CONNECTION=redis
 
-REDIS_HOST=${REDIS_HOST:-redis}
-REDIS_PASSWORD=${REDIS_PASSWORD:-null}
-REDIS_PORT=${REDIS_PORT:-6379}
+REDIS_HOST=redis
+REDIS_PASSWORD=null
+REDIS_PORT=6379
 
-SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS}
-SESSION_DOMAIN=${SESSION_DOMAIN}
+SANCTUM_STATEFUL_DOMAINS=pickleflavor.info,www.pickleflavor.info
+SESSION_DOMAIN=.pickleflavor.info
 
-MAIL_MAILER=${MAIL_MAILER:-smtp}
+BROADCAST_DRIVER=websocket
+PUSHER_APP_ID=local
+PUSHER_APP_KEY=local
+PUSHER_APP_SECRET=local
+PUSHER_HOST=pickleflavor.info
+PUSHER_PORT=443
+PUSHER_SCHEME=https
+PUSHER_APP_CLUSTER=mt1
+WEBSOCKET_HOST=0.0.0.0
+WEBSOCKET_PORT=6001
+WEBSOCKET_SCHEME=http
+
+MAIL_MAILER=smtp
 MAIL_HOST=${MAIL_HOST}
 MAIL_PORT=${MAIL_PORT:-587}
 MAIL_USERNAME=${MAIL_USERNAME}
 MAIL_PASSWORD=${MAIL_PASSWORD}
 MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-tls}
 MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
-MAIL_FROM_NAME=${MAIL_FROM_NAME:-${APP_NAME}}
+MAIL_FROM_NAME=${MAIL_FROM_NAME:-Materio}
 EOF
 fi
 
