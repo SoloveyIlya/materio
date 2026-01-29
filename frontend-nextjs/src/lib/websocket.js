@@ -31,11 +31,11 @@ export const initializeSocket = () => {
     console.warn('[WS] ⚠️ Токен не найден в localStorage!')
   }
 
-  // Парсим WebSocket URL
+  // Парсим WebSocket URL (wss: и https: → порт 443 и TLS, ws: и http: → порт 80)
   const wsUrlObj = new URL(wsUrl)
   const wsHost = wsUrlObj.hostname
-  const wsPort = wsUrlObj.port || (wsUrlObj.protocol === 'https:' ? 443 : 80)
-  const useTLS = wsUrlObj.protocol === 'https:'
+  const useTLS = wsUrlObj.protocol === 'https:' || wsUrlObj.protocol === 'wss:'
+  const wsPort = wsUrlObj.port || (useTLS ? 443 : 80)
 
   console.log('[WS] Параметры подключения:', {
     wsHost,
