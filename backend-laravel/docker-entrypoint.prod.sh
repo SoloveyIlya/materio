@@ -124,6 +124,16 @@ fi
 if [ "${AUTO_MIGRATE:-false}" = "true" ]; then
     echo "Running migrations..."
     php artisan migrate --force
+    
+    # Создаем таблицы для кэша, очередей, сессий если используется database драйвер
+    echo "Creating cache table..."
+    php artisan cache:table
+    php artisan migrate --force
+    
+    # Если используется database для сессий
+    echo "Creating session table..."
+    php artisan session:table
+    php artisan migrate --force
 fi
 
 # Regenerate optimized autoload files and clear caches
@@ -153,9 +163,33 @@ fi
 
 echo "Production setup complete!"
 
-# Start websocket server in background (nginx will proxy ws connections to this port)
-echo "Starting Laravel WebSockets server on ${WEBSOCKET_HOST:-0.0.0.0}:${WEBSOCKET_PORT:-6001}..."
-php artisan websockets:serve --host="${WEBSOCKET_HOST:-0.0.0.0}" --port="${WEBSOCKET_PORT:-6001}" &
+# Запускаем HTTP сервер в фоне на порту 8000
+echo "Starting Laravel HTTP server on 0.0.0.0:8000..."
+php artisan serve --host=0.0.0.0 --port=8000 &
 
-echo "Starting main process..."
-exec "$@"
+# Даем серверу время запуститься
+sleep 3
+
+# Start websocket server in background
+echo "Starting Laravel WebSockets server on 0.0.0.0:6001..."
+php artisan websockets:serve --host=0.0.0.0 --port=6001 &
+
+# Проверяем что оба сервера запущены
+sleep 2
+echo "Checking servers status..."
+if ! curl -s http://localhost:8000 > /dev/null; then
+    echo "ERROR: HTTP server not responding on port 8000"
+    exit 1
+fi
+
+if ! curl -s http://localhost:6001 > /dev/null 2>&1; then
+    echo "WARNING: WebSocket server not responding on port 6001 (might be normal for WS)"
+fi
+
+echo "All servers started successfully!"
+echo "HTTP server: http://0.0.0.0:8000"
+echo "WebSocket server: ws://0.0.0.0:6001"
+
+# Keep container running
+echo "Container is running..."
+tail -f /dev/null
