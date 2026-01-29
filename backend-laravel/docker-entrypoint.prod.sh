@@ -124,16 +124,6 @@ fi
 if [ "${AUTO_MIGRATE:-false}" = "true" ]; then
     echo "Running migrations..."
     php artisan migrate --force
-    
-    # Создаем таблицы для кэша, очередей, сессий если используется database драйвер
-    echo "Creating cache table..."
-    php artisan cache:table
-    php artisan migrate --force
-    
-    # Если используется database для сессий
-    echo "Creating session table..."
-    php artisan session:table
-    php artisan migrate --force
 fi
 
 # Regenerate optimized autoload files and clear caches
@@ -163,9 +153,9 @@ fi
 
 echo "Production setup complete!"
 
-# Запускаем HTTP сервер в фоне на порту 8000
+# Запускаем HTTP сервер на порту 8000 в фоне
 echo "Starting Laravel HTTP server on 0.0.0.0:8000..."
-php artisan serve --host=0.0.0.0 --port=8000 &
+php -S 0.0.0.0:8000 -t public &
 
 # Даем серверу время запуститься
 sleep 3
@@ -174,16 +164,14 @@ sleep 3
 echo "Starting Laravel WebSockets server on 0.0.0.0:6001..."
 php artisan websockets:serve --host=0.0.0.0 --port=6001 &
 
-# Проверяем что оба сервера запущены
+# Проверяем что HTTP сервер запущен
 sleep 2
-echo "Checking servers status..."
-if ! curl -s http://localhost:8000 > /dev/null; then
+echo "Checking HTTP server status..."
+if curl -s -o /dev/null -w "%{http_code}" http://localhost:8000 | grep -q "200\|404\|403"; then
+    echo "HTTP server is running on port 8000"
+else
     echo "ERROR: HTTP server not responding on port 8000"
     exit 1
-fi
-
-if ! curl -s http://localhost:6001 > /dev/null 2>&1; then
-    echo "WARNING: WebSocket server not responding on port 6001 (might be normal for WS)"
 fi
 
 echo "All servers started successfully!"
