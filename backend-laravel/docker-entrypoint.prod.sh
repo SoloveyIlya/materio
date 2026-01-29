@@ -16,7 +16,8 @@ if [ "$DB_CONNECTION" = "mysql" ]; then
     _db_user=${DB_USERNAME:-${MYSQL_USER:-admin}}
     _db_pass=${DB_PASSWORD:-${MYSQL_PASSWORD}}
 
-    until php -r "try { \$pdo = new PDO('mysql:host=${_db_host};port=${_db_port};dbname=${_db_name}', '${_db_user}', '${_db_pass}'); echo 'OK'; exit(0); } catch (PDOException \$e) { exit(1); }" 2>/dev/null; do
+    # 1) Ждём доступности MySQL СЕРВЕРА (без выбора конкретной БД)
+    until php -r "try { new PDO('mysql:host=${_db_host};port=${_db_port}', '${_db_user}', '${_db_pass}', [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]); echo 'OK'; exit(0); } catch (PDOException \$e) { exit(1); }" 2>/dev/null; do
         attempt=$((attempt + 1))
         if [ $attempt -ge $max_attempts ]; then
             echo "Failed to connect to database after $max_attempts attempts"
@@ -25,7 +26,30 @@ if [ "$DB_CONNECTION" = "mysql" ]; then
         echo "Waiting for database... ($attempt/$max_attempts)"
         sleep 2
     done
-    echo "MySQL database is ready!"
+
+    # 2) Гарантируем, что БД существует (для случая, когда volume уже был и MYSQL_DATABASE не отработал)
+    echo "Ensuring database '${_db_name}' exists..."
+    php -r "\
+try {\
+  \$pdo = new PDO('mysql:host=${_db_host};port=${_db_port}', '${_db_user}', '${_db_pass}', [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);\
+  \$pdo->exec('CREATE DATABASE IF NOT EXISTS `${_db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');\
+  echo 'OK';\
+  exit(0);\
+} catch (PDOException \$e) {\
+  exit(1);\
+}" 2>/dev/null || php -r "\
+try {\
+  \$rootPass = getenv('MYSQL_ROOT_PASSWORD') ?: '';\
+  \$pdo = new PDO('mysql:host=${_db_host};port=${_db_port}', 'root', \$rootPass, [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);\
+  \$pdo->exec('CREATE DATABASE IF NOT EXISTS `${_db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');\
+  echo 'OK';\
+  exit(0);\
+} catch (PDOException \$e) {\
+  fwrite(STDERR, \$e->getMessage());\
+  exit(1);\
+}"
+
+    echo "MySQL server is ready!"
 fi
 
 # Create .env file from environment variables if it doesn't exist
