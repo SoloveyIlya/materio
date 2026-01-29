@@ -29,8 +29,28 @@ if [ "$DB_CONNECTION" = "mysql" ]; then
 
     # 2) Гарантируем, что БД существует (для случая, когда volume уже был и MYSQL_DATABASE не отработал)
     echo "Ensuring database '${_db_name}' exists..."
-    php -r "try {\$pdo=new PDO('mysql:host=${_db_host};port=${_db_port}','${_db_user}','${_db_pass}');\$dbName='${_db_name}';\$pdo->exec('CREATE DATABASE IF NOT EXISTS `'.\$dbName.'` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');echo 'OK';exit(0);} catch (PDOException \$e){exit(1);}" 2>/dev/null \
-      || php -r "try {\$rootPass=getenv('MYSQL_ROOT_PASSWORD')?:'';\$pdo=new PDO('mysql:host=${_db_host};port=${_db_port}','root',\$rootPass);\$dbName='${_db_name}';\$pdo->exec('CREATE DATABASE IF NOT EXISTS `'.\$dbName.'` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');echo 'OK';exit(0);} catch (PDOException \$e){fwrite(STDERR,\$e->getMessage());exit(1);}"
+    php -r "
+    try {
+        \$pdo = new PDO('mysql:host=${_db_host};port=${_db_port}', '${_db_user}', '${_db_pass}');
+        \$dbName = '${_db_name}';
+        \$pdo->exec('CREATE DATABASE IF NOT EXISTS `' . \$dbName . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+        echo 'OK';
+        exit(0);
+    } catch (PDOException \$e) {
+        exit(1);
+    }" 2>/dev/null \
+    || php -r "
+    try {
+        \$rootPass = getenv('MYSQL_ROOT_PASSWORD') ?: '';
+        \$pdo = new PDO('mysql:host=${_db_host};port=${_db_port}', 'root', \$rootPass);
+        \$dbName = '${_db_name}';
+        \$pdo->exec('CREATE DATABASE IF NOT EXISTS `' . \$dbName . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+        echo 'OK';
+        exit(0);
+    } catch (PDOException \$e) {
+        fwrite(STDERR, \$e->getMessage());
+        exit(1);
+    }"
 
     echo "MySQL server is ready!"
 fi
