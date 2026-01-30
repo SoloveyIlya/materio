@@ -196,6 +196,21 @@ export const subscribeToMessages = (domainId, userId, callback) => {
   echoInstance.connector.pusher.bind_global((eventName, data) => {
     if (eventName.includes('message') || eventName.includes('Message') || eventName === 'MessageSent') {
       console.log('[WS] ГЛОБАЛЬНОЕ СОБЫТИЕ:', eventName, data)
+      try {
+        // If global event carries a MessageSent payload that our regular channel handlers missed,
+        // invoke the provided callback to render it immediately. Use processedMessageIds to avoid duplicates.
+        const maybeId = data && data.id
+        if (!maybeId || !processedMessageIds.has(maybeId)) {
+          if (maybeId) {
+            processedMessageIds.add(maybeId)
+            setTimeout(() => processedMessageIds.delete(maybeId), 10000)
+          }
+          // Call callback so UI can render message immediately
+          try { callback(data) } catch (e) { /* swallow callback errors */ }
+        }
+      } catch (e) {
+        // ignore
+      }
     }
   })
 
