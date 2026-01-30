@@ -802,7 +802,7 @@ const ChatContent = props => {
             <style>{messageAnimationStyles}</style>
             <CardContent className='p-0'>
               {selectedChat.messages && selectedChat.messages.length > 0 ? (
-                selectedChat.messages
+                (selectedChat.messages ?? []).slice()
                   .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
                   .map((msg) => {
                     // Для админов: сообщение считается отправленным от нас, если оно от текущего пользователя или от выбранного админа во вкладке

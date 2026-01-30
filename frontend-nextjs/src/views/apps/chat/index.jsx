@@ -42,6 +42,10 @@ const ChatWrapper = () => {
   const messageInputRef = useRef(null)
   const previousMessagesDataRef = useRef(null)
   const markedAsReadRef = useRef(new Set()) // Track which chats we've already marked as read in this session
+  const selectedChatRef = useRef(null)
+  const activeTabRef = useRef(activeTab)
+  const selectedAdminTabRef = useRef(selectedAdminTab)
+  const userRef = useRef(user)
 
   // Hooks
   const { settings } = useSettings()
@@ -71,7 +75,47 @@ const ChatWrapper = () => {
     }
   }, [activeTab, messagesData, user])
 
-  // Auto-refresh messages with WebSocket
+  // Sync refs with latest state to avoid stale closures in WS handlers
+  useEffect(() => { selectedChatRef.current = selectedChat }, [selectedChat])
+  useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
+  useEffect(() => { selectedAdminTabRef.current = selectedAdminTab }, [selectedAdminTab])
+  useEffect(() => { userRef.current = user }, [user])
+
+  // Helper: patch messagesData for incoming message by peerId
+  const patchMessagesData = (prev, msg, peerId) => {
+    if (!prev) return prev
+
+    // Admin tabs structure
+    if (prev.tabs) {
+      return {
+        ...prev,
+        tabs: prev.tabs.map(tab => ({
+          ...tab,
+          chats: tab.chats.map(chat => {
+            if (chat.user?.id !== peerId) return chat
+            // avoid duplicate
+            const exists = (chat.messages || []).some(m => m.id === msg.id)
+            if (exists) return chat
+            return { ...chat, messages: [...(chat.messages || []), msg], last_message: msg }
+          })
+        }))
+      }
+    }
+
+    // Moderator list (array)
+    if (Array.isArray(prev)) {
+      return prev.map(chat => {
+        if (chat.user?.id !== peerId) return chat
+        const exists = (chat.messages || []).some(m => m.id === msg.id)
+        if (exists) return chat
+        return { ...chat, messages: [...(chat.messages || []), msg], last_message: msg }
+      })
+    }
+
+    return prev
+  }
+
+  // Auto-refresh messages with WebSocket — subscribe only on `user` to avoid stale closures
   useEffect(() => {
     if (!user) return
 
@@ -81,124 +125,14 @@ const ChatWrapper = () => {
     // Import WebSocket utilities
     const initSocket = async () => {
       if (isSubscribed) return null
-      
       const { initializeSocket, subscribeToMessages } = await import('@/lib/websocket')
-      const socket = initializeSocket()
-      
+      initializeSocket()
+
       isSubscribed = true
-      
-      // Функция для локального обновления счетчика в чате без перезагрузки всех сообщений
-      const updateChatCounterLocally = (toUserId) => {
-        setMessagesData(prevData => {
-          if (!prevData) return prevData
-          
-          // Для админов
-          if (user?.roles?.some(r => r.name === 'admin') && prevData?.tabs) {
-            return {
-              ...prevData,
-              tabs: prevData.tabs.map((tab, tabIndex) => ({
-                ...tab,
-                chats: tab.chats.map(chat => 
-                  (chat.user.id === toUserId)
-                    ? { ...chat, unread_count: (chat.unread_count || 0) + 1 }
-                    : chat
-                )
-              }))
-            }
-          }
-          // Для модераторов
-          else if (Array.isArray(prevData)) {
-            return prevData.map(chat =>
-              (chat.user.id === toUserId)
-                ? { ...chat, unread_count: (chat.unread_count || 0) + 1 }
-                : chat
-            )
-          }
-          
-          return prevData
-        })
-      }
-      
-      // Подписываемся на новые сообщения
+
+      // Подписываемся на новые сообщения и делегируем обработку в handleIncomingWsMessage
       unsubscribe = subscribeToMessages(user.domain_id, user.id, (data) => {
-        // Воспроизводим звук для новых непрочитанных сообщений (не от текущего пользователя)
-        if (data.from_user_id !== user.id) {
-          playNotificationSoundIfVisible()
-          
-          // Локально обновляем счетчик в списке чатов
-          updateChatCounterLocally(data.from_user_id)
-          
-          // Оптимистично увеличиваем счетчик непрочитанных на +1 в меню
-          optimisticallyUpdateChatCount(1)
-        }
-        
-        // Если текущий чат открыт и сообщение относится к этому чату, пытаемся обновить UI сразу
-        const selectedChatUserId = selectedChat?.user?.id
-        const messageFrom = data.from_user_id
-        const messageTo = data.to_user_id
-
-        // Debug helper
-        console.debug('[WS] Incoming message for chat check:', { selectedChatUserId, messageFrom, messageTo })
-
-        if (selectedChatUserId && (selectedChatUserId === messageFrom || selectedChatUserId === messageTo)) {
-          // Попробуем сразу добавить сообщение в UI без полного перезагрузки
-          const incomingMessage = {
-            id: data.id || `ws-${Date.now()}`,
-            from_user_id: data.from_user_id,
-            to_user_id: data.to_user_id,
-            body: data.content ?? data.body ?? null,
-            attachments: data.attachments || null,
-            task_id: data.task_id || null,
-            is_read: data.is_read || false,
-            created_at: data.created_at || new Date().toISOString(),
-            created_at_formatted: data.created_at_formatted || data.created_at || new Date().toISOString(),
-            from_user: data.from_user || null,
-            to_user: data.to_user || null,
-          }
-
-          // Обновляем выбранный чат локально
-          setSelectedChat(prev => {
-            if (!prev) return prev
-            const beforeLen = (prev.messages || []).length
-            const updatedMessages = [...(prev.messages || []), incomingMessage]
-            console.debug('[WS] Appending message to selectedChat', { id: incomingMessage.id, beforeLen, afterLen: updatedMessages.length })
-            return { ...prev, messages: updatedMessages }
-          })
-
-          // Обновляем общие данные сообщений (список чатов)
-          setMessagesData(prevData => {
-            if (!prevData) return prevData
-            if (user?.roles?.some(r => r.name === 'admin') && prevData?.tabs) {
-              const updatedTabs = prevData.tabs.map((tab, tabIndex) => {
-                if (tabIndex === activeTab) {
-                    const updatedChats = tab.chats.map(chat => {
-                      if (chat.user.id === selectedChat.user.id) {
-                        const beforeLen = (chat.messages || []).length
-                        const updated = { ...chat, messages: [...(chat.messages || []), incomingMessage] }
-                        console.debug('[WS] Appending message to messagesData.tabs', { chatUserId: chat.user.id, id: incomingMessage.id, beforeLen, afterLen: updated.messages.length })
-                        return updated
-                      }
-                      return chat
-                    })
-                    return { ...tab, chats: updatedChats }
-                  }
-                return tab
-              })
-              return { ...prevData, tabs: updatedTabs }
-            } else if (Array.isArray(prevData)) {
-              return prevData.map(chat => {
-                if (chat.user.id === selectedChat.user.id) {
-                  return { ...chat, messages: [...(chat.messages || []), incomingMessage] }
-                }
-                return chat
-              })
-            }
-            return prevData
-          })
-
-          // Также запускаем фоновую перезагрузку на случай расхождений
-          loadMessages(true)
-        }
+        handleIncomingWsMessage(data)
       })
 
       return unsubscribe
@@ -212,49 +146,110 @@ const ChatWrapper = () => {
 
     return () => {
       isSubscribed = false
-      if (unsubscribe) {
-        unsubscribe()
-      }
+      if (unsubscribe) unsubscribe()
     }
-  }, [user, selectedChat])
+  }, [user])
+
+  // Incoming WS message handler (uses refs to avoid stale closures)
+  const handleIncomingWsMessage = (data) => {
+    const currentUser = userRef.current
+    if (!currentUser) return
+
+    // Play sound and update counters for messages from others
+    if (data.from_user_id !== currentUser.id) {
+      playNotificationSoundIfVisible()
+      optimisticallyUpdateChatCount(1)
+
+      // Local unread counter bump
+      setMessagesData(prev => patchMessagesData(prev, {}, null)) // noop to keep structure if null
+      setMessagesData(prev => {
+        if (!prev) return prev
+        // We'll increment unread_count in the patched chat below by peer logic
+        return prev
+      })
+    }
+
+    const peerId = (data.from_user_id === currentUser.id) ? data.to_user_id : data.from_user_id
+
+    const incomingMessage = {
+      id: data.id || `ws-${Date.now()}`,
+      from_user_id: data.from_user_id,
+      to_user_id: data.to_user_id,
+      body: data.content ?? data.body ?? null,
+      attachments: data.attachments || null,
+      task_id: data.task_id || null,
+      is_read: data.is_read || false,
+      created_at: data.created_at || new Date().toISOString(),
+      created_at_formatted: data.created_at_formatted || data.created_at || new Date().toISOString(),
+      from_user: data.from_user || null,
+      to_user: data.to_user || null,
+    }
+
+    // 1) Patch global messagesData for the peer
+    setMessagesData(prev => patchMessagesData(prev, incomingMessage, peerId))
+
+    // 2) If selected chat is open with this peer — append to it
+    const sc = selectedChatRef.current
+    if (sc && sc.user && sc.user.id === peerId) {
+      setSelectedChat(prev => {
+        if (!prev) return prev
+        // prevent duplicates
+        if ((prev.messages || []).some(m => m.id === incomingMessage.id)) return prev
+        return { ...prev, messages: [...(prev.messages || []), incomingMessage] }
+      })
+    }
+
+    // 3) Background reload to ensure consistency
+    void loadMessages(true)
+  }
 
   // Update selectedChat when messagesData changes and automatically mark messages as read if chat is open
   useEffect(() => {
     if (selectedChat && selectedChat.user && messagesData) {
       const selectedUserId = selectedChat.user.id
       let updatedChat = null
-      
+
       // For admin - ищем чат только в текущей вкладке
-      if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs && activeTab >= 0 && activeTab < messagesData.tabs.length) {
-        const currentTab = messagesData.tabs[activeTab]
+      if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs && activeTabRef.current >= 0 && activeTabRef.current < messagesData.tabs.length) {
+        const currentTab = messagesData.tabs[activeTabRef.current]
         const chat = currentTab.chats.find(c => c.user.id === selectedUserId)
         if (chat) {
-          // Обновляем чат только если он найден в текущей вкладке
           updatedChat = chat
-          setSelectedChat(chat)
+          // Merge: don't overwrite selectedChat if it already has more messages
+          setSelectedChat(prev => {
+            if (!prev) return chat
+            const prevLen = prev.messages?.length || 0
+            const nextLen = chat.messages?.length || 0
+            return nextLen >= prevLen ? chat : prev
+          })
         } else {
-          // Если чат не найден в текущей вкладке, сбрасываем selectedChat
-          // Это предотвращает отображение чата из другой вкладки
-          setSelectedChat(null)
+          // If chat not found in current tab, avoid immediate nulling unless absent globally
+          // Check globally for the chat in other tabs
+          const foundElsewhere = messagesData.tabs.some(t => t.chats.some(c => c.user.id === selectedUserId))
+          if (!foundElsewhere) setSelectedChat(null)
         }
       } else if (messagesData && Array.isArray(messagesData) && selectedChat.user) {
         // For moderator
         const chat = messagesData.find(c => c.user.id === selectedUserId)
         if (chat) {
           updatedChat = chat
-          setSelectedChat(chat)
+          setSelectedChat(prev => {
+            if (!prev) return chat
+            const prevLen = prev.messages?.length || 0
+            const nextLen = chat.messages?.length || 0
+            return nextLen >= prevLen ? chat : prev
+          })
         }
       }
 
       // Если чат открыт и есть непрочитанные сообщения, автоматически помечаем их как прочитанные
-      // Используем ключ для отслеживания, чтобы не помечать повторно
       if (updatedChat && updatedChat.unread_count > 0) {
-        const chatKey = `${updatedChat.user.id}-${selectedAdminTab || user?.id}`
-        
+        const chatKey = `${updatedChat.user.id}-${selectedAdminTabRef.current || user?.id}`
+
         // Проверяем, были ли уже непрочитанные сообщения в предыдущих данных
         const previousChat = previousMessagesDataRef.current
           ? (user?.roles?.some(r => r.name === 'admin') && previousMessagesDataRef.current?.tabs
-              ? previousMessagesDataRef.current.tabs[activeTab]?.chats?.find(c => c.user.id === selectedUserId)
+              ? previousMessagesDataRef.current.tabs[activeTabRef.current]?.chats?.find(c => c.user.id === selectedUserId)
               : Array.isArray(previousMessagesDataRef.current)
                 ? previousMessagesDataRef.current.find(c => c.user.id === selectedUserId)
                 : null)
