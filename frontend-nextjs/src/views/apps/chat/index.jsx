@@ -205,39 +205,50 @@ const ChatWrapper = () => {
 
   // Update selectedChat when messagesData changes and automatically mark messages as read if chat is open
   useEffect(() => {
-    if (selectedChat && selectedChat.user && messagesData) {
-      const selectedUserId = selectedChat.user.id
+    const sc = selectedChatRef.current
+    if (sc?.user && messagesData) {
+      const selectedUserId = sc.user.id
       let updatedChat = null
 
       // For admin - ищем чат только в текущей вкладке
-      if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs && activeTabRef.current >= 0 && activeTabRef.current < messagesData.tabs.length) {
-        const currentTab = messagesData.tabs[activeTabRef.current]
+      if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs && activeTab >= 0 && activeTab < messagesData.tabs.length) {
+          const currentTab = messagesData.tabs[activeTab]
         const chat = currentTab.chats.find(c => c.user.id === selectedUserId)
         if (chat) {
           updatedChat = chat
-          // Merge: don't overwrite selectedChat if it already has more messages
-          setSelectedChat(prev => {
-            if (!prev) return chat
-            const prevLen = prev.messages?.length || 0
-            const nextLen = chat.messages?.length || 0
-            return nextLen >= prevLen ? chat : prev
-          })
+            // Merge safely by message id to avoid losing WS-appended messages
+            const mergeMessagesById = (a = [], b = []) => {
+              const map = new Map()
+              for (const m of a || []) map.set(m.id, m)
+              for (const m of b || []) map.set(m.id, m)
+              return Array.from(map.values()).sort((x, y) => new Date(x.created_at) - new Date(y.created_at))
+            }
+
+            setSelectedChat(prev => {
+              if (!prev) return chat
+              return { ...chat, messages: mergeMessagesById(prev.messages || [], chat.messages || []) }
+            })
         } else {
           // If chat not found in current tab, avoid immediate nulling unless absent globally
           // Check globally for the chat in other tabs
           const foundElsewhere = messagesData.tabs.some(t => t.chats.some(c => c.user.id === selectedUserId))
           if (!foundElsewhere) setSelectedChat(null)
         }
-      } else if (messagesData && Array.isArray(messagesData) && selectedChat.user) {
+      } else if (messagesData && Array.isArray(messagesData) && sc.user) {
         // For moderator
         const chat = messagesData.find(c => c.user.id === selectedUserId)
         if (chat) {
           updatedChat = chat
+          const mergeMessagesById = (a = [], b = []) => {
+            const map = new Map()
+            for (const m of a || []) map.set(m.id, m)
+            for (const m of b || []) map.set(m.id, m)
+            return Array.from(map.values()).sort((x, y) => new Date(x.created_at) - new Date(y.created_at))
+          }
+
           setSelectedChat(prev => {
             if (!prev) return chat
-            const prevLen = prev.messages?.length || 0
-            const nextLen = chat.messages?.length || 0
-            return nextLen >= prevLen ? chat : prev
+            return { ...chat, messages: mergeMessagesById(prev.messages || [], chat.messages || []) }
           })
         }
       }
@@ -315,7 +326,7 @@ const ChatWrapper = () => {
         markedAsReadRef.current.delete(chatKey)
       }
     }
-  }, [messagesData, activeTab, selectedChat?.user?.id, selectedAdminTab])
+  }, [messagesData, activeTab])
 
 
   // Check URL parameters for task_id
