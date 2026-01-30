@@ -81,7 +81,7 @@ services:
       PUSHER_PORT: "443"
       PUSHER_SCHEME: "https"
       PUSHER_APP_CLUSTER: mt1
-      WEBSOCKET_HOST: "0.0.0.0"
+      WEBSOCKET_HOST: "127.0.0.1"
       WEBSOCKET_PORT: "6001"
       WEBSOCKET_SCHEME: "http"
 
@@ -107,11 +107,11 @@ services:
       - prod_network
 
   frontend:
-    build:
+      build:
       context: ./frontend-nextjs
       dockerfile: Dockerfile.prod
       args:
-        - NEXT_PUBLIC_API_URL=https://pickleflavor.info/api
+        - NEXT_PUBLIC_API_URL=https://pickleflavor.info
         - NEXT_PUBLIC_WEBSOCKET_URL=wss://pickleflavor.info
         - NEXT_PUBLIC_PUSHER_APP_KEY=local
         - NEXT_PUBLIC_PUSHER_APP_CLUSTER=mt1
@@ -120,7 +120,7 @@ services:
     working_dir: /app
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=https://pickleflavor.info/api
+      - NEXT_PUBLIC_API_URL=https://pickleflavor.info
       - NEXT_PUBLIC_WEBSOCKET_URL=wss://pickleflavor.info
       - NEXT_PUBLIC_PUSHER_APP_KEY=local
       - NEXT_PUBLIC_PUSHER_APP_CLUSTER=mt1
