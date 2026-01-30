@@ -164,6 +164,10 @@ sleep 3
 echo "Starting Laravel WebSockets server on 0.0.0.0:6001..."
 php artisan websockets:serve --host=0.0.0.0 --port=6001 &
 
+# Start queue worker in background to process ShouldBroadcast events
+echo "Starting Laravel queue worker..."
+php artisan queue:work --sleep=3 --tries=3 &
+
 # Проверяем что HTTP сервер запущен
 sleep 2
 echo "Checking HTTP server status..."
