@@ -159,7 +159,9 @@ const ChatWrapper = () => {
           // Обновляем выбранный чат локально
           setSelectedChat(prev => {
             if (!prev) return prev
+            const beforeLen = (prev.messages || []).length
             const updatedMessages = [...(prev.messages || []), incomingMessage]
+            console.debug('[WS] Appending message to selectedChat', { id: incomingMessage.id, beforeLen, afterLen: updatedMessages.length })
             return { ...prev, messages: updatedMessages }
           })
 
@@ -169,14 +171,17 @@ const ChatWrapper = () => {
             if (user?.roles?.some(r => r.name === 'admin') && prevData?.tabs) {
               const updatedTabs = prevData.tabs.map((tab, tabIndex) => {
                 if (tabIndex === activeTab) {
-                  const updatedChats = tab.chats.map(chat => {
-                    if (chat.user.id === selectedChat.user.id) {
-                      return { ...chat, messages: [...(chat.messages || []), incomingMessage] }
-                    }
-                    return chat
-                  })
-                  return { ...tab, chats: updatedChats }
-                }
+                    const updatedChats = tab.chats.map(chat => {
+                      if (chat.user.id === selectedChat.user.id) {
+                        const beforeLen = (chat.messages || []).length
+                        const updated = { ...chat, messages: [...(chat.messages || []), incomingMessage] }
+                        console.debug('[WS] Appending message to messagesData.tabs', { chatUserId: chat.user.id, id: incomingMessage.id, beforeLen, afterLen: updated.messages.length })
+                        return updated
+                      }
+                      return chat
+                    })
+                    return { ...tab, chats: updatedChats }
+                  }
                 return tab
               })
               return { ...prevData, tabs: updatedTabs }
