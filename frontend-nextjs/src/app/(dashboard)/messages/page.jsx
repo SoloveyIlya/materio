@@ -42,6 +42,7 @@ export default function MessagesPage() {
   const [editingMessage, setEditingMessage] = useState(null)
   const [editText, setEditText] = useState('')
   const previousMessagesDataRef = useRef(null)
+  const messagesDataRef = useRef(null)
   const isMarkingAsReadRef = useRef(false)
 
   useEffect(() => {
@@ -54,6 +55,11 @@ export default function MessagesPage() {
     }
   }, [activeTab, user])
 
+  // Keep a ref to the latest messagesData so WS callbacks can read current state
+  useEffect(() => {
+    messagesDataRef.current = messagesData
+  }, [messagesData])
+
   // Автоматическое обновление сообщений через WebSocket
   useEffect(() => {
     if (!user) return
@@ -64,7 +70,15 @@ export default function MessagesPage() {
     // Подписываемся на новые сообщения
     const unsubscribe = subscribeToMessages(user.domain_id, user.id, (data) => {
       console.log('New message received via WebSocket:', data)
-      
+
+      // Если данные ещё не загружены — подгружаем их целиком
+      if (!messagesDataRef.current) {
+        console.debug('[WS] messagesData пустой — вызываю loadMessages(true) для синхронизации')
+        // Запрашиваем свежие данные (silent) и выходим — loadMessages обновит состояние
+        void loadMessages(true)
+        return
+      }
+
       // Оптимизированное добавление сообщения напрямую в состояние
       setMessagesData(prevData => {
         if (!prevData) return prevData
