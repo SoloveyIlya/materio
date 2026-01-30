@@ -68,8 +68,15 @@ export default function MessagesPage() {
       // Оптимизированное добавление сообщения напрямую в состояние
       setMessagesData(prevData => {
         if (!prevData) return prevData
-        
-        const newMessage = data
+
+        // Нормализуем полезную нагрузку от WebSocket: некоторые бэкенды отправляют `content`,
+        // фронтенд ожидает `body` в структурах сообщений.
+        const newMessage = {
+          ...data,
+          body: data.content ?? data.body ?? null,
+          created_at: data.created_at ?? data.createdAt ?? new Date().toISOString(),
+          created_at_formatted: data.created_at_formatted ?? data.createdAtFormatted ?? data.created_at ?? new Date().toISOString(),
+        }
         
         // Для админов - обновляем tabs структуру
         if (user?.roles?.some(r => r.name === 'admin') && prevData.tabs) {
@@ -116,17 +123,17 @@ export default function MessagesPage() {
             // Находим чат с собеседником
             const chatUserId = chat.user.id
             const otherUserId = newMessage.from_user_id === user.id ? newMessage.to_user_id : newMessage.from_user_id
-            
+
             if (chatUserId !== otherUserId) return chat
-            
+
             // Проверяем, что сообщение еще не добавлено
             const messageExists = chat.messages.some(m => m.id === newMessage.id)
             if (messageExists) return chat
-            
+
             // Увеличиваем unread_count только если сообщение не от текущего пользователя
             const isFromCurrentUser = newMessage.from_user_id === user.id
             const newUnreadCount = isFromCurrentUser ? chat.unread_count : (chat.unread_count || 0) + 1
-            
+
             return {
               ...chat,
               messages: [...chat.messages, newMessage],
