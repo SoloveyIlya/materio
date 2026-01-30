@@ -132,8 +132,15 @@ const ChatWrapper = () => {
           optimisticallyUpdateChatCount(1)
         }
         
-        // Если текущий чат открыт, перезагружаем сообщения для отображения новых
-        if (selectedChat?.user.id === data.from_user_id) {
+        // Если текущий чат открыт и сообщение относится к этому чату, пытаемся обновить UI сразу
+        const selectedChatUserId = selectedChat?.user?.id
+        const messageFrom = data.from_user_id
+        const messageTo = data.to_user_id
+
+        // Debug helper
+        console.debug('[WS] Incoming message for chat check:', { selectedChatUserId, messageFrom, messageTo })
+
+        if (selectedChatUserId && (selectedChatUserId === messageFrom || selectedChatUserId === messageTo)) {
           // Попробуем сразу добавить сообщение в UI без полного перезагрузки
           const incomingMessage = {
             id: data.id || `ws-${Date.now()}`,
