@@ -51,7 +51,7 @@ class MessageSent implements ShouldBroadcast
             'id' => $this->message->id,
             'from_user_id' => $this->message->from_user_id,
             'to_user_id' => $this->message->to_user_id,
-            'content' => $this->message->content,
+            'content' => $this->message->body,
             'type' => $this->message->type,
             'is_read' => $this->message->is_read,
             'created_at' => $this->message->created_at,
