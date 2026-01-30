@@ -115,6 +115,58 @@ const ChatWrapper = () => {
     return prev
   }
 
+  // --- Helpers: merge messages and keep newest messages without data loss ---
+  // merge messages by id (stable, no data loss)
+  const mergeMessagesById = (a = [], b = []) => {
+    const map = new Map()
+
+    for (const m of a) {
+      if (m?.id != null) map.set(m.id, m)
+    }
+    for (const m of b) {
+      if (m?.id != null) map.set(m.id, m)
+    }
+
+    // If some messages have temp ids without numeric ids, keep them too
+    // by adding those that are missing from the map
+    const pushIfMissing = (arr) => {
+      for (const m of arr) {
+        if (!m) continue
+        if (m.id == null) continue
+        if (!map.has(m.id)) map.set(m.id, m)
+      }
+    }
+    pushIfMissing(a)
+    pushIfMissing(b)
+
+    const merged = Array.from(map.values())
+
+    // sort by created_at (fallback to created_at_formatted)
+    merged.sort((x, y) => {
+      const dx = new Date(x.created_at || x.created_at_formatted || 0).getTime()
+      const dy = new Date(y.created_at || y.created_at_formatted || 0).getTime()
+      return dx - dy
+    })
+
+    return merged
+  }
+
+  const mergeChatKeepingNewestMessages = (prevSelectedChat, nextChatFromMessagesData) => {
+    if (!prevSelectedChat) return nextChatFromMessagesData
+    if (!nextChatFromMessagesData) return prevSelectedChat
+
+    const prevMsgs = prevSelectedChat.messages || []
+    const nextMsgs = nextChatFromMessagesData.messages || []
+
+    const mergedMessages = mergeMessagesById(prevMsgs, nextMsgs)
+
+    // keep nextChat object as base (fresh unread_count etc), but never lose messages
+    return {
+      ...nextChatFromMessagesData,
+      messages: mergedMessages,
+    }
+  }
+
   // Auto-refresh messages with WebSocket — subscribe only on `user` to avoid stale closures
   useEffect(() => {
     if (!user) return
@@ -206,127 +258,146 @@ const ChatWrapper = () => {
   // Update selectedChat when messagesData changes and automatically mark messages as read if chat is open
   useEffect(() => {
     const sc = selectedChatRef.current
-    if (sc?.user && messagesData) {
-      const selectedUserId = sc.user.id
-      let updatedChat = null
+    if (!sc?.user || !messagesData || !user) return
 
-      // For admin - ищем чат только в текущей вкладке
-      if (user?.roles?.some(r => r.name === 'admin') && messagesData?.tabs && activeTab >= 0 && activeTab < messagesData.tabs.length) {
-          const currentTab = messagesData.tabs[activeTab]
-        const chat = currentTab.chats.find(c => c.user.id === selectedUserId)
-        if (chat) {
-          updatedChat = chat
-            // Merge safely by message id to avoid losing WS-appended messages
-            const mergeMessagesById = (a = [], b = []) => {
-              const map = new Map()
-              for (const m of a || []) map.set(m.id, m)
-              for (const m of b || []) map.set(m.id, m)
-              return Array.from(map.values()).sort((x, y) => new Date(x.created_at) - new Date(y.created_at))
-            }
+    const selectedUserId = sc.user.id
+    let updatedChat = null
 
-            setSelectedChat(prev => {
-              if (!prev) return chat
-              return { ...chat, messages: mergeMessagesById(prev.messages || [], chat.messages || []) }
-            })
-        } else {
-          // If chat not found in current tab, avoid immediate nulling unless absent globally
-          // Check globally for the chat in other tabs
-          const foundElsewhere = messagesData.tabs.some(t => t.chats.some(c => c.user.id === selectedUserId))
-          if (!foundElsewhere) setSelectedChat(null)
-        }
-      } else if (messagesData && Array.isArray(messagesData) && sc.user) {
-        // For moderator
-        const chat = messagesData.find(c => c.user.id === selectedUserId)
-        if (chat) {
-          updatedChat = chat
-          const mergeMessagesById = (a = [], b = []) => {
-            const map = new Map()
-            for (const m of a || []) map.set(m.id, m)
-            for (const m of b || []) map.set(m.id, m)
-            return Array.from(map.values()).sort((x, y) => new Date(x.created_at) - new Date(y.created_at))
+    const isAdmin = user?.roles?.some(r => r.name === 'admin')
+    const isModerator = user?.roles?.some(r => r.name === 'moderator')
+
+    // --- 1) Find chat in messagesData ---
+    if (isAdmin && messagesData?.tabs && Array.isArray(messagesData.tabs)) {
+      // Prefer current tab
+      const inCurrentTab =
+        activeTab >= 0 &&
+        activeTab < messagesData.tabs.length &&
+        messagesData.tabs[activeTab]?.chats?.find(c => c.user?.id === selectedUserId)
+
+      if (inCurrentTab) {
+        updatedChat = inCurrentTab
+      } else {
+        // Fallback: search globally across tabs to avoid accidental nulling
+        for (const tab of messagesData.tabs) {
+          const found = tab?.chats?.find(c => c.user?.id === selectedUserId)
+          if (found) {
+            updatedChat = found
+            break
           }
-
-          setSelectedChat(prev => {
-            if (!prev) return chat
-            return { ...chat, messages: mergeMessagesById(prev.messages || [], chat.messages || []) }
-          })
         }
       }
 
-      // Если чат открыт и есть непрочитанные сообщения, автоматически помечаем их как прочитанные
-      if (updatedChat && updatedChat.unread_count > 0) {
-        const chatKey = `${updatedChat.user.id}-${selectedAdminTabRef.current || user?.id}`
-
-        // Проверяем, были ли уже непрочитанные сообщения в предыдущих данных
-        const previousChat = previousMessagesDataRef.current
-          ? (user?.roles?.some(r => r.name === 'admin') && previousMessagesDataRef.current?.tabs
-              ? previousMessagesDataRef.current.tabs[activeTabRef.current]?.chats?.find(c => c.user.id === selectedUserId)
-              : Array.isArray(previousMessagesDataRef.current)
-                ? previousMessagesDataRef.current.find(c => c.user.id === selectedUserId)
-                : null)
-          : null
-        
-        const previousUnreadCount = previousChat?.unread_count || 0
-        const currentUnreadCount = updatedChat.unread_count || 0
-        
-        // Помечаем как прочитанные только если:
-        // 1. Есть непрочитанные сообщения
-        // 2. Это новый набор непрочитанных (количество увеличилось или чат только что открыт)
-        // 3. Мы еще не помечали этот чат как прочитанный для текущего набора сообщений
-        if (currentUnreadCount > 0 && (currentUnreadCount !== previousUnreadCount || !markedAsReadRef.current.has(chatKey))) {
-          const markChatAsRead = async () => {
-            try {
-              let fromUserId = updatedChat.user.id
-              let toUserId = null
-
-              if (user?.roles?.some(r => r.name === 'admin')) {
-                fromUserId = updatedChat.user.id // От модератора
-                toUserId = selectedAdminTab || user.id // К админу
-              } else if (user?.roles?.some(r => r.name === 'moderator')) {
-                fromUserId = updatedChat.user.id // От админа
-                toUserId = user.id // К модератору
-              }
-
-              const requestData = {
-                from_user_id: fromUserId,
-                type: 'message'
-              }
-
-              if (user?.roles?.some(r => r.name === 'admin') && toUserId && toUserId !== user.id) {
-                requestData.to_user_id = toUserId
-              }
-
-              await api.post('/messages/mark-chat-read', requestData)
-              
-              // Отмечаем, что мы пометили этот чат как прочитанный
-              markedAsReadRef.current.add(chatKey)
-              
-              // Оптимистично уменьшаем счетчик в меню сразу (для мгновенного обновления UI)
-              const unreadCount = updatedChat.unread_count || 0
-              if (unreadCount > 0) {
-                optimisticallyUpdateChatCount(-unreadCount)
-              }
-              
-              // Небольшая задержка перед обновлением сообщений, чтобы избежать лишних вызовов
-              setTimeout(() => {
-                loadMessages(true) // silent = true для быстрого обновления
-              }, 1000)
-            } catch (error) {
-              console.error('Error auto-marking chat as read:', error)
-            }
-          }
-          
-          // Помечаем сообщения как прочитанные с небольшой задержкой
-          const timeoutId = setTimeout(markChatAsRead, 500)
-          return () => clearTimeout(timeoutId)
-        }
-      } else if (updatedChat && updatedChat.unread_count === 0) {
-        // Если все сообщения прочитаны, очищаем отметку для этого чата
-        const chatKey = `${updatedChat.user.id}-${selectedAdminTab || user?.id}`
-        markedAsReadRef.current.delete(chatKey)
+      if (!updatedChat) {
+        // If truly absent everywhere, close chat
+        setSelectedChat(null)
+        return
       }
+
+      // Merge safely (by message ids)
+      setSelectedChat(prev => mergeChatKeepingNewestMessages(prev, updatedChat))
     }
-  }, [messagesData, activeTab])
+
+    if (isModerator && Array.isArray(messagesData)) {
+      updatedChat = messagesData.find(c => c.user?.id === selectedUserId)
+
+      if (!updatedChat) {
+        setSelectedChat(null)
+        return
+      }
+
+      setSelectedChat(prev => mergeChatKeepingNewestMessages(prev, updatedChat))
+    }
+
+    // If role mismatch or no chat found, stop
+    if (!updatedChat) return
+
+    // --- 2) Auto mark as read (same logic, but avoid stale refs mix) ---
+    if (updatedChat.unread_count > 0) {
+      const adminIdForKey = selectedAdminTabRef.current || user.id
+      const chatKey = `${updatedChat.user.id}-${adminIdForKey}`
+
+      // Find previous chat snapshot to compare unread counts
+      const prevData = previousMessagesDataRef.current
+      let previousChat = null
+
+      if (prevData) {
+        if (isAdmin && prevData?.tabs && Array.isArray(prevData.tabs)) {
+          // try current tab first, then global
+          const prevInCurrent =
+            activeTab >= 0 &&
+            activeTab < prevData.tabs.length &&
+            prevData.tabs[activeTab]?.chats?.find(c => c.user?.id === selectedUserId)
+
+          previousChat = prevInCurrent || null
+
+          if (!previousChat) {
+            for (const tab of prevData.tabs) {
+              const found = tab?.chats?.find(c => c.user?.id === selectedUserId)
+              if (found) { previousChat = found; break }
+            }
+          }
+        } else if (isModerator && Array.isArray(prevData)) {
+          previousChat = prevData.find(c => c.user?.id === selectedUserId) || null
+        }
+      }
+
+      const previousUnreadCount = previousChat?.unread_count || 0
+      const currentUnreadCount = updatedChat.unread_count || 0
+
+      if (
+        currentUnreadCount > 0 &&
+        (currentUnreadCount !== previousUnreadCount || !markedAsReadRef.current.has(chatKey))
+      ) {
+        const markChatAsRead = async () => {
+          try {
+            let fromUserId = updatedChat.user.id
+            let toUserId = null
+
+            if (isAdmin) {
+              fromUserId = updatedChat.user.id
+              toUserId = selectedAdminTabRef.current || user.id
+            } else if (isModerator) {
+              fromUserId = updatedChat.user.id
+              toUserId = user.id
+            }
+
+            const requestData = {
+              from_user_id: fromUserId,
+              type: 'message'
+            }
+
+            // only for admin with specific tab target
+            if (isAdmin && toUserId && toUserId !== user.id) {
+              requestData.to_user_id = toUserId
+            }
+
+            await api.post('/messages/mark-chat-read', requestData)
+
+            markedAsReadRef.current.add(chatKey)
+
+            const unreadCount = updatedChat.unread_count || 0
+            if (unreadCount > 0) {
+              optimisticallyUpdateChatCount(-unreadCount)
+            }
+
+            setTimeout(() => {
+              loadMessages(true)
+            }, 1000)
+          } catch (error) {
+            console.error('Error auto-marking chat as read:', error)
+          }
+        }
+
+        const timeoutId = setTimeout(markChatAsRead, 500)
+        return () => clearTimeout(timeoutId)
+      }
+    } else {
+      // Clear mark for this chatKey when unread is 0
+      const adminIdForKey = selectedAdminTabRef.current || user.id
+      const chatKey = `${updatedChat.user.id}-${adminIdForKey}`
+      markedAsReadRef.current.delete(chatKey)
+    }
+  }, [messagesData, activeTab, user?.id])
 
 
   // Check URL parameters for task_id
