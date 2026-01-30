@@ -134,7 +134,58 @@ const ChatWrapper = () => {
         
         // Если текущий чат открыт, перезагружаем сообщения для отображения новых
         if (selectedChat?.user.id === data.from_user_id) {
-          loadMessages(true) // silent = true
+          // Попробуем сразу добавить сообщение в UI без полного перезагрузки
+          const incomingMessage = {
+            id: data.id || `ws-${Date.now()}`,
+            from_user_id: data.from_user_id,
+            to_user_id: data.to_user_id,
+            body: data.content ?? data.body ?? null,
+            attachments: data.attachments || null,
+            task_id: data.task_id || null,
+            is_read: data.is_read || false,
+            created_at: data.created_at || new Date().toISOString(),
+            created_at_formatted: data.created_at_formatted || data.created_at || new Date().toISOString(),
+            from_user: data.from_user || null,
+            to_user: data.to_user || null,
+          }
+
+          // Обновляем выбранный чат локально
+          setSelectedChat(prev => {
+            if (!prev) return prev
+            const updatedMessages = [...(prev.messages || []), incomingMessage]
+            return { ...prev, messages: updatedMessages }
+          })
+
+          // Обновляем общие данные сообщений (список чатов)
+          setMessagesData(prevData => {
+            if (!prevData) return prevData
+            if (user?.roles?.some(r => r.name === 'admin') && prevData?.tabs) {
+              const updatedTabs = prevData.tabs.map((tab, tabIndex) => {
+                if (tabIndex === activeTab) {
+                  const updatedChats = tab.chats.map(chat => {
+                    if (chat.user.id === selectedChat.user.id) {
+                      return { ...chat, messages: [...(chat.messages || []), incomingMessage] }
+                    }
+                    return chat
+                  })
+                  return { ...tab, chats: updatedChats }
+                }
+                return tab
+              })
+              return { ...prevData, tabs: updatedTabs }
+            } else if (Array.isArray(prevData)) {
+              return prevData.map(chat => {
+                if (chat.user.id === selectedChat.user.id) {
+                  return { ...chat, messages: [...(chat.messages || []), incomingMessage] }
+                }
+                return chat
+              })
+            }
+            return prevData
+          })
+
+          // Также запускаем фоновую перезагрузку на случай расхождений
+          loadMessages(true)
         }
       })
 
