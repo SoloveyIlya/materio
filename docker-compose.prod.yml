@@ -107,7 +107,7 @@ services:
       - prod_network
 
   frontend:
-      build:
+    build:
       context: ./frontend-nextjs
       dockerfile: Dockerfile.prod
       args:
