@@ -6,6 +6,7 @@ import Grid from '@mui/material/Grid'
 
 // Component Imports
 import HorizontalWithSubtitle from '@/components/card-statistics/HorizontalWithSubtitle'
+import { useWebSocketContext } from '@/contexts/WebSocketContext'
 import api from '@/lib/api'
 
 const UserListCards = ({ activeTab }) => {
@@ -16,22 +17,38 @@ const UserListCards = ({ activeTab }) => {
     moderators: 0,
     admins: 0
   })
+  const [users, setUsers] = useState([])
+  
+  // Hooks
+  const { isUserOnline, onlineUsersVersion } = useWebSocketContext()
 
   useEffect(() => {
     loadStats()
   }, [activeTab])
+  
+  // Обновляем статистику онлайн-пользователей при изменении статусов
+  useEffect(() => {
+    if (users.length > 0) {
+      const onlineCount = users.filter(u => isUserOnline(u.id)).length
+      setStats(prev => ({
+        ...prev,
+        online: onlineCount
+      }))
+    }
+  }, [onlineUsersVersion, users, isUserOnline])
 
   const loadStats = async () => {
     try {
       const endpoint = activeTab === 0 ? '/admin/moderators' : '/admin/users' // Swapped: 0 is now Moderators
       const response = await api.get(endpoint)
-      const users = response.data || []
+      const loadedUsers = response.data || []
       
+      setUsers(loadedUsers)
       setStats({
-        total: users.length,
-        online: users.filter(u => u.is_online).length,
-        moderators: users.filter(u => u.roles?.some(r => r.name === 'moderator')).length,
-        admins: users.filter(u => u.roles?.some(r => r.name === 'admin')).length
+        total: loadedUsers.length,
+        online: loadedUsers.filter(u => isUserOnline(u.id)).length,
+        moderators: loadedUsers.filter(u => u.roles?.some(r => r.name === 'moderator')).length,
+        admins: loadedUsers.filter(u => u.roles?.some(r => r.name === 'admin')).length
       })
     } catch (error) {
       console.error('Error loading stats:', error)

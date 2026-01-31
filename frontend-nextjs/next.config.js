@@ -6,7 +6,8 @@ const nextConfig = {
   basePath: process.env.BASEPATH,
   output: 'standalone', // Enable standalone output for Docker
   env: {
-    NEXT_PUBLIC_API_URL: 'https://pickleflavor.info',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+    NEXT_PUBLIC_WEBSOCKET_URL: process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'http://localhost:6001',
   },
   // Отключаем ESLint во время сборки в production (предупреждения не должны блокировать сборку)
   eslint: {
@@ -49,4 +50,3 @@ const nextConfig = {
 }
 
 module.exports = nextConfig
-

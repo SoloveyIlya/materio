@@ -42,11 +42,11 @@ import {
 // Component Imports
 import TableFilters from './TableFilters'
 import CustomAvatar from '@core/components/mui/Avatar'
+import { useWebSocketContext } from '@/contexts/WebSocketContext'
 
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
 import api from '@/lib/api'
-import { subscribeToUserStatus } from '@/lib/websocket'
 import { useAuthStore } from '@/store/authStore'
 
 // Style Imports
@@ -120,30 +120,15 @@ const UserListTable = ({ tableData, activeTab, onSendTasks, administrators, sele
   // Hooks
   const router = useRouter()
   const { user: currentUser } = useAuthStore()
+  const { isUserOnline, onlineUsersVersion } = useWebSocketContext()
 
   useEffect(() => {
     setData(tableData || [])
     setFilteredData(tableData || [])
   }, [tableData])
 
-  // Subscribe to real-time user status changes
-  useEffect(() => {
-    if (currentUser?.domain_id) {
-      const unsubscribe = subscribeToUserStatus(currentUser.domain_id, (statusData) => {
-        console.log('User status changed:', statusData)
-        // Update the user's online status in the table
-        setData(prevData => 
-          prevData.map(user => 
-            user.id === statusData.user_id 
-              ? { ...user, is_online: statusData.is_online, last_seen_at: statusData.last_seen_at }
-              : user
-          )
-        )
-      })
-
-      return () => unsubscribe()
-    }
-  }, [currentUser?.domain_id])
+  // Убрали синхронизацию через state - используем isUserOnline() напрямую в рендере
+  // Это предотвращает race conditions и лишние ре-рендеры
 
   const getAvatar = params => {
     const { avatar, name, email } = params
@@ -214,7 +199,9 @@ const UserListTable = ({ tableData, activeTab, onSendTasks, administrators, sele
         columnHelper.accessor('is_online', {
           header: 'Status',
           cell: ({ row }) => {
-            const isOnline = row.original.is_online
+            // Используем isUserOnline из глобального контекста напрямую
+            // onlineUsersVersion включен в зависимости useMemo столбцов для ре-рендера
+            const isOnline = isUserOnline(row.original.id)
             return (
               <Chip
                 variant='tonal'
@@ -330,7 +317,7 @@ const UserListTable = ({ tableData, activeTab, onSendTasks, administrators, sele
       return baseColumns
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, filteredData, activeTab, router, onSendTasks, onAssignAdministrator]
+    [data, filteredData, activeTab, router, onSendTasks, onAssignAdministrator, onlineUsersVersion, isUserOnline]
   )
 
   const table = useReactTable({

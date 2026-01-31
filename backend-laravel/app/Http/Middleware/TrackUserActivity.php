@@ -20,6 +20,11 @@ class TrackUserActivity
     {
         $response = $next($request);
 
+        // Пропускаем mark-offline endpoints чтобы не устанавливать is_online=true перед явным mark-offline
+        if ($request->is('api/user/mark-offline*')) {
+            return $response;
+        }
+
         // Обновляем информацию о пользователе при каждом запросе
         if ($request->user()) {
             $user = $request->user();
@@ -30,9 +35,9 @@ class TrackUserActivity
             $previousIp = $user->ip_address;
             
             // Проверяем, не истек ли таймаут для других пользователей (чтобы обновить их статус)
-            // Таймаут: 5 минут без активности
-            $offlineTimeoutMinutes = config('app.user_offline_timeout_minutes', 5);
-            $offlineThreshold = now()->subMinutes($offlineTimeoutMinutes);
+            // Таймаут: 30 секунд без активности (для более быстрой реакции на disconnect)
+            $offlineTimeoutSeconds = config('app.user_offline_timeout_seconds', 30);
+            $offlineThreshold = now()->subSeconds($offlineTimeoutSeconds);
             
             // Обновляем статус пользователей, которые не были активны в течение таймаута
             $usersToOffline = \App\Models\User::where('is_online', true)
@@ -51,7 +56,11 @@ class TrackUserActivity
             $user->ip_address = $currentIp;
             $user->user_agent = $request->userAgent();
             $user->last_seen_at = now();
-            $user->is_online = true;
+            
+            // Устанавливаем is_online только если он изменился (чтобы не было ложных broadcast)
+            if (!$user->is_online) {
+                $user->is_online = true;
+            }
 
             // Определяем platform из user agent
             $userAgent = $request->userAgent();

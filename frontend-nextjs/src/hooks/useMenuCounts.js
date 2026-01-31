@@ -7,25 +7,36 @@ import { subscribeToTaskAssignments } from '@/lib/websocket'
 
 export const useMenuCounts = () => {
   const { user } = useAuthStore()
-  const { counts, loading, fetchCounts, updateChatCount } = useMenuCountsStore()
+  // Используем селектор для правильной подписки на изменения
+  const counts = useMenuCountsStore(state => state.counts)
+  const loading = useMenuCountsStore(state => state.loading)
+  const updateChatCount = useMenuCountsStore(state => state.updateChatCount)
+  const userId = user?.id // Используем только ID чтобы избежать лишних ре-рендеров
 
   useEffect(() => {
     // Загружаем счетчики при монтировании компонента
-    fetchCounts()
+    console.log('[useMenuCounts] Начальная загрузка счетчиков, user:', userId)
+    if (user) {
+      // Получаем fetchCounts напрямую из store, чтобы не создавать зависимость
+      useMenuCountsStore.getState().fetchCounts(true, user)
+    }
 
-    // Отслеживаем видимость вкладки (Visibility API)
+    // Проверяем при возврате на вкладку (на случай пропущенных WebSocket событий)
     const handleVisibilityChange = () => {
-      const isVisible = document.visibilityState === 'visible'
-      // Если вкладка стала видна, обновляем счетчики
-      if (isVisible) {
-        fetchCounts(true) // force = true
+      if (document.visibilityState === 'visible' && user) {
+        const lastFetch = useMenuCountsStore.getState().lastFetchTime
+        const timeSinceLastFetch = Date.now() - lastFetch
+        // Обновляем только если прошло больше 60 секунд с последнего запроса
+        if (timeSinceLastFetch > 60000) {
+          console.log('[useMenuCounts] Вкладка активна, синхронизация (прошло >60 сек)')
+          useMenuCountsStore.getState().fetchCounts(true, user)
+        }
       }
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [user])
+  }, [userId, user]) // Убрали fetchCounts из зависимостей
 
   // Subscribe to real-time task assignment events for moderators
   useEffect(() => {
@@ -42,18 +53,20 @@ export const useMenuCounts = () => {
           }))
         } else {
           // Fallback: refresh all counts if pending_count is not provided
-          fetchCounts(true)
+          useMenuCountsStore.getState().fetchCounts(true, user)
         }
       })
 
       return () => unsubscribe()
     }
-  }, [user])
+  }, [userId]) // Используем userId вместо user
 
   return { 
     counts, 
     loading, 
-    refreshCounts: () => fetchCounts(true), 
-    optimisticallyUpdateChatCount: updateChatCount 
+    refreshCounts: () => useMenuCountsStore.getState().fetchCounts(true, user), 
+    optimisticallyUpdateChatCount: updateChatCount,
+    resetChatCount: useMenuCountsStore.getState().resetChatCount,
+    resetSupportCount: useMenuCountsStore.getState().resetSupportCount
   }
 }

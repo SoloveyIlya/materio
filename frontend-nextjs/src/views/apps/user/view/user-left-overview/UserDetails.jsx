@@ -21,6 +21,7 @@ import TextField from '@mui/material/TextField'
 
 // Component Imports
 import CustomAvatar from '@core/components/mui/Avatar'
+import { useWebSocketContext } from '@/contexts/WebSocketContext'
 
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
@@ -98,6 +99,10 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
   const [currentUser, setCurrentUser] = useState(null)
   const [workStartDialogOpen, setWorkStartDialogOpen] = useState(false)
   const [workStartDate, setWorkStartDate] = useState('')
+  
+  // Получаем актуальный онлайн-статус из глобального WebSocket контекста
+  const { isUserOnline, onlineUsersVersion } = useWebSocketContext()
+  const isOnline = isUserOnline(user?.id)
   
   useEffect(() => {
     // Получаем текущего авторизованного пользователя
@@ -277,8 +282,8 @@ const UserDetails = ({ user, stats, onUserUpdate }) => {
                 Status:
               </Typography>
               <Chip
-                label={user.is_online ? 'Online' : 'Offline'}
-                color={user.is_online ? 'success' : 'default'}
+                label={isOnline ? 'Online' : 'Offline'}
+                color={isOnline ? 'success' : 'default'}
                 size='small'
                 variant='tonal'
               />
