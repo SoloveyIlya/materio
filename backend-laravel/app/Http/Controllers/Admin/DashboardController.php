@@ -442,11 +442,15 @@ class DashboardController extends Controller
                 // Непрочитанные тикеты в support (тикеты модератора с непрочитанными ответами)
                 $unreadSupportTickets = Ticket::where('domain_id', $user->domain_id)
                     ->where('user_id', $user->id)
-                    ->whereHas('messages', function ($q) use ($user) {
-                        $q->where('from_user_id', '!=', $user->id)
-                          ->where('to_user_id', $user->id)
-                          ->where('is_read', false)
-                          ->where('type', 'support');
+                    ->where('status', '!=', 'closed')
+                    ->where(function ($query) use ($user) {
+                        $query->whereHas('messages', function ($q) use ($user) {
+                            $q->where('from_user_id', '!=', $user->id)
+                              ->where('to_user_id', $user->id)
+                              ->where('is_read', false)
+                              ->where('type', 'support');
+                        })
+                        ->orWhereDoesntHave('messages');
                     })
                     ->count();
                 $counts['support'] = $unreadSupportTickets;

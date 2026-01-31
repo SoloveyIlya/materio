@@ -51,7 +51,7 @@ const ChatWrapper = () => {
   // Hooks
   const { settings } = useSettings()
   const { optimisticallyUpdateChatCount, resetChatCount } = useMenuCounts()
-  const { isUserOnline, onlineUsersVersion, syncOnlineUsersFromData } = useWebSocketContext()
+  const { isUserOnline, onlineUsersVersion } = useWebSocketContext()
   const isBelowLgScreen = useMediaQuery(theme => theme.breakpoints.down('lg'))
   const isBelowMdScreen = useMediaQuery(theme => theme.breakpoints.down('md'))
   const isBelowSmScreen = useMediaQuery(theme => theme.breakpoints.down('sm'))
@@ -86,8 +86,6 @@ const ChatWrapper = () => {
   // Update online status in messagesData when onlineUsers changes from WebSocket
   useEffect(() => {
     if (!messagesData) return
-
-    console.log('[Chat] 🔄 Обновление статусов, version:', onlineUsersVersion)
 
     setMessagesData(prev => {
       if (!prev) return prev
@@ -241,26 +239,15 @@ const ChatWrapper = () => {
     }
   }
 
-  // Auto-refresh messages with WebSocket — subscribe only on `user` to avoid stale closures
-  // Убрана локальная подписка на WebSocket - используем только глобальную подписку из WebSocketContext
-  // Глобальная подписка обновляет счетчики, а чат обновляется через периодический loadMessages
-  // Это предотвращает дублирование обработки событий и проблемы с Hot Reload
-  
-  // Периодическое обновление сообщений для синхронизации с сервером
+  // WebSocket обновляет чаты в реальном времени через subscribeToMessages
+  // Загружаем сообщения только при монтировании компонента
   useEffect(() => {
     if (!user) return
     
-    // Обновляем при монтировании
+    // Обновляем только при монтировании
     loadMessages(true)
     
-    // Периодическое обновление каждые 3 секунды если чат открыт
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        loadMessages(true)
-      }
-    }, 3000)
-    
-    // Обновляем при возврате на вкладку
+    // Обновляем при возврате на вкладку (после длительного отсутствия)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         loadMessages(true)
@@ -270,10 +257,30 @@ const ChatWrapper = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange)
     
     return () => {
-      clearInterval(interval)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [user])
+
+  // Подписка на WebSocket события для обновления чатов при новых сообщениях
+  useEffect(() => {
+    if (!user?.domain_id) return
+
+    // Подписываемся на события новых сообщений через Echo
+    const { getSocket } = require('@/lib/websocket')
+    const echo = getSocket()
+    
+    const channel = echo.private(`domain.${user.domain_id}`)
+    
+    channel.listen('.MessageSent', (data) => {
+      console.log('[Chat] Получено новое сообщение через WS, обновляем чаты')
+      // Обновляем список чатов при новом сообщении
+      loadMessages(true)
+    })
+
+    return () => {
+      channel.stopListening('.MessageSent')
+    }
+  }, [user?.domain_id])
 
   // Update selectedChat when messagesData changes and automatically mark messages as read if chat is open
   useEffect(() => {
@@ -403,9 +410,33 @@ const ChatWrapper = () => {
               optimisticallyUpdateChatCount(-unreadCount)
             }
 
-            setTimeout(() => {
-              loadMessages(true)
-            }, 1000)
+            // Обновляем список чатов локально, чтобы показать что сообщения прочитаны
+            setMessagesData(prev => {
+              if (!prev) return prev
+              
+              if (prev.tabs) {
+                // Для админов
+                return {
+                  ...prev,
+                  tabs: prev.tabs.map(tab => ({
+                    ...tab,
+                    chats: tab.chats.map(chat => 
+                      chat.user.id === updatedChat.user.id 
+                        ? { ...chat, unread_count: 0, messages: chat.messages?.map(m => ({ ...m, is_read: true })) }
+                        : chat
+                    )
+                  }))
+                }
+              } else if (Array.isArray(prev)) {
+                // Для модераторов
+                return prev.map(chat =>
+                  chat.user.id === updatedChat.user.id
+                    ? { ...chat, unread_count: 0, messages: chat.messages?.map(m => ({ ...m, is_read: true })) }
+                    : chat
+                )
+              }
+              return prev
+            })
           } catch (error) {
             console.error('Error auto-marking chat as read:', error)
           }
@@ -480,27 +511,6 @@ const ChatWrapper = () => {
       // Обновляем данные сообщений
       setMessagesData(newData)
       previousMessagesDataRef.current = JSON.parse(JSON.stringify(newData)) // Глубокая копия для сравнения
-      
-      // Синхронизируем онлайн статусы из загруженных данных
-      if (syncOnlineUsersFromData) {
-        const allUsers = []
-        if (newData?.tabs) {
-          // Для админов
-          newData.tabs.forEach(tab => {
-            tab.chats.forEach(chat => {
-              if (chat.user) allUsers.push(chat.user)
-            })
-          })
-        } else if (Array.isArray(newData)) {
-          // Для модераторов
-          newData.forEach(chat => {
-            if (chat.user) allUsers.push(chat.user)
-          })
-        }
-        if (allUsers.length > 0) {
-          syncOnlineUsersFromData(allUsers)
-        }
-      }
       
       // Для админов: устанавливаем вкладку текущего админа по умолчанию ТОЛЬКО при первой загрузке
       // Не меняем вкладку при автоматических обновлениях (silent = true), чтобы не сбрасывать выбранный чат

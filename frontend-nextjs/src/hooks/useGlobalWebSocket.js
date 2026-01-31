@@ -179,28 +179,9 @@ export const useGlobalWebSocket = () => {
     return onlineUsers.has(userId)
   }
 
-  // Функция для синхронизации статусов из API данных
-  const syncOnlineUsersFromData = (users) => {
-    const newOnlineUsers = new Set()
-    users.forEach(user => {
-      // Нормализуем is_online к boolean (может быть 1/0 из БД)
-      const isOnline = Boolean(user.is_online)
-      if (isOnline) {
-        newOnlineUsers.add(user.id)
-      }
-    })
-    
-    if (newOnlineUsers.size > 0) {
-      console.log('[useGlobalWebSocket] 🔄 Синхронизация из API:', Array.from(newOnlineUsers))
-      setOnlineUsers(newOnlineUsers)
-      setOnlineUsersVersion(v => v + 1)
-    }
-  }
-
   return {
     isConnected,
     isUserOnline,
-    syncOnlineUsersFromData,
     onlineUsersSet: onlineUsers,
     onlineUsersVersion, // Используется для отслеживания изменений в useEffect
   }

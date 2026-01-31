@@ -70,6 +70,34 @@ class SupportController extends Controller
             }
         }
 
+        // Получаем количество непрочитанных тикетов для админа
+        $adminId = $user->administrator_id;
+        $unreadCount = 0;
+        if ($adminId) {
+            // Считаем все открытые тикеты для этого админа
+            // (либо с непрочитанными сообщениями, либо совсем новые без сообщений)
+            $unreadCount = Ticket::where('domain_id', $user->domain_id)
+                ->where('status', '!=', 'closed')
+                ->where(function ($query) use ($adminId) {
+                    // Тикеты с непрочитанными сообщениями для админа
+                    $query->whereHas('messages', function ($q) use ($adminId) {
+                        $q->where('to_user_id', $adminId)
+                            ->where('is_read', false);
+                    })
+                    // ИЛИ новые тикеты без сообщений вообще
+                    ->orWhereDoesntHave('messages');
+                })
+                ->count();
+        }
+
+        // Broadcast событие о новом тикете
+        broadcast(new \App\Events\SupportTicketCreated(
+            $user->domain_id,
+            $adminId,
+            $ticket->id,
+            $unreadCount
+        ))->toOthers();
+
         return response()->json($ticket->load(['assignedUser', 'attachments']), 201);
     }
 

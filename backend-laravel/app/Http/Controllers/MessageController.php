@@ -513,6 +513,34 @@ class MessageController extends Controller
         broadcast(new MessageSent($message))->toOthers();
         \Log::info('Message broadcast complete');
 
+        // Если это сообщение support типа, отправляем событие об обновлении счетчика
+        if ($validated['type'] === 'support' && $user->isModerator()) {
+            // Модератор отправил сообщение в support - обновляем счетчик для админа
+            $adminId = $toUser->id;
+            
+            // Считаем непрочитанные тикеты для админа
+            // (либо с непрочитанными сообщениями, либо совсем новые без сообщений)
+            $unreadCount = \App\Models\Ticket::where('domain_id', $user->domain_id)
+                ->where('status', '!=', 'closed')
+                ->where(function ($query) use ($adminId) {
+                    // Тикеты с непрочитанными сообщениями для админа
+                    $query->whereHas('messages', function ($q) use ($adminId) {
+                        $q->where('to_user_id', $adminId)
+                            ->where('is_read', false);
+                    })
+                    // ИЛИ новые тикеты без сообщений вообще
+                    ->orWhereDoesntHave('messages');
+                })
+                ->count();
+            
+            broadcast(new \App\Events\SupportTicketCreated(
+                $user->domain_id,
+                $adminId,
+                $validated['task_id'] ?? null,
+                $unreadCount
+            ))->toOthers();
+        }
+
         return response()->json($message, 201);
     }
 

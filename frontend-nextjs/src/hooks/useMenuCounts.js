@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useMenuCountsStore } from '@/store/menuCountsStore'
-import { subscribeToTaskAssignments } from '@/lib/websocket'
+import { subscribeToTaskAssignments, subscribeToSupportTickets } from '@/lib/websocket'
 
 export const useMenuCounts = () => {
   const { user } = useAuthStore()
@@ -15,7 +15,6 @@ export const useMenuCounts = () => {
 
   useEffect(() => {
     // Загружаем счетчики при монтировании компонента
-    console.log('[useMenuCounts] Начальная загрузка счетчиков, user:', userId)
     if (user) {
       // Получаем fetchCounts напрямую из store, чтобы не создавать зависимость
       useMenuCountsStore.getState().fetchCounts(true, user)
@@ -28,7 +27,6 @@ export const useMenuCounts = () => {
         const timeSinceLastFetch = Date.now() - lastFetch
         // Обновляем только если прошло больше 60 секунд с последнего запроса
         if (timeSinceLastFetch > 60000) {
-          console.log('[useMenuCounts] Вкладка активна, синхронизация (прошло >60 сек)')
           useMenuCountsStore.getState().fetchCounts(true, user)
         }
       }
@@ -42,7 +40,6 @@ export const useMenuCounts = () => {
   useEffect(() => {
     if (user && user.roles?.some(r => r.name === 'moderator')) {
       const unsubscribe = subscribeToTaskAssignments(user.id, (data) => {
-        console.log('Task assigned event received:', data)
         // Update the task count with the value from the broadcast event
         if (data.pending_count !== undefined) {
           useMenuCountsStore.setState(state => ({
@@ -61,10 +58,33 @@ export const useMenuCounts = () => {
     }
   }, [userId]) // Используем userId вместо user
 
-  return { 
-    counts, 
-    loading, 
-    refreshCounts: () => useMenuCountsStore.getState().fetchCounts(true, user), 
+  // Subscribe to real-time support ticket events for admins
+  useEffect(() => {
+    if (user && user.roles?.some(r => r.name === 'admin') && user.domain_id) {
+
+      const unsubscribe = subscribeToSupportTickets(user.domain_id, (data) => {
+
+        // Update the support count with the value from the broadcast event
+        if (data.unread_count !== undefined && data.admin_id === user.id) {
+          useMenuCountsStore.setState(state => ({
+            counts: {
+              ...state.counts,
+              support: data.unread_count
+            }
+          }))
+        }
+      })
+
+      return () => {
+        unsubscribe()
+      }
+    }
+  }, [userId, user?.domain_id]) // Зависимости: userId и domain_id
+
+  return {
+    counts,
+    loading,
+    refreshCounts: () => useMenuCountsStore.getState().fetchCounts(true, user),
     optimisticallyUpdateChatCount: updateChatCount,
     resetChatCount: useMenuCountsStore.getState().resetChatCount,
     resetSupportCount: useMenuCountsStore.getState().resetSupportCount
