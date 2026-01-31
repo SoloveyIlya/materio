@@ -20,6 +20,7 @@ import Alert from '@mui/material/Alert'
 // Component Imports
 import api, { API_URL } from '@/lib/api'
 import { showToast } from '@/utils/toast'
+import { useMenuCounts } from '@/hooks/useMenuCounts'
 
 const ticketStatusColors = {
   open: 'info',
@@ -43,10 +44,13 @@ export default function TicketDetailPage() {
   const [ticket, setTicket] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const { resetSupportCount } = useMenuCounts()
 
   useEffect(() => {
     if (ticketId) {
       loadTicket()
+      // Сбрасываем счетчик support при открытии тикета
+      resetSupportCount()
     }
   }, [ticketId])
 

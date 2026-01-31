@@ -15,10 +15,15 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import TextField from '@mui/material/TextField'
 import api from '@/lib/api'
+import { useWebSocketContext } from '@/contexts/WebSocketContext'
 
 const ModeratorUserDetails = ({ user, stats, onUserUpdate, isAdminView = false }) => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [workStartDate, setWorkStartDate] = useState('')
+  
+  // Получаем актуальный онлайн-статус
+  const { isUserOnline } = useWebSocketContext()
+  const isOnline = isUserOnline(user?.id)
   
   if (!user) return null
   
@@ -55,8 +60,8 @@ const ModeratorUserDetails = ({ user, stats, onUserUpdate, isAdminView = false }
             Status:
           </Typography>
           <Chip
-            label={user.is_online ? 'Online' : 'Offline'}
-            color={user.is_online ? 'success' : 'default'}
+            label={isOnline ? 'Online' : 'Offline'}
+            color={isOnline ? 'success' : 'default'}
             size='small'
             variant='tonal'
           />

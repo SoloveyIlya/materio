@@ -73,11 +73,13 @@ const SupportDetails = ({
   const [replyText, setReplyText] = useState('')
   const [sending, setSending] = useState(false)
   const [ticketData, setTicketData] = useState(currentTicket)
-  const { refreshCounts } = useMenuCounts()
+  const { resetSupportCount } = useMenuCounts()
 
   useEffect(() => {
     if (currentTicket?.id) {
       loadTicketDetails()
+      // Сбрасываем счетчик support при открытии тикета
+      resetSupportCount()
     }
   }, [currentTicket?.id])
 
@@ -113,10 +115,6 @@ const SupportDetails = ({
       }
       if (onReplySent) {
         onReplySent()
-      }
-      // Обновляем счетчик в меню
-      if (refreshCounts) {
-        await refreshCounts()
       }
       showToast.success('Reply sent successfully')
     } catch (error) {
@@ -413,4 +411,3 @@ const SupportDetails = ({
 }
 
 export default SupportDetails
-

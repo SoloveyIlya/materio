@@ -44,6 +44,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user/mark-offline', [AuthController::class, 'markOffline']);
 });
 
+// Mark offline endpoint that accepts token in query (for sendBeacon)
+Route::post('/user/mark-offline-beacon', [AuthController::class, 'markOfflineBeacon']);
+
 // Admin routes
 Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin', 'activity'])->group(function () {
     // Task Categories

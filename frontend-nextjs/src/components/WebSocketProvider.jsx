@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
+import { WebSocketContextProvider } from '@/contexts/WebSocketContext'
 
 /**
  * WebSocket Provider - инициализирует Echo/WebSocket при загрузке приложения
  * Это гарантирует, что WebSocket доступен глобально через window.Echo
+ * И предоставляет глобальный контекст для статусов и уведомлений
  */
 export default function WebSocketProvider({ children }) {
   const { user } = useAuthStore()
@@ -57,5 +59,9 @@ export default function WebSocketProvider({ children }) {
     return () => clearTimeout(timeout)
   }, [user, isInitialized])
 
-  return children
+  return (
+    <WebSocketContextProvider>
+      {children}
+    </WebSocketContextProvider>
+  )
 }

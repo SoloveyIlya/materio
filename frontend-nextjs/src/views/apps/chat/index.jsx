@@ -20,6 +20,7 @@ import ChatContent from './ChatContent'
 
 // Hook Imports
 import { useSettings } from '@core/hooks/useSettings'
+import { useWebSocketContext } from '@/contexts/WebSocketContext'
 
 // Util Imports
 import { commonLayoutClasses } from '@layouts/utils/layoutClasses'
@@ -49,7 +50,8 @@ const ChatWrapper = () => {
 
   // Hooks
   const { settings } = useSettings()
-  const { refreshCounts, optimisticallyUpdateChatCount } = useMenuCounts()
+  const { optimisticallyUpdateChatCount, resetChatCount } = useMenuCounts()
+  const { isUserOnline, onlineUsersVersion } = useWebSocketContext()
   const isBelowLgScreen = useMediaQuery(theme => theme.breakpoints.down('lg'))
   const isBelowMdScreen = useMediaQuery(theme => theme.breakpoints.down('md'))
   const isBelowSmScreen = useMediaQuery(theme => theme.breakpoints.down('sm'))
@@ -80,6 +82,76 @@ const ChatWrapper = () => {
   useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
   useEffect(() => { selectedAdminTabRef.current = selectedAdminTab }, [selectedAdminTab])
   useEffect(() => { userRef.current = user }, [user])
+
+  // Update online status in messagesData when onlineUsers changes from WebSocket
+  useEffect(() => {
+    if (!messagesData) return
+
+    setMessagesData(prev => {
+      if (!prev) return prev
+
+      // Admin tabs structure
+      if (prev.tabs) {
+        const updated = {
+          ...prev,
+          tabs: prev.tabs.map(tab => ({
+            ...tab,
+            chats: tab.chats.map(chat => {
+              const oldIsOnline = Boolean(chat.user.is_online) // Нормализуем к boolean
+              const newIsOnline = isUserOnline(chat.user.id)
+              if (oldIsOnline !== newIsOnline) {
+                console.log(`[Chat] 👤 Статус ${chat.user.name || chat.user.email} (${chat.user.id}): ${oldIsOnline} → ${newIsOnline}`)
+              }
+              return {
+                ...chat,
+                user: {
+                  ...chat.user,
+                  is_online: newIsOnline
+                }
+              }
+            })
+          }))
+        }
+        return updated
+      }
+
+      // Moderator list (array)
+      if (Array.isArray(prev)) {
+        return prev.map(chat => {
+          const oldIsOnline = Boolean(chat.user.is_online) // Нормализуем к boolean
+          const newIsOnline = isUserOnline(chat.user.id)
+          if (oldIsOnline !== newIsOnline) {
+            console.log(`[Chat] 👤 Статус ${chat.user.name || chat.user.email} (${chat.user.id}): ${oldIsOnline} → ${newIsOnline}`)
+          }
+          return {
+            ...chat,
+            user: {
+              ...chat.user,
+              is_online: newIsOnline
+            }
+          }
+        })
+      }
+
+      return prev
+    })
+
+    // Update selectedChat if it exists
+    if (selectedChat?.user) {
+      const oldIsOnline = Boolean(selectedChat.user.is_online) // Нормализуем к boolean
+      const newIsOnline = isUserOnline(selectedChat.user.id)
+      if (oldIsOnline !== newIsOnline) {
+        console.log(`[Chat] 👤 Выбранный чат - статус ${selectedChat.user.name || selectedChat.user.email} (${selectedChat.user.id}): ${oldIsOnline} → ${newIsOnline}`)
+      }
+      setSelectedChat(prev => ({
+        ...prev,
+        user: {
+          ...prev.user,
+          is_online: newIsOnline
+        }
+      }))
+    }
+  }, [onlineUsersVersion])
 
   // Helper: patch messagesData for incoming message by peerId
   const patchMessagesData = (prev, msg, peerId) => {
@@ -167,93 +239,48 @@ const ChatWrapper = () => {
     }
   }
 
-  // Auto-refresh messages with WebSocket — subscribe only on `user` to avoid stale closures
+  // WebSocket обновляет чаты в реальном времени через subscribeToMessages
+  // Загружаем сообщения только при монтировании компонента
   useEffect(() => {
     if (!user) return
-
-    let unsubscribe = null
-    let isSubscribed = false
-
-    // Import WebSocket utilities
-    const initSocket = async () => {
-      if (isSubscribed) return null
-      const { initializeSocket, subscribeToMessages } = await import('@/lib/websocket')
-      initializeSocket()
-
-      isSubscribed = true
-
-      // Подписываемся на новые сообщения и делегируем обработку в handleIncomingWsMessage
-      unsubscribe = subscribeToMessages(user.domain_id, user.id, (data) => {
-        handleIncomingWsMessage(data)
-      })
-
-      return unsubscribe
+    
+    // Обновляем только при монтировании
+    loadMessages(true)
+    
+    // Обновляем при возврате на вкладку (после длительного отсутствия)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadMessages(true)
+      }
     }
-
-    initSocket().then(unsub => {
-      if (unsub) unsubscribe = unsub
-    }).catch(err => {
-      console.error('Failed to initialize WebSocket:', err)
-    })
-
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
     return () => {
-      isSubscribed = false
-      if (unsubscribe) unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [user])
 
-  // Incoming WS message handler (uses refs to avoid stale closures)
-  const handleIncomingWsMessage = (data) => {
-    const currentUser = userRef.current
-    if (!currentUser) return
+  // Подписка на WebSocket события для обновления чатов при новых сообщениях
+  useEffect(() => {
+    if (!user?.domain_id) return
 
-    // Play sound and update counters for messages from others
-    if (data.from_user_id !== currentUser.id) {
-      playNotificationSoundIfVisible()
-      optimisticallyUpdateChatCount(1)
+    // Подписываемся на события новых сообщений через Echo
+    const { getSocket } = require('@/lib/websocket')
+    const echo = getSocket()
+    
+    const channel = echo.private(`domain.${user.domain_id}`)
+    
+    channel.listen('.MessageSent', (data) => {
+      console.log('[Chat] Получено новое сообщение через WS, обновляем чаты')
+      // Обновляем список чатов при новом сообщении
+      loadMessages(true)
+    })
 
-      // Local unread counter bump
-      setMessagesData(prev => patchMessagesData(prev, {}, null)) // noop to keep structure if null
-      setMessagesData(prev => {
-        if (!prev) return prev
-        // We'll increment unread_count in the patched chat below by peer logic
-        return prev
-      })
+    return () => {
+      channel.stopListening('.MessageSent')
     }
-
-    const peerId = (data.from_user_id === currentUser.id) ? data.to_user_id : data.from_user_id
-
-    const incomingMessage = {
-      id: data.id || `ws-${Date.now()}`,
-      from_user_id: data.from_user_id,
-      to_user_id: data.to_user_id,
-      body: data.content ?? data.body ?? null,
-      attachments: data.attachments || null,
-      task_id: data.task_id || null,
-      is_read: data.is_read || false,
-      created_at: data.created_at || new Date().toISOString(),
-      created_at_formatted: data.created_at_formatted || data.created_at || new Date().toISOString(),
-      from_user: data.from_user || null,
-      to_user: data.to_user || null,
-    }
-
-    // 1) Patch global messagesData for the peer
-    setMessagesData(prev => patchMessagesData(prev, incomingMessage, peerId))
-
-    // 2) If selected chat is open with this peer — append to it
-    const sc = selectedChatRef.current
-    if (sc && sc.user && sc.user.id === peerId) {
-      setSelectedChat(prev => {
-        if (!prev) return prev
-        // prevent duplicates
-        if ((prev.messages || []).some(m => m.id === incomingMessage.id)) return prev
-        return { ...prev, messages: [...(prev.messages || []), incomingMessage] }
-      })
-    }
-
-    // 3) Background reload to ensure consistency
-    void loadMessages(true)
-  }
+  }, [user?.domain_id])
 
   // Update selectedChat when messagesData changes and automatically mark messages as read if chat is open
   useEffect(() => {
@@ -375,14 +402,41 @@ const ChatWrapper = () => {
 
             markedAsReadRef.current.add(chatKey)
 
+            // Сбрасываем счетчик чата в меню
+            resetChatCount()
+
             const unreadCount = updatedChat.unread_count || 0
             if (unreadCount > 0) {
               optimisticallyUpdateChatCount(-unreadCount)
             }
 
-            setTimeout(() => {
-              loadMessages(true)
-            }, 1000)
+            // Обновляем список чатов локально, чтобы показать что сообщения прочитаны
+            setMessagesData(prev => {
+              if (!prev) return prev
+              
+              if (prev.tabs) {
+                // Для админов
+                return {
+                  ...prev,
+                  tabs: prev.tabs.map(tab => ({
+                    ...tab,
+                    chats: tab.chats.map(chat => 
+                      chat.user.id === updatedChat.user.id 
+                        ? { ...chat, unread_count: 0, messages: chat.messages?.map(m => ({ ...m, is_read: true })) }
+                        : chat
+                    )
+                  }))
+                }
+              } else if (Array.isArray(prev)) {
+                // Для модераторов
+                return prev.map(chat =>
+                  chat.user.id === updatedChat.user.id
+                    ? { ...chat, unread_count: 0, messages: chat.messages?.map(m => ({ ...m, is_read: true })) }
+                    : chat
+                )
+              }
+              return prev
+            })
           } catch (error) {
             console.error('Error auto-marking chat as read:', error)
           }
@@ -858,9 +912,6 @@ const ChatWrapper = () => {
           })
         }
       }
-      
-      // Обновляем счетчики в меню после отправки сообщения (без перезагрузки списка диалогов)
-      refreshCounts()
     } catch (error) {
       console.error('Error sending message:', error)
       // В случае ошибки удаляем временное сообщение
@@ -974,15 +1025,13 @@ const ChatWrapper = () => {
 
         await api.post('/messages/mark-chat-read', requestData)
 
-        // Обновляем сообщения и счетчики
+        // Сбрасываем счетчик чата в меню
+        resetChatCount()
+
+        // Обновляем сообщения
         await loadMessages(true) // silent = true для быстрого обновления
-        
-        // Обновляем счетчики в меню (для синхронизации с сервером)
-        refreshCounts()
       } catch (error) {
         console.error('Error marking chat as read:', error)
-        // В случае ошибки обновляем счетчики, чтобы восстановить правильное значение
-        refreshCounts()
       }
     }
   }

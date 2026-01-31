@@ -82,8 +82,16 @@ export const initializeSocket = () => {
       console.log('[WS] ✅ Connected успешно!')
     })
 
-    // Логирование всех событий (ДИАГНОСТИКА)
+    // Логирование всех событий (ДИАГНОСТИКА) - игнорируем служебные события Pusher
     echo.connector.pusher.bind_global((event, data) => {
+      // Фильтруем служебные события Pusher (pusher:*, pusher_internal:*)
+      if (event.startsWith('pusher:') || event.startsWith('pusher_internal:')) {
+        return // Не логируем служебные события
+      }
+      // Не логируем user.status.changed (слишком много спама, логи в useGlobalWebSocket)
+      if (event === 'user.status.changed') {
+        return
+      }
       console.log('[WS EVENT]', event, data)
     })
 
@@ -129,120 +137,217 @@ export const disconnectSocket = () => {
   }
 }
 
+// Глобальный Set для отслеживания уже обработанных сообщений (дедупликация)
+const globalProcessedMessageIds = new Set()
+// Глобальное хранилище callback'ов для обработки сообщений
+const messageCallbacks = new Set()
+// Флаг что bind_global уже установлен
+let isGlobalBindSetup = false
+
+// Глобальное хранилище callback'ов для обработки статусов пользователей
+const statusCallbacks = new Set()
+// Флаг что bind_global для статусов уже установлен
+let isGlobalStatusBindSetup = false
+
 export const subscribeToMessages = (domainId, userId, callback) => {
   const echoInstance = getSocket()
-  
+
   const userChannelName = `user.${userId}`
   const domainChannelName = `domain.${domainId}`
-  
+
   console.log('[WS] Подписка на сообщения:', { userChannelName, domainChannelName })
-  
-  // Set для отслеживания уже обработанных сообщений (дедупликация)
-  const processedMessageIds = new Set()
-  
+
+  // Добавляем callback в глобальное хранилище
+  messageCallbacks.add(callback)
+
   // Обработчик сообщений
   const handleUserMessage = (data) => {
-    console.log('[WS] Получено сообщение на user канале:', data)
-    
+
     // Проверяем, не обработали ли мы уже это сообщение
-    if (data.id && processedMessageIds.has(data.id)) {
-      console.log('[WS] Дубликат сообщения:', data.id)
+    if (data.id && globalProcessedMessageIds.has(data.id)) {
       return
     }
-    
+
     // Добавляем ID в обработанные
     if (data.id) {
-      processedMessageIds.add(data.id)
-      
+      globalProcessedMessageIds.add(data.id)
+
       // Очищаем старые ID через 10 секунд чтобы не переполнять память
       setTimeout(() => {
-        processedMessageIds.delete(data.id)
+        globalProcessedMessageIds.delete(data.id)
       }, 10000)
     }
-    
+
     callback(data)
   }
 
   const handleDomainMessage = (data) => {
     console.log('[WS] Получено сообщение на domain канале:', data)
-    
+
     // Проверяем, не обработали ли мы уже это сообщение
-    if (data.id && processedMessageIds.has(data.id)) {
-      console.log('[WS] Дубликат сообщения (domain):', data.id)
+    if (data.id && globalProcessedMessageIds.has(data.id)) {
       return
     }
-    
+
     if (data.id) {
-      processedMessageIds.add(data.id)
+      globalProcessedMessageIds.add(data.id)
       setTimeout(() => {
-        processedMessageIds.delete(data.id)
+        globalProcessedMessageIds.delete(data.id)
       }, 10000)
     }
-    
+
     callback(data)
   }
-  
+
   // Подписываемся на user канал
   const userChannel = echoInstance.private(userChannelName)
   userChannel.listen('MessageSent', handleUserMessage)
-  console.log('[WS] Подписаны на user канал', userChannelName)
-  
+
   // Подписываемся и на domain канал (на случай если события там)
   const domainChannel = echoInstance.private(domainChannelName)
   domainChannel.listen('MessageSent', handleDomainMessage)
-  console.log('[WS] Подписаны на domain канал', domainChannelName)
-  
-  // Логируем ВСЕ события для диагностики
-  echoInstance.connector.pusher.bind_global((eventName, data) => {
-    if (eventName.includes('message') || eventName.includes('Message') || eventName === 'MessageSent') {
-      console.log('[WS] ГЛОБАЛЬНОЕ СОБЫТИЕ:', eventName, data)
-      try {
-        // If global event carries a MessageSent payload that our regular channel handlers missed,
-        // invoke the provided callback to render it immediately. Use processedMessageIds to avoid duplicates.
-        const maybeId = data && data.id
-        if (!maybeId || !processedMessageIds.has(maybeId)) {
-          if (maybeId) {
-            processedMessageIds.add(maybeId)
-            setTimeout(() => processedMessageIds.delete(maybeId), 10000)
-          }
-          // Call callback so UI can render message immediately
-          try { callback(data) } catch (e) { /* swallow callback errors */ }
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
+
+  // Также попробуем подписаться на событие с точкой (на случай, если Laravel так транслирует)
+  userChannel.listen('.message.sent', (data) => {
+    handleUserMessage(data)
   })
+  domainChannel.listen('.message.sent', (data) => {
+    handleDomainMessage(data)
+  })
+
+  // Устанавливаем глобальный обработчик только один раз
+  if (!isGlobalBindSetup) {
+    isGlobalBindSetup = true
+
+    // Логируем ВСЕ события для диагностики (фильтруем служебные события Pusher)
+    echoInstance.connector.pusher.bind_global((eventName, data) => {
+      // Игнорируем служебные события Pusher
+      if (eventName.startsWith('pusher:') || eventName.startsWith('pusher_internal:')) {
+        return
+      }
+
+      if (eventName.includes('message') || eventName.includes('Message') || eventName === 'MessageSent') {
+        console.log('[WS] ГЛОБАЛЬНОЕ СОБЫТИЕ:', eventName, data)
+
+
+        // Так как .listen() не работает, вызываем callback здесь напрямую
+        // Проверяем что это событие MessageSent и оно относится к нашему пользователю
+        if (eventName === 'MessageSent' && data && data.id) {
+          if (!globalProcessedMessageIds.has(data.id)) {
+            globalProcessedMessageIds.add(data.id)
+            setTimeout(() => globalProcessedMessageIds.delete(data.id), 10000)
+
+            // Вызываем ВСЕ зарегистрированные callback'и
+            messageCallbacks.forEach(cb => {
+              try {
+                cb(data)
+              } catch (e) {
+                console.error('[WS] Ошибка в callback:', e)
+              }
+            })
+          }
+        }
+      }
+    })
+  }
 
   // Возвращаем функцию для отписки
   return () => {
-    console.log('[WS] Отписка от сообщений:', userChannelName, domainChannelName)
+    // Удаляем callback из глобального хранилища
+    messageCallbacks.delete(callback)
     echoInstance.leave(userChannelName)
     echoInstance.leave(domainChannelName)
-    processedMessageIds.clear()
   }
 }
 
 export const subscribeToUserStatus = (domainId, callback) => {
   const echoInstance = getSocket()
-  
+
+  // Подписываемся на канал домена
   const channel = echoInstance.private(`domain.${domainId}`)
-  channel.listen('UserStatusChanged', callback)
+
+  // Добавляем callback в набор
+  statusCallbacks.add(callback)
+
+  // Устанавливаем bind_global только один раз
+  if (!isGlobalStatusBindSetup) {
+    isGlobalStatusBindSetup = true
+
+    echoInstance.connector.pusher.bind_global((event, data) => {
+      if (event === 'user.status.changed') {
+        console.log('[WS] 👤 Статус пользователя:', data)
+
+        // Вызываем все зарегистрированные callbacks
+        statusCallbacks.forEach(cb => {
+          try {
+            cb(data)
+          } catch (error) {
+            console.error('[WS] Ошибка в status callback:', error)
+          }
+        })
+      }
+    })
+  }
 
   return () => {
-    echoInstance.leave(`domain.${domainId}`)
+    statusCallbacks.delete(callback)
+    echoInstance.leave(`private-domain.${domainId}`)
   }
 }
 
 export const subscribeToTaskAssignments = (userId, callback) => {
   const echoInstance = getSocket()
-  
+
   // Subscribe to task.assigned events on user's private channel
-  const channel = echoInstance.private(`user.${userId}`)
+  const channelName = `user.${userId}`
+  const channel = echoInstance.private(channelName)
   channel.listen('TaskAssigned', callback)
+
+  // Return unsubscribe function - отписываемся только от события, не покидаем канал
+  return () => {
+    const chan = echoInstance.connector.channels[`private-${channelName}`]
+    if (chan) {
+      chan.stopListening('TaskAssigned')
+    }
+  }
+}
+
+// Глобальное хранилище callback'ов для обработки support тикетов
+const supportCallbacks = new Set()
+// Флаг что bind_global для support уже установлен
+let isGlobalSupportBindSetup = false
+
+export const subscribeToSupportTickets = (domainId, callback) => {
+  const echoInstance = getSocket()
+
+  // Подписываемся на канал домена
+  const channelName = `domain.${domainId}`
+  const channel = echoInstance.private(channelName)
+
+  // Добавляем callback в набор
+  supportCallbacks.add(callback)
+
+  // Устанавливаем bind_global только один раз
+  if (!isGlobalSupportBindSetup) {
+    isGlobalSupportBindSetup = true
+
+    echoInstance.connector.pusher.bind_global((event, data) => {
+      if (event === 'support.ticket.created') {
+        // Вызываем все зарегистрированные callbacks
+        supportCallbacks.forEach(cb => {
+          try {
+            cb(data)
+          } catch (error) {
+            console.error('[WS] Ошибка в support callback:', error)
+          }
+        })
+      }
+    })
+  }
 
   // Return unsubscribe function
   return () => {
-    echoInstance.leave(`user.${userId}`)
+    supportCallbacks.delete(callback)
+    echoInstance.leave(channelName)
   }
 }

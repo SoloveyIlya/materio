@@ -219,6 +219,8 @@ class AuthController extends Controller
             $user->is_online = false;
             $user->save();
             
+            \Log::info('User marked offline via API', ['user_id' => $user->id, 'method' => 'POST /mark-offline']);
+            
             // Broadcast user status change event
             broadcast(new \App\Events\UserStatusChanged($user->id, $user->domain_id, false, $user->last_seen_at))->toOthers();
         }
@@ -226,6 +228,41 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'User marked as offline',
         ]);
+    }
+
+    /**
+     * Mark user as offline using token from query parameter (for sendBeacon)
+     * This endpoint doesn't use auth middleware because sendBeacon can't send custom headers
+     */
+    public function markOfflineBeacon(Request $request): JsonResponse
+    {
+        // Get token from query parameter
+        $token = $request->query('token') ?? $request->input('token');
+        
+        if (!$token) {
+            return response()->json(['message' => 'Token required'], 401);
+        }
+        
+        // Find user by token
+        $personalAccessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+        
+        if (!$personalAccessToken) {
+            return response()->json(['message' => 'Invalid token'], 401);
+        }
+        
+        $user = $personalAccessToken->tokenable;
+        
+        if ($user) {
+            $user->is_online = false;
+            $user->save();
+            
+            // Broadcast user status change event
+            broadcast(new \App\Events\UserStatusChanged($user->id, $user->domain_id, false, $user->last_seen_at))->toOthers();
+            
+            \Log::info('User marked offline via beacon', ['user_id' => $user->id]);
+        }
+        
+        return response()->json(['message' => 'User marked as offline']);
     }
 
     public function user(Request $request): JsonResponse

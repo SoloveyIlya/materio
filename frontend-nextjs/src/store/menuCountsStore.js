@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 import api from '@/lib/api'
+import { useAuthStore } from './authStore'
 
 export const useMenuCountsStore = create((set, get) => ({
   counts: {
@@ -13,21 +14,21 @@ export const useMenuCountsStore = create((set, get) => ({
   },
   loading: true,
   lastFetchTime: 0,
-  
-  fetchCounts: async (force = false) => {
+
+  fetchCounts: async (force = false, userFromStore = null) => {
     const state = get()
     const now = Date.now()
-    
-    // Кэширование: не делаем запрос, если прошло менее 5 секунд с последнего запроса
-    if (!force && state.lastFetchTime && (now - state.lastFetchTime) < 5000) {
-      return state.counts
-    }
-    
+
     try {
-      const user = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || 'null') : null
-      
+      // Используем переданного пользователя или пытаемся получить из localStorage
+      let user = userFromStore
+      if (!user && typeof window !== 'undefined') {
+        const storedUser = localStorage.getItem('user')
+        user = storedUser ? JSON.parse(storedUser) : null
+      }
+
       if (!user) {
-        set({ 
+        set({
           counts: { chat: 0, support: 0, tasks: 0, chat_by_admin: [], tasks_by_admin: [] },
           loading: false,
           lastFetchTime: now
@@ -42,35 +43,47 @@ export const useMenuCountsStore = create((set, get) => ({
 
       const response = await api.get(endpoint)
       const data = response.data || {}
+
+      // Проверяем, находится ли пользователь на странице чата
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
+      const isOnChatPage = currentPath === '/chat' || currentPath.startsWith('/chat/')
+
+      // Сохраняем текущий счетчик chat, если он больше чем пришел из API
+      // (WebSocket может увеличить его быстрее, чем API обновится)
+      // Если пользователь на странице чата - всегда сбрасываем в 0
+      const currentChatCount = state.counts.chat || 0
+      const apiChatCount = data.chat ?? 0
+      const finalChatCount = isOnChatPage ? 0 : Math.max(currentChatCount, apiChatCount)
+
       const newCounts = {
-        chat: data.chat ?? 0,
+        chat: finalChatCount,
         support: data.support ?? 0,
         tasks: data.tasks ?? 0,
         chat_by_admin: data.chat_by_admin ?? [],
         tasks_by_admin: data.tasks_by_admin ?? [],
       }
-      
-      set({ 
+
+      set({
         counts: newCounts,
         loading: false,
         lastFetchTime: now
       })
-      
+
       return newCounts
     } catch (error) {
-      set({ 
+      set({
         counts: { chat: 0, support: 0, tasks: 0, chat_by_admin: [], tasks_by_admin: [] },
         loading: false,
         lastFetchTime: now
       })
     }
   },
-  
+
   // Оптимистичное обновление счетчика чата
   updateChatCount: (delta) => {
     const state = get()
     const newChatCount = Math.max(0, (state.counts.chat || 0) + delta)
-    
+
     set({
       counts: {
         ...state.counts,
@@ -78,7 +91,103 @@ export const useMenuCountsStore = create((set, get) => ({
       }
     })
   },
-  
+
+  // Увеличить счетчик при новом сообщении через WebSocket
+  incrementChatCount: (message = null) => {
+    const state = get()
+
+    // Получаем текущего пользователя из authStore
+    const currentUserId = useAuthStore.getState().user?.id
+
+    // Проверяем, адресовано ли сообщение текущему пользователю
+    const isMessageForCurrentUser = message && message.to_user_id === currentUserId
+
+    // Увеличиваем общий счетчик только если сообщение для текущего пользователя
+    let newCount = state.counts.chat || 0
+    if (isMessageForCurrentUser) {
+      newCount = newCount + 1
+    }
+
+    // Для админов нужно также обновить chat_by_admin
+    // Обновляем только если массив уже существует И в нем есть элементы (пришел с бэкенда для админа)
+    let newChatByAdmin = state.counts.chat_by_admin || []
+    if (message && message.to_user_id && Array.isArray(newChatByAdmin) && newChatByAdmin.length > 0) {
+      const adminIndex = newChatByAdmin.findIndex(item => item.admin_id === message.to_user_id)
+
+      if (adminIndex >= 0) {
+        // Админ уже есть в списке - увеличиваем его счетчик
+        newChatByAdmin = [
+          ...newChatByAdmin.slice(0, adminIndex),
+          {
+            ...newChatByAdmin[adminIndex],
+            count: (newChatByAdmin[adminIndex].count || 0) + 1
+          },
+          ...newChatByAdmin.slice(adminIndex + 1)
+        ]
+      } else {
+        // Админ еще нет в списке - добавляем (только если это админский домен)
+        newChatByAdmin = [
+          ...newChatByAdmin,
+          {
+            admin_id: message.to_user_id,
+            admin_name: message.to_user?.name || 'Admin',
+            count: 1
+          }
+        ]
+      }
+    }
+
+    set({
+      counts: {
+        ...state.counts,
+        chat: newCount,
+        chat_by_admin: newChatByAdmin
+      }
+    })
+  },
+
+  // Сбросить счетчик чата (когда пользователь открывает страницу чата)
+  resetChatCount: () => {
+    const state = get()
+    const currentUserId = useAuthStore.getState().user?.id
+
+
+    // Для админов также нужно обнулить счетчик в chat_by_admin
+    let newChatByAdmin = state.counts.chat_by_admin || []
+    if (currentUserId && Array.isArray(newChatByAdmin)) {
+      const adminIndex = newChatByAdmin.findIndex(item => item.admin_id === currentUserId)
+      if (adminIndex >= 0) {
+        newChatByAdmin = [
+          ...newChatByAdmin.slice(0, adminIndex),
+          {
+            ...newChatByAdmin[adminIndex],
+            count: 0
+          },
+          ...newChatByAdmin.slice(adminIndex + 1)
+        ]
+      }
+    }
+
+    set({
+      counts: {
+        ...state.counts,
+        chat: 0,
+        chat_by_admin: newChatByAdmin
+      }
+    })
+  },
+
+  // Сбросить счетчик поддержки (когда пользователь открывает тикет)
+  resetSupportCount: () => {
+    const state = get()
+    set({
+      counts: {
+        ...state.counts,
+        support: 0
+      }
+    })
+  },
+
   // Сброс счетчиков
   reset: () => {
     set({
