@@ -106,10 +106,8 @@ echo ""
 echo "To run migrations manually: php artisan migrate"
 
 # Create storage symlink if it doesn't exist
-if [ ! -L /var/www/public/storage ] && [ ! -d /var/www/public/storage ]; then
-    echo "Creating storage symlink..."
-    php artisan storage:link || echo "Warning: Could not create storage symlink"
-fi
+echo "Creating storage symlink..."
+php artisan storage:link || echo "Warning: Could not create storage symlink"
 
 echo "Setup complete! Starting server..."
 
