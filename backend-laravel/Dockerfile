@@ -20,10 +20,6 @@ RUN apt-get update && apt-get install -y \
     && pecl install redis \
     # Включаем расширение Redis
     && docker-php-ext-enable redis \
-    # Устанавливаем pcov для покрытия тестов (опционально)
-    && pecl install pcov \
-    && docker-php-ext-enable pcov \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Остальная часть Dockerfile остается без изменений...
 # Install Composer
