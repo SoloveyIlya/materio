@@ -370,5 +370,153 @@ class TaskService
 
         return $this->scheduleTasksForModerator($moderator, 1);
     }
+
+    /**
+     * Планирование отправки тасков для модератора с использованием конфигурации из формы
+     * 
+     * @param User $moderator - модератор
+     * @param int $workDay - день работы
+     * @param array $dayConfig - конфигурация дня из формы (send_date, start_time, end_time, timezone, selected_tasks)
+     * @return array - запланированные таски
+     */
+    public function scheduleTasksForModeratorWithConfig(User $moderator, int $workDay, array $dayConfig): array
+    {
+        $domainId = $moderator->domain_id;
+        $timezone = $dayConfig['timezone'] ?? 'America/New_York';
+        $sendDate = $dayConfig['send_date'];
+        $startTime = $dayConfig['start_time'] ?? '07:00';
+        $endTime = $dayConfig['end_time'] ?? '17:00';
+        $selectedTaskIds = $dayConfig['selected_tasks'] ?? [];
+
+        if (empty($selectedTaskIds)) {
+            Log::warning("No tasks selected for user {$moderator->id} on work day {$workDay}");
+            return [];
+        }
+
+        // Получаем выбранные шаблоны
+        $templates = TaskTemplate::where('domain_id', $domainId)
+            ->where('is_active', true)
+            ->whereIn('id', $selectedTaskIds)
+            ->get();
+
+        $tasksToSchedule = [];
+
+        foreach ($templates as $template) {
+            // Проверяем, не существует ли уже расписание для этого шаблона и пользователя
+            $existingSchedule = TaskSchedule::where('user_id', $moderator->id)
+                ->where('work_day', $workDay)
+                ->whereHas('task', function ($query) use ($template) {
+                    $query->where('template_id', $template->id);
+                })
+                ->where('is_sent', false)
+                ->exists();
+
+            if ($existingSchedule) {
+                continue; // Уже запланировано
+            }
+
+            // Проверяем, не существует ли уже таск для этого шаблона
+            $existingTask = Task::where('domain_id', $domainId)
+                ->where('template_id', $template->id)
+                ->where('work_day', $workDay)
+                ->where(function ($query) use ($moderator) {
+                    $query->where('assigned_to', $moderator->id)
+                          ->orWhereNull('assigned_to');
+                })
+                ->first();
+
+            if ($existingTask) {
+                // Используем существующий таск
+                if (!$existingTask->assigned_to) {
+                    $existingTask->update(['assigned_to' => $moderator->id]);
+                }
+                $tasksToSchedule[] = $existingTask;
+            } else {
+                // Создаем новый таск
+                $task = Task::create([
+                    'domain_id' => $domainId,
+                    'template_id' => $template->id,
+                    'category_id' => $template->category_id,
+                    'assigned_to' => $moderator->id,
+                    'title' => $template->title,
+                    'description' => $template->description,
+                    'price' => $template->price,
+                    'completion_hours' => $template->completion_hours,
+                    'guides_links' => $template->guides_links,
+                    'attached_services' => $template->attached_services,
+                    'work_day' => $workDay,
+                    'status' => 'pending',
+                    'assigned_at' => null,
+                ]);
+
+                $tasksToSchedule[] = $task;
+            }
+        }
+
+        // Планируем отправку тасков
+        $scheduledTasks = [];
+        
+        // Парсим время
+        $startDateTime = Carbon::parse("{$sendDate} {$startTime}", $timezone);
+        $endDateTime = Carbon::parse("{$sendDate} {$endTime}", $timezone);
+        
+        // Если конец раньше начала, это следующий день
+        if ($endDateTime->lt($startDateTime)) {
+            $endDateTime->addDay();
+        }
+
+        // Вычисляем общее время и интервалы
+        $totalMinutes = $startDateTime->diffInMinutes($endDateTime);
+        $taskCount = count($tasksToSchedule);
+        
+        if ($taskCount === 0) {
+            return [];
+        }
+
+        // Распределяем таски равномерно с небольшой рандомизацией
+        $baseInterval = $taskCount > 1 ? floor($totalMinutes / $taskCount) : $totalMinutes;
+        $randomVariation = min(10, floor($baseInterval * 0.2)); // 20% вариация, но не более 10 минут
+
+        $scheduledAt = $startDateTime->copy();
+
+        foreach ($tasksToSchedule as $index => $task) {
+            // Добавляем небольшую рандомную вариацию
+            $randomOffset = $index > 0 ? rand(-$randomVariation, $randomVariation) : 0;
+            $currentScheduledAt = $scheduledAt->copy()->addMinutes($randomOffset);
+            
+            // Убеждаемся, что не выходим за пределы диапазона
+            if ($currentScheduledAt->lt($startDateTime)) {
+                $currentScheduledAt = $startDateTime->copy();
+            }
+            if ($currentScheduledAt->gt($endDateTime)) {
+                $currentScheduledAt = $endDateTime->copy()->subMinutes(rand(1, 30));
+            }
+
+            // Создаем запись в расписании
+            $schedule = TaskSchedule::create([
+                'task_id' => $task->id,
+                'user_id' => $moderator->id,
+                'work_day' => $workDay,
+                'scheduled_at' => $currentScheduledAt,
+                'is_sent' => false,
+            ]);
+
+            // Планируем отправку через очередь
+            SendTask::dispatch($task, $moderator)
+                ->delay($currentScheduledAt);
+
+            $scheduledTasks[] = [
+                'task' => $task,
+                'scheduled_at' => $currentScheduledAt->toDateTimeString(),
+            ];
+
+            Log::info("Task {$task->id} scheduled for user {$moderator->id} at {$currentScheduledAt->toDateTimeString()} (work day {$workDay})");
+
+            // Переходим к следующему интервалу
+            $scheduledAt->addMinutes($baseInterval);
+        }
+
+        return $scheduledTasks;
+    }
 }
 

@@ -8,6 +8,7 @@ import { showToast } from '@/utils/toast'
 // Component Imports
 import UserListTable from '@/views/apps/user/list/UserListTable'
 import UserListCards from '@/views/apps/user/list/UserListCards'
+import SendTasksDialog from '@/views/apps/user/list/SendTasksDialog'
 
 export default function UsersPage() {
   const [users, setUsers] = useState([])
@@ -20,6 +21,10 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [formData, setFormData] = useState({ name: '', email: '', password: '', administrator_id: '' })
+  
+  // Send Tasks Dialog
+  const [sendTasksDialogOpen, setSendTasksDialogOpen] = useState(false)
+  const [selectedUserForTasks, setSelectedUserForTasks] = useState(null)
 
   useEffect(() => {
     loadAdministrators()
@@ -67,14 +72,16 @@ export default function UsersPage() {
   }
 
   const handleSendTasks = async (userId) => {
-    try {
-      await api.post(`/admin/users/${userId}/send-tasks`)
-      showToast.success('Tasks scheduled successfully')
-      loadUsers()
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || 'Error scheduling tasks'
-      showToast.warning(errorMessage)
+    // Находим пользователя и открываем диалог
+    const user = users.find(u => u.id === userId)
+    if (user) {
+      setSelectedUserForTasks(user)
+      setSendTasksDialogOpen(true)
     }
+  }
+
+  const handleSendTasksSuccess = () => {
+    loadUsers()
   }
 
   const handleAssignAdministrator = async (userId, administratorId) => {
@@ -208,6 +215,17 @@ export default function UsersPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Send Tasks Dialog */}
+      <SendTasksDialog
+        open={sendTasksDialogOpen}
+        onClose={() => {
+          setSendTasksDialogOpen(false)
+          setSelectedUserForTasks(null)
+        }}
+        user={selectedUserForTasks}
+        onSuccess={handleSendTasksSuccess}
+      />
     </Box>
   )
 }

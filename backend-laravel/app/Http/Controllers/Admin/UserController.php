@@ -4,9 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\UserTaskSendingConfig;
+use App\Models\Task;
+use App\Models\Test;
+use App\Models\TestResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class UserController extends Controller
 {
@@ -366,12 +371,13 @@ class UserController extends Controller
     public function sendTasks(Request $request, $id)
     {
         $user = User::withTrashed()->find($id);
+        $currentUser = $request->user();
         
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        if ($user->domain_id !== $request->user()->domain_id) {
+        if ($user->domain_id !== $currentUser->domain_id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -380,34 +386,63 @@ class UserController extends Controller
             return response()->json(['message' => 'User is not a moderator'], 400);
         }
 
-        // Если модератор еще не начал работу, автоматически устанавливаем сегодняшнюю дату
-        if (!$user->work_start_date) {
-            $user->update(['work_start_date' => now()->toDateString()]);
+        // Проверяем, прошел ли модератор все тесты
+        $testsCheck = $this->checkUserTestsStatus($user, $currentUser->domain_id);
+        if (!$testsCheck['all_passed']) {
+            return response()->json([
+                'message' => 'Moderator has not passed all tests',
+                'tests_not_passed' => true,
+                'tests_status' => $testsCheck,
+            ], 400);
         }
+
+        // Валидация данных формы
+        $validated = $request->validate([
+            'days_config' => 'required|array',
+            'days_config.*.send_date' => 'required|date',
+            'days_config.*.start_time' => 'required|string',
+            'days_config.*.end_time' => 'required|string',
+            'days_config.*.timezone' => 'required|string',
+            'days_config.*.selected_tasks' => 'required|array',
+        ]);
+
+        // Если модератор еще не начал работу, устанавливаем дату первого дня
+        $firstDayConfig = reset($validated['days_config']);
+        if (!$user->work_start_date && $firstDayConfig) {
+            $user->update(['work_start_date' => $firstDayConfig['send_date']]);
+        }
+
+        // Сохраняем/обновляем конфигурацию
+        $config = UserTaskSendingConfig::updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'admin_id' => $currentUser->id,
+            ],
+            [
+                'days_config' => $validated['days_config'],
+                'is_active' => true,
+                'started_at' => now(),
+            ]
+        );
 
         try {
             $taskService = new \App\Services\TaskService();
-            $currentWorkDay = $user->getCurrentWorkDay();
-            
-            if (!$currentWorkDay) {
-                return response()->json(['message' => 'Unable to determine current work day'], 400);
-            }
-
-            // Планируем таски для текущего дня и следующего дня
             $scheduledTasks = [];
-            
-            // Таски на сегодняшний день
-            $todayTasks = $taskService->scheduleTasksForModerator($user, $currentWorkDay);
-            $scheduledTasks = array_merge($scheduledTasks, $todayTasks);
-            
-            // Таски на следующий день
-            $nextDayTasks = $taskService->scheduleTasksForModerator($user, $currentWorkDay + 1);
-            $scheduledTasks = array_merge($scheduledTasks, $nextDayTasks);
+
+            // Планируем таски для каждого дня из конфигурации
+            foreach ($validated['days_config'] as $workDay => $dayConfig) {
+                $dayTasks = $taskService->scheduleTasksForModeratorWithConfig(
+                    $user, 
+                    (int) $workDay, 
+                    $dayConfig
+                );
+                $scheduledTasks = array_merge($scheduledTasks, $dayTasks);
+            }
 
             return response()->json([
                 'message' => 'Tasks scheduled successfully',
                 'scheduled_count' => count($scheduledTasks),
-                'work_day' => $currentWorkDay,
+                'config_id' => $config->id,
             ]);
         } catch (\Exception $e) {
             \Log::error('Error scheduling tasks: ' . $e->getMessage());
@@ -415,6 +450,184 @@ class UserController extends Controller
                 'message' => 'Error scheduling tasks: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Получить конфигурацию отправки тасков для пользователя
+     */
+    public function getTaskSendingConfig(Request $request, $id)
+    {
+        $user = User::withTrashed()->find($id);
+        $currentUser = $request->user();
+        
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        if ($user->domain_id !== $currentUser->domain_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // Получаем существующую конфигурацию или возвращаем дефолтную
+        $config = UserTaskSendingConfig::where('user_id', $user->id)
+            ->where('admin_id', $currentUser->id)
+            ->first();
+
+        // Получаем все таски по дням из шаблонов
+        $tasksByDay = $this->getTasksByWorkDay($currentUser->domain_id);
+
+        // Проверка статуса тестов
+        $testsStatus = $this->checkUserTestsStatus($user, $currentUser->domain_id);
+
+        if ($config) {
+            return response()->json([
+                'config' => $config,
+                'tasks_by_day' => $tasksByDay,
+                'tests_status' => $testsStatus,
+                'has_existing_config' => true,
+            ]);
+        }
+
+        // Возвращаем дефолтную конфигурацию
+        $defaultConfig = $this->generateDefaultConfig($tasksByDay);
+
+        return response()->json([
+            'config' => [
+                'days_config' => $defaultConfig,
+                'is_active' => false,
+            ],
+            'tasks_by_day' => $tasksByDay,
+            'tests_status' => $testsStatus,
+            'has_existing_config' => false,
+        ]);
+    }
+
+    /**
+     * Проверить статус прохождения тестов пользователем
+     */
+    public function checkTestsStatus(Request $request, $id)
+    {
+        $user = User::withTrashed()->find($id);
+        $currentUser = $request->user();
+        
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        if ($user->domain_id !== $currentUser->domain_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $testsStatus = $this->checkUserTestsStatus($user, $currentUser->domain_id);
+
+        return response()->json($testsStatus);
+    }
+
+    /**
+     * Проверить статус тестов пользователя
+     */
+    private function checkUserTestsStatus(User $user, int $domainId): array
+    {
+        // Получаем все активные тесты домена
+        $allTests = Test::where('domain_id', $domainId)
+            ->where('is_active', true)
+            ->with('level')
+            ->orderBy('order')
+            ->get();
+
+        // Получаем результаты тестов пользователя
+        $passedTests = TestResult::where('user_id', $user->id)
+            ->where('is_passed', true)
+            ->pluck('test_id')
+            ->toArray();
+
+        $testsDetails = [];
+        $allPassed = true;
+        $passedCount = 0;
+        $totalCount = $allTests->count();
+
+        foreach ($allTests as $test) {
+            $isPassed = in_array($test->id, $passedTests);
+            if ($isPassed) {
+                $passedCount++;
+            } else {
+                $allPassed = false;
+            }
+            
+            $testsDetails[] = [
+                'id' => $test->id,
+                'title' => $test->title,
+                'level' => $test->level ? $test->level->name : null,
+                'is_passed' => $isPassed,
+            ];
+        }
+
+        return [
+            'all_passed' => $allPassed,
+            'passed_count' => $passedCount,
+            'total_count' => $totalCount,
+            'tests' => $testsDetails,
+        ];
+    }
+
+    /**
+     * Получить таски по дням работы из шаблонов
+     */
+    private function getTasksByWorkDay(int $domainId): array
+    {
+        $templates = \App\Models\TaskTemplate::where('domain_id', $domainId)
+            ->where('is_active', true)
+            ->orderBy('work_day')
+            ->orderBy('created_at')
+            ->get();
+
+        $tasksByDay = [];
+
+        foreach ($templates as $template) {
+            $workDay = $template->work_day ?? 1;
+            
+            if (!isset($tasksByDay[$workDay])) {
+                $tasksByDay[$workDay] = [];
+            }
+
+            $tasksByDay[$workDay][] = [
+                'id' => $template->id,
+                'title' => $template->title,
+                'description' => $template->description,
+                'price' => $template->price,
+                'completion_hours' => $template->completion_hours,
+                'work_day' => $workDay,
+            ];
+        }
+
+        // Сортируем по дням
+        ksort($tasksByDay);
+
+        return $tasksByDay;
+    }
+
+    /**
+     * Сгенерировать дефолтную конфигурацию
+     */
+    private function generateDefaultConfig(array $tasksByDay): array
+    {
+        $config = [];
+        $tomorrow = Carbon::tomorrow('America/New_York');
+
+        foreach ($tasksByDay as $workDay => $tasks) {
+            // Дата отправки: завтра + (день работы - 1)
+            $sendDate = $tomorrow->copy()->addDays($workDay - 1);
+
+            $config[$workDay] = [
+                'send_date' => $sendDate->format('Y-m-d'),
+                'start_time' => '07:00',
+                'end_time' => '17:00',
+                'timezone' => 'America/New_York',
+                'selected_tasks' => array_column($tasks, 'id'), // Все таски выбраны по умолчанию
+            ];
+        }
+
+        return $config;
     }
 
     /**
