@@ -404,7 +404,11 @@ class UserController extends Controller
             'days_config.*.end_time' => 'required|string',
             'days_config.*.timezone' => 'required|string',
             'days_config.*.selected_tasks' => 'required|array',
+            'tasks_source' => 'nullable|string|in:template,task',
         ]);
+
+        // Определяем источник тасков
+        $tasksSource = $validated['tasks_source'] ?? 'template';
 
         // Если модератор еще не начал работу, устанавливаем дату первого дня
         $firstDayConfig = reset($validated['days_config']);
@@ -434,7 +438,8 @@ class UserController extends Controller
                 $dayTasks = $taskService->scheduleTasksForModeratorWithConfig(
                     $user, 
                     (int) $workDay, 
-                    $dayConfig
+                    $dayConfig,
+                    $tasksSource
                 );
                 $scheduledTasks = array_merge($scheduledTasks, $dayTasks);
             }
@@ -473,8 +478,10 @@ class UserController extends Controller
             ->where('admin_id', $currentUser->id)
             ->first();
 
-        // Получаем все таски по дням из шаблонов
-        $tasksByDay = $this->getTasksByWorkDay($currentUser->domain_id);
+        // Получаем все таски по дням
+        $tasksData = $this->getTasksByWorkDay($currentUser->domain_id);
+        $tasksByDay = $tasksData['tasks'];
+        $source = $tasksData['source'];
 
         // Проверка статуса тестов
         $testsStatus = $this->checkUserTestsStatus($user, $currentUser->domain_id);
@@ -483,6 +490,7 @@ class UserController extends Controller
             return response()->json([
                 'config' => $config,
                 'tasks_by_day' => $tasksByDay,
+                'tasks_source' => $source,
                 'tests_status' => $testsStatus,
                 'has_existing_config' => true,
             ]);
@@ -497,6 +505,7 @@ class UserController extends Controller
                 'is_active' => false,
             ],
             'tasks_by_day' => $tasksByDay,
+            'tasks_source' => $source,
             'tests_status' => $testsStatus,
             'has_existing_config' => false,
         ]);
@@ -571,10 +580,12 @@ class UserController extends Controller
     }
 
     /**
-     * Получить таски по дням работы из шаблонов
+     * Получить таски по дням работы
+     * Сначала ищем в task_templates, если там пусто — берём из tasks
      */
     private function getTasksByWorkDay(int $domainId): array
     {
+        // Сначала пробуем получить из шаблонов
         $templates = \App\Models\TaskTemplate::where('domain_id', $domainId)
             ->where('is_active', true)
             ->orderBy('work_day')
@@ -582,28 +593,61 @@ class UserController extends Controller
             ->get();
 
         $tasksByDay = [];
+        $source = 'template';
 
-        foreach ($templates as $template) {
-            $workDay = $template->work_day ?? 1;
-            
-            if (!isset($tasksByDay[$workDay])) {
-                $tasksByDay[$workDay] = [];
+        if ($templates->count() > 0) {
+            // Используем шаблоны
+            foreach ($templates as $template) {
+                $workDay = $template->work_day ?? 1;
+                
+                if (!isset($tasksByDay[$workDay])) {
+                    $tasksByDay[$workDay] = [];
+                }
+
+                $tasksByDay[$workDay][] = [
+                    'id' => $template->id,
+                    'title' => $template->title,
+                    'description' => $template->description,
+                    'price' => $template->price,
+                    'completion_hours' => $template->completion_hours,
+                    'work_day' => $workDay,
+                ];
             }
+        } else {
+            // Если шаблонов нет, берём из тасков (неназначенные)
+            $source = 'task';
+            $tasks = Task::where('domain_id', $domainId)
+                ->whereNull('assigned_to') // только неназначенные
+                ->whereNotNull('work_day')
+                ->orderBy('work_day')
+                ->orderBy('created_at')
+                ->get();
 
-            $tasksByDay[$workDay][] = [
-                'id' => $template->id,
-                'title' => $template->title,
-                'description' => $template->description,
-                'price' => $template->price,
-                'completion_hours' => $template->completion_hours,
-                'work_day' => $workDay,
-            ];
+            foreach ($tasks as $task) {
+                $workDay = $task->work_day ?? 1;
+                
+                if (!isset($tasksByDay[$workDay])) {
+                    $tasksByDay[$workDay] = [];
+                }
+
+                $tasksByDay[$workDay][] = [
+                    'id' => $task->id,
+                    'title' => $task->title,
+                    'description' => $task->description,
+                    'price' => $task->price,
+                    'completion_hours' => $task->completion_hours,
+                    'work_day' => $workDay,
+                ];
+            }
         }
 
         // Сортируем по дням
         ksort($tasksByDay);
 
-        return $tasksByDay;
+        return [
+            'tasks' => $tasksByDay,
+            'source' => $source,
+        ];
     }
 
     /**

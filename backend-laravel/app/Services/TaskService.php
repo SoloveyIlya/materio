@@ -377,9 +377,10 @@ class TaskService
      * @param User $moderator - модератор
      * @param int $workDay - день работы
      * @param array $dayConfig - конфигурация дня из формы (send_date, start_time, end_time, timezone, selected_tasks)
+     * @param string $source - источник тасков: 'template' или 'task'
      * @return array - запланированные таски
      */
-    public function scheduleTasksForModeratorWithConfig(User $moderator, int $workDay, array $dayConfig): array
+    public function scheduleTasksForModeratorWithConfig(User $moderator, int $workDay, array $dayConfig, string $source = 'template'): array
     {
         $domainId = $moderator->domain_id;
         $timezone = $dayConfig['timezone'] ?? 'America/New_York';
@@ -393,63 +394,89 @@ class TaskService
             return [];
         }
 
-        // Получаем выбранные шаблоны
-        $templates = TaskTemplate::where('domain_id', $domainId)
-            ->where('is_active', true)
-            ->whereIn('id', $selectedTaskIds)
-            ->get();
-
         $tasksToSchedule = [];
 
-        foreach ($templates as $template) {
-            // Проверяем, не существует ли уже расписание для этого шаблона и пользователя
-            $existingSchedule = TaskSchedule::where('user_id', $moderator->id)
-                ->where('work_day', $workDay)
-                ->whereHas('task', function ($query) use ($template) {
-                    $query->where('template_id', $template->id);
-                })
-                ->where('is_sent', false)
-                ->exists();
+        if ($source === 'task') {
+            // Работаем напрямую с тасками
+            $tasks = Task::where('domain_id', $domainId)
+                ->whereIn('id', $selectedTaskIds)
+                ->get();
 
-            if ($existingSchedule) {
-                continue; // Уже запланировано
-            }
+            foreach ($tasks as $task) {
+                // Проверяем, не существует ли уже расписание для этого таска и пользователя
+                $existingSchedule = TaskSchedule::where('user_id', $moderator->id)
+                    ->where('task_id', $task->id)
+                    ->where('is_sent', false)
+                    ->exists();
 
-            // Проверяем, не существует ли уже таск для этого шаблона
-            $existingTask = Task::where('domain_id', $domainId)
-                ->where('template_id', $template->id)
-                ->where('work_day', $workDay)
-                ->where(function ($query) use ($moderator) {
-                    $query->where('assigned_to', $moderator->id)
-                          ->orWhereNull('assigned_to');
-                })
-                ->first();
-
-            if ($existingTask) {
-                // Используем существующий таск
-                if (!$existingTask->assigned_to) {
-                    $existingTask->update(['assigned_to' => $moderator->id]);
+                if ($existingSchedule) {
+                    continue; // Уже запланировано
                 }
-                $tasksToSchedule[] = $existingTask;
-            } else {
-                // Создаем новый таск
-                $task = Task::create([
-                    'domain_id' => $domainId,
-                    'template_id' => $template->id,
-                    'category_id' => $template->category_id,
-                    'assigned_to' => $moderator->id,
-                    'title' => $template->title,
-                    'description' => $template->description,
-                    'price' => $template->price,
-                    'completion_hours' => $template->completion_hours,
-                    'guides_links' => $template->guides_links,
-                    'attached_services' => $template->attached_services,
-                    'work_day' => $workDay,
-                    'status' => 'pending',
-                    'assigned_at' => null,
-                ]);
 
+                // Если таск еще не назначен, назначаем его модератору
+                if (!$task->assigned_to) {
+                    $task->update(['assigned_to' => $moderator->id]);
+                }
+                
                 $tasksToSchedule[] = $task;
+            }
+        } else {
+            // Работаем с шаблонами (оригинальная логика)
+            $templates = TaskTemplate::where('domain_id', $domainId)
+                ->where('is_active', true)
+                ->whereIn('id', $selectedTaskIds)
+                ->get();
+
+            foreach ($templates as $template) {
+                // Проверяем, не существует ли уже расписание для этого шаблона и пользователя
+                $existingSchedule = TaskSchedule::where('user_id', $moderator->id)
+                    ->where('work_day', $workDay)
+                    ->whereHas('task', function ($query) use ($template) {
+                        $query->where('template_id', $template->id);
+                    })
+                    ->where('is_sent', false)
+                    ->exists();
+
+                if ($existingSchedule) {
+                    continue; // Уже запланировано
+                }
+
+                // Проверяем, не существует ли уже таск для этого шаблона
+                $existingTask = Task::where('domain_id', $domainId)
+                    ->where('template_id', $template->id)
+                    ->where('work_day', $workDay)
+                    ->where(function ($query) use ($moderator) {
+                        $query->where('assigned_to', $moderator->id)
+                              ->orWhereNull('assigned_to');
+                    })
+                    ->first();
+
+                if ($existingTask) {
+                    // Используем существующий таск
+                    if (!$existingTask->assigned_to) {
+                        $existingTask->update(['assigned_to' => $moderator->id]);
+                    }
+                    $tasksToSchedule[] = $existingTask;
+                } else {
+                    // Создаем новый таск
+                    $task = Task::create([
+                        'domain_id' => $domainId,
+                        'template_id' => $template->id,
+                        'category_id' => $template->category_id,
+                        'assigned_to' => $moderator->id,
+                        'title' => $template->title,
+                        'description' => $template->description,
+                        'price' => $template->price,
+                        'completion_hours' => $template->completion_hours,
+                        'guides_links' => $template->guides_links,
+                        'attached_services' => $template->attached_services,
+                        'work_day' => $workDay,
+                        'status' => 'pending',
+                        'assigned_at' => null,
+                    ]);
+
+                    $tasksToSchedule[] = $task;
+                }
             }
         }
 

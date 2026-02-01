@@ -86,6 +86,7 @@ const SendTasksDialog = ({ open, onClose, user, onSuccess }) => {
   const [saving, setSaving] = useState(false)
   const [testsStatus, setTestsStatus] = useState(null)
   const [tasksByDay, setTasksByDay] = useState({})
+  const [tasksSource, setTasksSource] = useState('template')
   const [daysConfig, setDaysConfig] = useState({})
   const [hasExistingConfig, setHasExistingConfig] = useState(false)
   const [expandedDay, setExpandedDay] = useState(null)
@@ -104,6 +105,7 @@ const SendTasksDialog = ({ open, onClose, user, onSuccess }) => {
       
       setTestsStatus(response.data.tests_status)
       setTasksByDay(response.data.tasks_by_day || {})
+      setTasksSource(response.data.tasks_source || 'template')
       setHasExistingConfig(response.data.has_existing_config)
       
       // Устанавливаем конфигурацию
@@ -183,7 +185,8 @@ const SendTasksDialog = ({ open, onClose, user, onSuccess }) => {
       })
 
       await api.post(`/admin/users/${user.id}/send-tasks`, {
-        days_config: configToSend
+        days_config: configToSend,
+        tasks_source: tasksSource
       })
 
       showToast.success('Tasks scheduled successfully')
